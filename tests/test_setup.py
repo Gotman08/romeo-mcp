@@ -161,6 +161,7 @@ print("allocation guards passed")
         self.assertTrue(check_privacy.inspect_text("commit", remote, metadata=True))
         address = b"student" + b"@github.com"
         self.assertTrue(check_privacy.inspect_text("source.py", address))
+        self.assertFalse(check_privacy.inspect_text("commit", b"GitHub <noreply@github.com>", metadata=True))
 
 
 if __name__ == "__main__":
