@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="340" viewBox="0 0 1100 340" role="img" aria-labelledby="title desc">
+  <title id="title">ROMEO MCP : du dialogue au calcul</title>
+  <desc id="desc">Sur votre poste, le client IA communique en stdio avec le MCP et sa documentation locale. Le MCP utilise SSH vers le nœud de login ROMEO, puis Slurm alloue les nœuds CPU ou GPU. Les résultats reviennent au client.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8" fill="none" stroke="#9ab6c9" stroke-width="1.5"/></marker></defs>
+  <rect width="1100" height="340" rx="18" fill="#101e2c"/>
+  <g font-family="Segoe UI,Arial,sans-serif">
+    <text x="36" y="43" fill="#d4a95e" font-size="14" letter-spacing="2">ROMEO MCP</text>
+    <text x="36" y="77" fill="#edf5fc" font-size="27" font-weight="600">Du dialogue au calcul scientifique</text>
+    <rect x="30" y="102" width="482" height="166" rx="12" fill="#1b3042"/>
+    <rect x="568" y="102" width="502" height="166" rx="12" fill="#17373c"/>
+    <text x="48" y="128" fill="#98b6ca" font-size="12" letter-spacing="1.5">VOTRE POSTE</text>
+    <text x="586" y="128" fill="#97c8c6" font-size="12" letter-spacing="1.5">ROMEO · URCA</text>
+    <g fill="#f1f6fa" font-size="18" font-weight="600">
+      <text x="57" y="180">Client IA</text><text x="299" y="180">MCP local</text>
+      <text x="604" y="180">Login</text><text x="873" y="180">Calcul CPU / GPU</text>
+    </g>
+    <g fill="#b7cbd8" font-size="13">
+      <text x="57" y="207">Questions et décisions</text><text x="299" y="207">Outils + documentation</text>
+      <text x="604" y="207">Accès SSH</text><text x="873" y="207">Nœuds alloués</text>
+      <text x="224" y="155">stdio</text><text x="523" y="155">SSH</text><text x="763" y="155">Slurm</text>
+    </g>
+    <g stroke="#9ab6c9" stroke-width="2" fill="none" marker-end="url(#arrow)">
+      <path d="M208 177 H280"/><path d="M456 177 H581"/><path d="M699 177 H851"/>
+    </g>
+    <path d="M954 226 V246 H104 V226" stroke="#6c919f" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+    <text x="345" y="307" fill="#cbdce6" font-size="14">État des jobs · extraits des journaux · résultats</text>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+name: Verifications
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Installer
+        run: python -m pip install -e ".[docs]" build
+      - name: Verifier les fichiers et l'historique
+        run: python tools/check_privacy.py --history
+      - name: Tester sans cluster
+        run: python tests/run_all.py
+      - name: Construire les distributions
+        run: python -m build

@@ -1,0 +1,52 @@
+# Environnement virtuel
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Registre local des jobs
+*.db
+.romeo-mcp/
+.romeo-provenance/
+
+# La documentation officielle dans romeo_mcp/documentation est versionnee.
+
+# Divers
+.DS_Store
+*.bak
+.romeo_doc_scraper.py.bak
+
+# Configuration, acces et donnees propres au poste
+.env
+.env.*
+!.env.example
+!.env.template
+.ssh/
+.codex/
+.claude/
+.mcp.json
+*.local.json
+credentials.json
+id_rsa*
+id_ed25519*
+id_ecdsa*
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite*
+*.db-*
+*.log
+*.bundle
+*.patch
+*.zip
+*.tar.gz
+.pytest_cache/
+.coverage
+htmlcov/
+.codegraph/

@@ -1,0 +1,14 @@
+# Fins de ligne normalisees en LF dans le depot, quelle que soit la plateforme
+# de travail. Sans cette regle, une simple ecriture depuis Windows convertit un
+# fichier entier en CRLF et son diff devient illisible.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+romeo_mcp/documentation/images/** binary
+# Les guides de navigation restent des fichiers texte dans le dossier d'images.
+romeo_mcp/documentation/images/*.md -binary text diff merge
