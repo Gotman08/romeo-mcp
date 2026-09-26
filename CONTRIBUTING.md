@@ -50,9 +50,15 @@ pas la relecture et ne garantissent pas l’absence de toute donnée sensible.
 
 ## Périmètre d’une contribution
 
-Chaque dossier versionné possède un README avec son rôle, un inventaire utile
-et des liens vers sa section parente. Mettre cette navigation à jour lorsqu’un
-dossier ou un parcours change, en partant de l’[index documentaire](docs/README.md).
+Chaque section possède un guide avec son rôle, un inventaire utile et des liens
+vers sa section parente. Utiliser un README dans les dossiers du projet, sauf
+dans `.github/`, où le guide se nomme [CONFIGURATION.md](.github/CONFIGURATION.md) :
+GitHub afficherait un `.github/README.md` à la place du README principal sur
+l’accueil du dépôt. Conserver la présentation et la bannière du README principal ;
+placer les détails propres à chaque section dans son guide.
+
+Mettre la navigation à jour lorsqu’un dossier ou un parcours change, en partant
+de l’[index documentaire](docs/README.md).
 Les guides du projet restent identifiés séparément des pages officielles ROMEO.
 
 Décrivez le problème, la modification et les vérifications effectuées. Une

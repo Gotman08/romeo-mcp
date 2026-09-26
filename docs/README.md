@@ -47,7 +47,7 @@ Les extraits de recherche conduisent aux sections complètes via `read_doc`.
 | [Code Python](../romeo_mcp/README.md) | Responsabilités des modules et trajet d’un appel |
 | [Utilitaires](../tools/README.md) | Installation des clients, contrôle de confidentialité et entretien du corpus |
 | [Tests](../tests/README.md) | Suites hors ligne et essais sur ROMEO |
-| [GitHub](../.github/README.md) | Vérifications automatiques du dépôt |
+| [GitHub](../.github/CONFIGURATION.md) | Vérifications automatiques du dépôt |
 | [Hooks Git](../.githooks/README.md) | Contrôles locaux avant commit et push |
 
 Pour signaler une vulnérabilité, suivre [SECURITY.md](../SECURITY.md).

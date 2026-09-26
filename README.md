@@ -6,7 +6,7 @@
 
 Un serveur MCP local pour préparer, soumettre, suivre et comprendre vos calculs Slurm.
 
-[Prise en main](#prise-en-main) · [Documentation du MCP](docs/README.md) · [Fonctionnement](#comment-ça-fonctionne) · [Documentation ROMEO](romeo_mcp/documentation/README.md)
+[Prise en main](#prise-en-main) · [Fonctionnement](#comment-ça-fonctionne) · [Référence](docs/reference.md) · [Documentation ROMEO](romeo_mcp/documentation/SOMMAIRE.md)
 
 [![Vérifications](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml)
 ![Python 3.11 et plus](https://img.shields.io/badge/Python-3.11%2B-3776AB)
@@ -37,22 +37,6 @@ Décrivez votre besoin à votre assistant IA. Le MCP lui fournit les outils pour
 | Reprendre une conversation | Registre local des jobs soumis par le MCP |
 | Commencer avec peu d’outils | Profil essentiel, avec accès au catalogue complet à la demande |
 | Conserver les preuves d’un calcul | Fiche JSON et Markdown : script filtré, code, environnement, ressources et empreintes |
-
-## Naviguer dans le projet
-
-Chaque dossier versionné possède un README pour expliquer son rôle, ses fichiers
-et les lectures utiles. Les liens de navigation permettent de revenir au
-contexte de la section depuis GitHub ou un lecteur Markdown local.
-
-| Section | Pour quoi faire ? |
-|---|---|
-| [Documentation du MCP](docs/README.md) | Choisir un parcours : installation, calcul, diagnostic ou reproductibilité |
-| [Documentation officielle ROMEO](romeo_mcp/documentation/README.md) | Lire les procédures du centre et leurs sources, par ressource ou service |
-| [Code Python](romeo_mcp/README.md) | Comprendre les modules et le trajet d’un appel MCP |
-| [Utilitaires](tools/README.md) | Installer un client, contrôler la confidentialité ou renouveler le corpus |
-| [Tests](tests/README.md) | Identifier les vérifications hors ligne et les essais sur ROMEO |
-| [GitHub et CI](.github/README.md) | Lire les vérifications automatiques Windows/Linux |
-| [Hooks Git](.githooks/README.md) | Activer les contrôles locaux avant commit et push |
 
 ## Comment ça fonctionne
 

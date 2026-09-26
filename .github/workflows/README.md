@@ -1,6 +1,6 @@
 # Vérifications automatiques
 
-[Accueil](../../README.md) › [GitHub](../README.md) › Workflows
+[Accueil](../../README.md) › [GitHub](../CONFIGURATION.md) › Workflows
 
 [ci.yml](ci.yml) définit le workflow `Verifications`. Il démarre lors d’un
 push, d’une pull request ou d’un lancement manuel via GitHub Actions.
