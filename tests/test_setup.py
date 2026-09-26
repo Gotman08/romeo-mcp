@@ -155,6 +155,13 @@ print("allocation guards passed")
         self.assertTrue(check_privacy.inspect_text("example.txt", token.encode()))
         self.assertTrue(check_privacy.path_issues(".ssh/id_ed25519"))
 
+    def test_privacy_allows_only_the_public_ssh_transport_identity(self):
+        remote = b"git" + b"@github.com:example/project.git"
+        self.assertFalse(check_privacy.inspect_text("source.py", remote))
+        self.assertTrue(check_privacy.inspect_text("commit", remote, metadata=True))
+        address = b"student" + b"@github.com"
+        self.assertTrue(check_privacy.inspect_text("source.py", address))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -14,7 +14,7 @@ python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
 ```
 
-Sans option, le lanceur exécute huit suites dans des processus séparés et
+Sans option, le lanceur exécute neuf suites dans des processus séparés et
 affiche un bilan. Il retourne un code non nul si une suite échoue. Les suites
 hors ligne utilisent une configuration fictive et ne nécessitent pas d’accès
 SSH au calculateur.
@@ -30,11 +30,17 @@ SSH au calculateur.
 | `docs` | [test_docs.py](test_docs.py) | Recherche, sections, pagination, portabilité et protocole documentaire |
 | `setup` | [test_setup.py](test_setup.py) | Configuration personnelle, installation et confidentialité |
 | `accompagnement` | [test_accompagnement.py](test_accompagnement.py) | Profils d’outils, diagnostic simulé, filtrage et reproductibilité |
+| `updates` | [test_updates.py](test_updates.py) | Intégrité des releases, confirmation, installation isolée réelle sans réseau, stdio et retour arrière avec processus actif |
 | `corpus` | [verify_corpus.py](../tools/verify_corpus.py) | Liens, images, accessibilité et empreintes de la documentation |
 
 Les appuis partagés se trouvent dans [commun.py](commun.py) et
 [offline.py](offline.py). La liste de référence des suites est dans
 [run_all.py](run_all.py).
+
+La suite `updates` construit une wheel de test et l’installe dans un venv
+temporaire avec `pip --no-index --no-deps`. Elle vérifie les erreurs avant
+activation et le lancement de la version choisie. Les requêtes GitHub sont
+simulées ; la notification réseau au démarrage est désactivée dans les suites.
 
 ## Essais sur ROMEO
 
