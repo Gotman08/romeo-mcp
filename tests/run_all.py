@@ -42,6 +42,8 @@ SUITES = [
      "configuration privee, allocation explicite et confidentialite", False),
     ("accompagnement", "tests/test_accompagnement.py",
      "profils MCP, diagnostic distant simule et reproductibilite privee", False),
+    ("updates", "tests/test_updates.py",
+     "releases, confirmation, activation, retour et isolation des mises a jour", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.
@@ -64,7 +66,7 @@ SUITES = [
 def executer(chemin: str, live: bool = False) -> tuple[int, float]:
     """Execute une suite et rend son code de sortie et sa duree."""
     debut = time.monotonic()
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "ROMEO_UPDATE_CHECK": "0"}
     if not live:
         env.update(ROMEO_ACCOUNT="test-project", ROMEO_HOST="invalid-offline-host", ROMEO_QOS="normal",
                    ROMEO_TOOL_PROFILE="full")

@@ -16,6 +16,7 @@ et leur date de collecte.
 | Présenter moins d’outils à l’IA | [Profils d’outils](configuration.md#profils-doutils) | [Catalogue complet](reference.md#outils-exposés) |
 | Comprendre un refus ou un échec | [Diagnostic des accès](configuration.md#diagnostic-en-lecture-seule) | [Diagnostic des jobs](reference.md#diagnostic-des-échecs) |
 | Conserver les conditions d’une expérience | [Fiches de reproductibilité](reproducibility.md) | [Mesures et limites](reproducibility.md#ce-qui-est-réellement-mesuré) |
+| Installer une nouvelle version | [Mises à jour GitHub](updates.md) | [Historique des versions](../CHANGELOG.md) |
 | Vérifier une procédure ROMEO | [Sommaire officiel embarqué](../romeo_mcp/documentation/SOMMAIRE.md) | [Recherche et lecture par sections](reference.md#recherche-et-contexte-pour-le-modèle) |
 | Contribuer au projet | [Architecture du code](../romeo_mcp/README.md) | [Tests](../tests/README.md) et [contribution](../CONTRIBUTING.md) |
 
@@ -28,6 +29,7 @@ et leur date de collecte.
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
+- [Mises à jour](updates.md) : versions stables, confirmation, activation et retour arrière.
 
 ## Lire un résultat dans son contexte
 

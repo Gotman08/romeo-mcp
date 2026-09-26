@@ -13,7 +13,13 @@ from .config import config_path, save, setting
 
 
 def main() -> None:
+    from . import updates
+    try:
+        updates.dispatch()
+    except (ValueError, OSError) as exc:
+        raise SystemExit(f"Mise a jour : {exc}") from exc
     if len(sys.argv) == 1:
+        updates.start_notice()
         from .server import main as serve
         serve()
         return
@@ -37,9 +43,19 @@ def main() -> None:
     export.add_argument("--code-dir", default="")
     export.add_argument("--data-file", action="append", default=[])
     export.add_argument("--offline", action="store_true")
+    update = sub.add_parser("update", help="verifier, installer ou annuler une mise a jour GitHub")
+    operation = update.add_mutually_exclusive_group()
+    operation.add_argument("--check", action="store_true", help="consulter la derniere release sans installer")
+    operation.add_argument("--rollback", action="store_true", help="reactiver l'environnement precedent")
+    update.add_argument("--yes", action="store_true", help="confirmation explicite sans dialogue interactif")
+    update.add_argument("--json", action="store_true", help="reponse structuree pour --check uniquement")
     args = parser.parse_args()
     try:
-        if args.action == "configure":
+        if args.action == "update":
+            if args.json and not args.check:
+                parser.error("--json s'utilise avec update --check")
+            updates.command(check_only=args.check, revert=args.rollback, yes=args.yes, json_output=args.json)
+        elif args.action == "configure":
             values = {key: value for key, value in (
                 ("ROMEO_ACCOUNT", args.account), ("ROMEO_HOST", args.host),
                 ("ROMEO_QOS", args.qos), ("ROMEO_TOOL_PROFILE", args.profile)) if value is not None}
@@ -51,6 +67,7 @@ def main() -> None:
         elif args.action == "serve":
             if args.profile:
                 os.environ["ROMEO_TOOL_PROFILE"] = args.profile
+            updates.start_notice()
             from .server import main as serve
             serve()
         elif args.action == "export-job":

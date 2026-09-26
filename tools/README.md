@@ -13,6 +13,7 @@ soumettre un calcul, utiliser les [outils MCP](../docs/reference.md).
 | [install_mcp.py](install_mcp.py) | Enregistrer le serveur dans un client IA | Peut modifier les fichiers personnels du client, avec sauvegarde préalable |
 | [check_privacy.py](check_privacy.py) | Vérifier les contenus qui seront publiés | Lit l’index Git et, sur demande, l’historique ; affiche les emplacements signalés |
 | [verify_corpus.py](verify_corpus.py) | Contrôler la copie documentaire | Lit les liens, images, accès depuis le sommaire et empreintes du manifeste |
+| [prepare_release.py](prepare_release.py) | Préparer une release stable | Vérifie le tag et les distributions puis écrit les empreintes et notes dans `dist/` |
 | [romeo_doc_scraper.py](romeo_doc_scraper.py) | Renouveler la copie du site ROMEO | Accède au site officiel et écrit dans le dossier de sortie choisi |
 
 ## Enregistrer le MCP dans un client
@@ -51,6 +52,9 @@ Les [hooks locaux](../.githooks/README.md) et la
 [CI GitHub](../.github/workflows/README.md) utilisent ces mêmes vérifications.
 
 ## Renouveler la documentation ROMEO
+
+Pour publier une nouvelle version du code et du corpus, suivre le
+[parcours de release](../docs/updates.md#publier-une-nouvelle-version).
 
 Installer les dépendances facultatives avec `python -m pip install -e ".[docs]"`,
 puis choisir un dossier temporaire extérieur au dépôt :

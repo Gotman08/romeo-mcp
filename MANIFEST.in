@@ -1,4 +1,4 @@
-include README.md LICENSE THIRD_PARTY_NOTICES.md CONTRIBUTING.md SECURITY.md
+include README.md LICENSE THIRD_PARTY_NOTICES.md CONTRIBUTING.md SECURITY.md CHANGELOG.md
 include romeo_mcp/README.md
 recursive-include docs *.md *.svg *.png
 recursive-include tools *.py *.md

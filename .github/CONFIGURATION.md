@@ -22,6 +22,10 @@ La CI couvre les contrôles hors ligne et la construction du paquet. Les
 [essais sur ROMEO](../tests/README.md#essais-sur-romeo) sont exécutés séparément
 sur un compte autorisé et ne font pas partie de ce workflow.
 
+Les tags de version déclenchent également une publication de release après
+réussite des tests. Le [guide des mises à jour](../docs/updates.md) décrit le
+fonctionnement pour les utilisateurs et les étapes pour les mainteneurs.
+
 ## Contribuer
 
 Avant de pousser, suivre les [vérifications locales](../CONTRIBUTING.md#avant-un-commit).
