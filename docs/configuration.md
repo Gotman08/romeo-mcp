@@ -122,7 +122,54 @@ les échappements JSON. Le paquet doit avoir été installé avec ce Python.
 L’installateur fourni gère les formats des trois clients documentés. Pour
 Codex, il écrit une section `[mcp_servers.romeo]` dans le fichier utilisateur
 `config.toml`. Il ajoute `PYTHONPATH` vers le dépôt pour permettre le démarrage
-depuis n’importe quel répertoire. Il ne change pas vos autorisations d’outils.
+depuis n’importe quel répertoire et conserve les réglages existants de Romeo,
+notamment ses outils désactivés, ses délais et ses règles d’approbation.
+
+## Reprendre automatiquement les préférences du client
+
+À chaque installation ou reconfiguration, `tools/install_mcp.py` lit les choix
+enregistrés dans le client. Pour Codex :
+
+| Choix enregistré | Comportement de l’installateur |
+|---|---|
+| Mode d’approbation explicite pour Romeo | Le conserver, ainsi que les règles propres à chaque outil |
+| `approval_policy = "never"` **et** `sandbox_mode = "danger-full-access"` | Utiliser `default_tools_approval_mode = "approve"` pour Romeo |
+| Autre mode, choix incomplet ou profil inconnu | Utiliser `auto`, le comportement normal du client |
+
+Le profil sélectionné par `profile` dans `config.toml` est pris en compte.
+`never` seul ne donne aucune autorisation supplémentaire : dans un environnement
+restreint, une opération qui aurait besoin d’approbation peut être refusée.
+
+Un commentaire `romeo-mcp: client-approvals=...` identifie le réglage calculé.
+À la prochaine exécution de l’installateur, celui-ci est recalculé, y compris
+si le client est devenu plus restrictif. Un mode modifié manuellement prend
+la priorité. Pour remplacer un ancien choix propre à Romeo par cette reprise
+automatique des préférences :
+
+```sh
+python tools/install_mcp.py --targets codex --follow-client-approvals --dry-run
+python tools/install_mcp.py --targets codex --follow-client-approvals
+```
+
+La simulation indique le mode retenu sans écrire de fichier. L’installation
+sauvegarde le fichier avant modification. Les règles par outil et les listes
+d’outils autorisés ou désactivés sont conservées, même avec cette option.
+
+Claude Code applique directement `permissions.defaultMode` et ses règles
+`allow`, `ask` et `deny`. L’installateur conserve ces préférences ; il n’ajoute
+pas d’autorisation implicite à partir de `dontAsk`, qui refuse les opérations
+non autorisées. Les autorisations de Claude Desktop restent gérées dans ce client.
+
+Cette adaptation intervient **à l’installation ou à la reconfiguration**.
+Le protocole MCP ne transmet pas une politique d’approbation standard au serveur.
+Romeo ne réécrit donc pas la configuration pendant un appel. Les changements
+temporaires de session et les restrictions administratives restent appliqués
+par le client ; après un changement de préférences enregistrées, relancer
+l’installateur, puis recharger la configuration du client.
+
+Références : [configuration Codex](https://developers.openai.com/ja-JP/docs/config-file/config-reference),
+[autorisations Claude Code](https://code.claude.com/docs/en/permissions) et
+[initialisation MCP](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle).
 
 ## Déplacer ou mettre à jour l’installation
 

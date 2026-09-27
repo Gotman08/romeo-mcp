@@ -29,6 +29,14 @@ par des virgules permet d’en choisir plusieurs. `--dry-run` montre les
 changements prévus ; sans cette option, le script enregistre la configuration
 et vérifie le démarrage du serveur. Le relancer met à jour la même entrée.
 
+L’installateur reprend automatiquement les préférences d’approbation de Codex
+et conserve les choix explicites pour Romeo, ses règles par outil et ses outils
+désactivés. `--follow-client-approvals` remplace un ancien choix global propre
+à Romeo par les préférences enregistrées du client. Claude Code applique ses
+propres règles d’autorisation, que l’installateur conserve. Le calcul est refait
+à chaque exécution de l’installateur ; voir les
+[règles de reprise des préférences](../docs/configuration.md#reprendre-automatiquement-les-préférences-du-client).
+
 Le projet Slurm se règle séparément avec `python -m romeo_mcp configure`.
 Les options `--python`, `--name` et les fichiers de configuration explicites
 sont détaillés par `python tools/install_mcp.py --help`.

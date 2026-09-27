@@ -27,6 +27,8 @@ Exemples :
 from __future__ import annotations
 
 import argparse
+import copy
+import datetime
 import json
 import os
 import re
@@ -44,6 +46,7 @@ except ModuleNotFoundError:  # pragma: no cover - dépend de la version
 
 CIBLES = ("claude-code", "claude-desktop", "codex")
 NOM_DEFAUT = "romeo"
+APPROBATION_AUTO = "romeo-mcp: client-approvals="
 
 
 # =============================================================================
@@ -314,22 +317,116 @@ def toml_chaine(valeur: str) -> str:
     antislashs : c'est la forme adaptée à `C:\\Users\\...`. On ne bascule sur
     une chaîne de base que si la valeur contient elle-même une apostrophe.
     """
-    if "'" not in valeur:
+    if "'" not in valeur and not any(ord(c) < 32 or ord(c) == 127 for c in valeur):
         return "'{}'".format(valeur)
     return json.dumps(valeur)
 
 
-def bloc_codex(nom: str, commande: str, arguments: list[str], env: dict) -> str:
-    lignes = [
-        "[mcp_servers.{}]".format(nom),
-        "command = {}".format(toml_chaine(commande)),
-        "args = [{}]".format(", ".join(toml_chaine(a) for a in arguments)),
-        "startup_timeout_sec = 60",
-    ]
+def toml_cle(valeur: str) -> str:
+    return valeur if re.fullmatch(r"[A-Za-z0-9_-]+", valeur) else toml_chaine(valeur)
+
+
+def toml_valeur(valeur) -> str:
+    """Sérialise les types TOML, y compris les listes de tables des clients."""
+    if isinstance(valeur, str):
+        return toml_chaine(valeur)
+    if isinstance(valeur, bool):
+        return "true" if valeur else "false"
+    if isinstance(valeur, (int, float)):
+        return repr(valeur)
+    if isinstance(valeur, (datetime.datetime, datetime.date, datetime.time)):
+        return valeur.isoformat()
+    if isinstance(valeur, list):
+        return "[{}]".format(", ".join(toml_valeur(v) for v in valeur))
+    if isinstance(valeur, dict):
+        return "{ " + ", ".join(
+            "{} = {}".format(toml_cle(k), toml_valeur(v)) for k, v in valeur.items()
+        ) + " }"
+    raise ValueError("Type de configuration TOML non pris en charge")
+
+
+def sections_toml(texte: str) -> list[tuple[tuple[str, ...], str]]:
+    """Repère les tables sans confondre leurs noms avec des chaînes multilignes.
+
+    Les noms entre guillemets et les commentaires sont lus par tomllib. Un
+    préfixe incomplet signale un en-tête apparent situé dans une valeur.
+    """
+    lignes = texte.splitlines(keepends=True)
+    debuts = [((), 0)]
+    for index, ligne in enumerate(lignes):
+        if not ligne.lstrip().startswith("["):
+            continue
+        try:
+            tomllib.loads("".join(lignes[:index]))
+            table = tomllib.loads(ligne + "\n__romeo_install_section__ = true\n")
+        except tomllib.TOMLDecodeError:
+            continue
+        chemin = []
+        while isinstance(table, dict) and "__romeo_install_section__" not in table:
+            cle, table = next(iter(table.items()))
+            chemin.append(cle)
+            if isinstance(table, list):
+                table = table[0]
+        debuts.append((tuple(chemin), index))
+    debuts.append(((), len(lignes)))
+    return [(chemin, "".join(lignes[debut:fin]))
+            for (chemin, debut), (_, fin) in zip(debuts, debuts[1:])]
+
+
+def approbation_codex(config: dict, nom: str, texte: str, suivre: bool = False) -> tuple[str, bool]:
+    """Reprend un choix explicite, sinon déduit le mode du client enregistré.
+
+    `never` seul signifie refuser les demandes, pas autoriser les outils. Seul
+    son emploi avec `danger-full-access` exprime ici l'accès complet sans
+    approbation. Les surcharges de session restent du ressort de Codex.
+    """
+    actuel = config.get("mcp_servers", {}).get(nom, {}).get("default_tools_approval_mode")
+    genere = False
+    for chemin, contenu in sections_toml(texte):
+        if chemin != ("mcp_servers", nom):
+            continue
+        motif = r"(?m)^default_tools_approval_mode = '(auto|approve)' # " + re.escape(APPROBATION_AUTO) + r"\1$"
+        correspondance = re.search(motif, contenu)
+        genere = bool(correspondance and correspondance[1] == actuel)
+    if actuel is not None and not genere and not suivre:
+        return actuel, False
+
+    effectif = config
+    profil = config.get("profile")
+    if profil:
+        choix = config.get("profiles", {}).get(profil)
+        if not isinstance(choix, dict):
+            return "auto", True
+        effectif = {**config, **choix}
+    complet = (effectif.get("approval_policy") == "never"
+               and effectif.get("sandbox_mode") == "danger-full-access")
+    return ("approve" if complet else "auto"), True
+
+
+def bloc_codex(nom: str, commande: str, arguments: list[str], env: dict,
+               existant: dict | None = None, automatique: bool = False) -> str:
+    """Actualise le lancement tout en conservant les réglages propres au MCP."""
+    config = {**(existant or {}), "command": commande, "args": arguments}
+    if not {"startup_timeout_sec", "startup_timeout_ms"}.intersection(config):
+        config["startup_timeout_sec"] = 60
     if env:
-        lignes += ["", "[mcp_servers.{}.env]".format(nom)]
-        lignes += ["{} = {}".format(cle, toml_chaine(val)) for cle, val in env.items()]
-    return "\n".join(lignes) + "\n"
+        config["env"] = {**config.get("env", {}), **env}
+
+    def table(chemin: tuple[str, ...], contenu: dict) -> list[str]:
+        lignes = ["[{}]".format(".".join(toml_cle(c) for c in chemin))]
+        for cle, valeur in contenu.items():
+            if isinstance(valeur, dict):
+                continue
+            ligne = "{} = {}".format(toml_cle(cle), toml_valeur(valeur))
+            if automatique and chemin == ("mcp_servers", nom) and cle == "default_tools_approval_mode":
+                ligne += " # " + APPROBATION_AUTO + valeur
+            lignes.append(ligne)
+        for cle, valeur in contenu.items():
+            if isinstance(valeur, dict):
+                lignes += [""] + table((*chemin, cle), valeur)
+        return lignes
+
+    return "\n".join(table(("mcp_servers", nom), config)) + "\n"
 
 
 def remplacer_section_toml(texte: str, nom: str, bloc: str | None) -> tuple[str, bool]:
@@ -339,39 +436,22 @@ def remplacer_section_toml(texte: str, nom: str, bloc: str | None) -> tuple[str,
     préserve intégralement le reste du fichier, commentaires et mise en forme
     compris, ce qu'un réécriture complète détruirait.
     """
-    entete = "[mcp_servers.{}]".format(nom)
-    prefixe_sous_table = "[mcp_servers.{}.".format(nom)
-
-    lignes = texte.splitlines()
     sortie: list[str] = []
-    index = 0
     trouve = False
-
-    while index < len(lignes):
-        nettoyee = lignes[index].strip()
-        if nettoyee == entete or nettoyee.startswith(prefixe_sous_table):
+    for chemin, contenu in sections_toml(texte):
+        if chemin[:2] == ("mcp_servers", nom):
             trouve = True
-            index += 1
-            # Absorber la section et ses sous-tables jusqu'au prochain en-tête
-            # étranger.
-            while index < len(lignes):
-                suivante = lignes[index].strip()
-                if suivante.startswith("[") and suivante != entete and not suivante.startswith(
-                    prefixe_sous_table
-                ):
-                    break
-                index += 1
-            continue
-        sortie.append(lignes[index])
-        index += 1
-
-    resultat = "\n".join(sortie).rstrip("\n")
+        else:
+            sortie.append(contenu)
+    resultat = "".join(sortie).rstrip("\n")
     if bloc is not None:
         resultat = (resultat + "\n\n" + bloc) if resultat else bloc
     return resultat.rstrip("\n") + "\n", trouve
 
 
 def installer_codex(commande: str, arguments: list[str], env: dict, args) -> Resultat:
+    if tomllib is None:
+        return Resultat("codex", "erreur", "Python 3.11+ requis pour préserver les autorisations TOML")
     chemin = Path(args.codex_config) if args.codex_config else premier_existant(
         candidats_codex()
     )
@@ -384,7 +464,7 @@ def installer_codex(commande: str, arguments: list[str], env: dict, args) -> Res
         )
 
     try:
-        texte = chemin.read_text(encoding="utf-8")
+        texte = chemin.read_text(encoding="utf-8-sig")
     except FileNotFoundError:
         texte = ""
     except OSError as exc:
@@ -394,29 +474,47 @@ def installer_codex(commande: str, arguments: list[str], env: dict, args) -> Res
         commande = vers_forme_windows(commande)
         env = {c: vers_forme_windows(v) if str(v).startswith('/') else v
                for c, v in env.items()}
-    bloc = None if args.uninstall else bloc_codex(args.name, commande, arguments, env)
-    nouveau, trouve = remplacer_section_toml(texte, args.name, bloc)
+    try:
+        config = tomllib.loads(texte)
+        existant = config.get("mcp_servers", {}).get(args.name, {})
+        if args.uninstall:
+            bloc, detail_approbation = None, ""
+        else:
+            mode, automatique = approbation_codex(
+                config, args.name, texte, getattr(args, "follow_client_approvals", False),
+            )
+            bloc = bloc_codex(args.name, commande, arguments, env,
+                              {**existant, "default_tools_approval_mode": mode}, automatique)
+            detail_approbation = " ; approbations : {} ({})".format(
+                mode, "préférence du client" if automatique else "choix Romeo conservé",
+            )
+        nouveau, trouve = remplacer_section_toml(texte, args.name, bloc)
+        if existant and not trouve:
+            raise ValueError("déclarer Romeo dans une table [mcp_servers.<nom>] avant de le modifier")
+        produit = tomllib.loads(nouveau)
+        if not args.uninstall:
+            attendu = copy.deepcopy(config)
+            attendu.setdefault("mcp_servers", {})[args.name] = tomllib.loads(bloc)["mcp_servers"][args.name]
+            if produit != attendu:
+                raise ValueError("la modification changerait une autre section")
+    except (ValueError, TypeError, AttributeError) as exc:
+        return Resultat("codex", "erreur", "Configuration conservée : {}".format(exc))
 
     if args.uninstall and not trouve:
         return Resultat("codex", "inchange", "{} : absent".format(chemin))
     if nouveau == texte:
-        return Resultat("codex", "inchange", "{} : déjà à jour".format(chemin))
+        return Resultat("codex", "inchange", "{} : déjà à jour{}".format(chemin, detail_approbation))
     if args.dry_run:
         action = "retirerait" if args.uninstall else "écrirait"
-        return Resultat("codex", "simule", "{} {} dans {}".format(action, args.name, chemin))
-
-    # Ne jamais livrer un TOML cassé : on valide avant d'écrire.
-    if tomllib is not None:
-        try:
-            tomllib.loads(nouveau)
-        except Exception as exc:  # noqa: BLE001
-            return Resultat("codex", "erreur", "TOML produit invalide : {}".format(exc))
+        return Resultat("codex", "simule", "{} {} dans {}{}".format(action, args.name, chemin, detail_approbation))
 
     chemin.parent.mkdir(parents=True, exist_ok=True)
     copie = sauvegarder(chemin) if chemin.exists() else None
     chemin.write_text(nouveau, encoding="utf-8")
     statut = "desinstalle" if args.uninstall else "installe"
-    return Resultat("codex", statut, "{} ({})".format(chemin, "sauvegarde : " + copie.name if copie else "creation"))
+    return Resultat("codex", statut, "{} ({}){}".format(
+        chemin, "sauvegarde : " + copie.name if copie else "creation", detail_approbation,
+    ))
 
 
 # =============================================================================
@@ -541,6 +639,9 @@ def main() -> int:
                          help="chemin explicite de claude_desktop_config.json")
     parseur.add_argument("--codex-config", default=None,
                          help="chemin explicite du config.toml de Codex")
+    parseur.add_argument("--follow-client-approvals", action="store_true",
+                         help="pour Codex, remplacer le choix global propre à Romeo par "
+                              "les préférences du client ; conserver les règles par outil")
     parseur.add_argument("--dry-run", action="store_true",
                          help="montrer ce qui serait fait, sans rien écrire")
     parseur.add_argument("--uninstall", action="store_true", help="retirer le serveur")
