@@ -97,6 +97,12 @@ seront alors manquantes. Les anciens jobs sans provenance enregistrée restent
 exportables avec leur script et les informations encore disponibles. Le mode
 hors ligne ne récupère pas une capture distante.
 
+Les nouvelles soumissions conservent aussi `submission.artifacts` : chemin et
+SHA-256 du script généré, ainsi que ceux du fichier de paramètres pour les
+tableaux. Ces empreintes portent sur le contenu envoyé par le MCP avant la
+soumission (`source: generated_content`), et non sur une observation distante
+après le calcul. Le contenu des paramètres n'est pas ajouté à cette métadonnée.
+
 ## Périmètre et protection des données
 
 - Chaque relevé traite au plus **20 fichiers**, **64 Mio au total**, sans

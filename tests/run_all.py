@@ -34,6 +34,8 @@ SUITES = [
      "diagnostic, lanceurs, gabarits, materiel", False),
     ("regressions", "tests/test_regressions.py",
      "defauts constates : ils doivent rester corriges", False),
+    ("job-io", "tests/test_job_io.py",
+     "tableaux concurrents dans un meme dossier et contenu reel des journaux", False),
     ("ajouts", "tests/test_ajouts.py",
      "enchainements de jobs, controle de derive du modele", False),
     ("docs", "tests/test_docs.py",

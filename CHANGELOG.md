@@ -2,6 +2,16 @@
 
 [Accueil](README.md) · [Guide des mises à jour](docs/updates.md)
 
+## Non publié
+
+- Isolation des fichiers de paramètres et des scripts Slurm par soumission,
+  avec noms uniques dans le même dossier et empreintes conservées dans la
+  provenance. Plusieurs tableaux peuvent partager le même nom et le même
+  `workdir` sans remplacer les paramètres encore attendus par leurs tâches (#3).
+- `job_output` distingue les octets présents dans stderr des en-têtes et des
+  extraits filtrés. Un stderr vide ne masque plus stdout en mode automatique ;
+  les journaux sans saut de ligne final restent correctement séparés (#5).
+
 ## 1.4.0
 
 ### Mises à jour depuis GitHub
