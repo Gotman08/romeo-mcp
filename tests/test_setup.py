@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -162,6 +163,157 @@ print("allocation guards passed")
         address = b"student" + b"@github.com"
         self.assertTrue(check_privacy.inspect_text("source.py", address))
         self.assertFalse(check_privacy.inspect_text("commit", b"GitHub <noreply@github.com>", metadata=True))
+
+
+class ClientApprovalTests(unittest.TestCase):
+    """Les choix du client survivent aux installations et aux changements de mode."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="romeo approvals ")
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.target = self.root / "config.toml"
+        self.args = SimpleNamespace(
+            targets="codex", codex_config=str(self.target), name="romeo",
+            uninstall=False, dry_run=False, follow_client_approvals=False,
+        )
+
+    def install(self, text=None):
+        if text is not None:
+            self.target.write_text(text, encoding="utf-8")
+        return install_mcp.installer_codex(
+            "new-python", ["-m", "romeo_mcp"], {"PYTHONPATH": "new-root"}, self.args,
+        )
+
+    def server(self):
+        return tomllib.loads(self.target.read_text(encoding="utf-8"))["mcp_servers"]["romeo"]
+
+    def test_full_access_inherits_without_repeated_approval_and_is_idempotent(self):
+        result = self.install('approval_policy = "never"\nsandbox_mode = "danger-full-access"\n')
+        self.assertEqual(result.statut, "installe", result.detail)
+        self.assertEqual(self.server()["default_tools_approval_mode"], "approve")
+        before = self.target.read_bytes()
+        self.assertEqual(self.install().statut, "inchange")
+        self.assertEqual(self.target.read_bytes(), before)
+
+    def test_never_alone_and_restricted_modes_do_not_grant_permission(self):
+        for text in (
+            '', 'approval_policy = "never"\n',
+            'approval_policy = "never"\nsandbox_mode = "read-only"\n',
+            'approval_policy = "never"\nsandbox_mode = "workspace-write"\n',
+            'approval_policy = "on-request"\nsandbox_mode = "danger-full-access"\n',
+            'approval_policy = { granular = { mcp_elicitations = false } }\nsandbox_mode = "danger-full-access"\n',
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.install(text).statut, "installe")
+                self.assertEqual(self.server()["default_tools_approval_mode"], "auto")
+
+    def test_selected_profile_is_used_and_unknown_profile_is_not_guessed(self):
+        for profile, expected in (
+            ('[profiles.chosen]\napproval_policy = "never"\nsandbox_mode = "danger-full-access"\n', "approve"),
+            ('[profiles.chosen]\nsandbox_mode = "read-only"\n', "auto"),
+            ('[profiles.other]\nsandbox_mode = "danger-full-access"\n', "auto"),
+        ):
+            with self.subTest(profile=profile):
+                self.install('profile = "chosen"\napproval_policy = "never"\nsandbox_mode = "danger-full-access"\n' + profile)
+                self.assertEqual(self.server()["default_tools_approval_mode"], expected)
+
+    def test_explicit_server_and_tool_preferences_survive_reinstallation(self):
+        for mode in ("auto", "prompt", "writes", "approve"):
+            with self.subTest(mode=mode):
+                source = '''# User configuration
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+[mcp_servers.other]
+command = "other"
+[mcp_servers."romeo"] # Existing settings
+command = "old-python"
+default_tools_approval_mode = "%s"
+enabled = false
+enabled_tools = ["tool_profile", "cancel_job"]
+disabled_tools = ["cancel_job"]
+tool_timeout_sec = 120.5
+startup_timeout_sec = 90
+env_vars = ["TOKEN", { name = "REMOTE", source = "remote" }]
+[mcp_servers.romeo.env]
+PYTHONPATH = "old-root"
+ROMEO_HOST = "example-host"
+[mcp_servers.romeo.tools.cancel_job]
+approval_mode = "prompt"
+output_token_limit = 500
+''' % mode
+                before = tomllib.loads(source)
+                result = self.install(source)
+                self.assertEqual(result.statut, "installe", result.detail)
+                expected = before["mcp_servers"]["romeo"]
+                expected.update(command="new-python", args=["-m", "romeo_mcp"])
+                expected["env"]["PYTHONPATH"] = "new-root"
+                self.assertEqual(tomllib.loads(self.target.read_text(encoding="utf-8")), before)
+                self.assertEqual(self.install().statut, "inchange")
+
+    def test_inherited_preference_is_recomputed_when_client_changes(self):
+        self.install('approval_policy = "never"\nsandbox_mode = "danger-full-access"\n')
+        text = self.target.read_text(encoding="utf-8").replace('"danger-full-access"', '"read-only"')
+        self.install(text)
+        self.assertEqual(self.server()["default_tools_approval_mode"], "auto")
+        text = self.target.read_text(encoding="utf-8").replace('"read-only"', '"danger-full-access"')
+        self.install(text)
+        self.assertEqual(self.server()["default_tools_approval_mode"], "approve")
+
+    def test_manual_change_takes_precedence_over_generated_marker(self):
+        self.install('approval_policy = "never"\nsandbox_mode = "danger-full-access"\n')
+        text = self.target.read_text(encoding="utf-8").replace(
+            "default_tools_approval_mode = 'approve'", "default_tools_approval_mode = 'prompt'",
+        )
+        self.install(text)
+        self.assertEqual(self.server()["default_tools_approval_mode"], "prompt")
+        self.args.follow_client_approvals = True
+        self.install()
+        self.assertEqual(self.server()["default_tools_approval_mode"], "approve")
+
+    def test_dry_run_and_invalid_config_never_write(self):
+        source = 'approval_policy = "never"\nsandbox_mode = "danger-full-access"\n'
+        self.args.dry_run = True
+        self.assertEqual(self.install(source).statut, "simule")
+        self.assertEqual(self.target.read_text(encoding="utf-8"), source)
+        self.assertFalse(list(self.root.glob("*.bak-*")))
+        self.args.dry_run = False
+        for source in ('[mcp_servers.romeo\n', 'mcp_servers = { romeo = { command = "old" } }\n'):
+            with self.subTest(source=source):
+                self.assertEqual(self.install(source).statut, "erreur")
+                self.assertEqual(self.target.read_text(encoding="utf-8"), source)
+
+    def test_multiline_values_and_custom_names_are_preserved(self):
+        self.args.name = "romeo.test"
+        source = '''description = ''' + "'''\n[mcp_servers.romeo.test]\n'''\n" + '''[mcp_servers."romeo.test"]
+command = "old"
+default_tools_approval_mode = "prompt"
+args = [
+  "old-argument",
+]
+[mcp_servers."romeo.test".tools."tool.name"]
+approval_mode = "prompt"
+'''
+        result = self.install(source)
+        self.assertEqual(result.statut, "installe", result.detail)
+        data = tomllib.loads(self.target.read_text(encoding="utf-8"))
+        self.assertEqual(data["description"], "[mcp_servers.romeo.test]\n")
+        self.assertEqual(data["mcp_servers"]["romeo.test"]["tools"]["tool.name"]["approval_mode"], "prompt")
+        self.assertEqual(self.install().statut, "inchange")
+
+    def test_claude_code_native_permission_rules_are_preserved(self):
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        for mode in ("default", "dontAsk", "bypassPermissions"):
+            with self.subTest(mode=mode):
+                source = json.dumps({"permissions": {"defaultMode": mode, "allow": ["mcp__romeo__*"], "ask": ["mcp__romeo__cancel_job"]}})
+                settings.write_text(source, encoding="utf-8")
+                (self.root / ".claude.json").write_text('{"mcpServers": {}}', encoding="utf-8")
+                args = SimpleNamespace(name="romeo", scope="user", uninstall=False, dry_run=False)
+                with patch.object(install_mcp.shutil, "which", return_value=None), patch.object(install_mcp.Path, "home", return_value=self.root):
+                    result = install_mcp.installer_claude_code({"command": "python"}, "python", [], args)
+                self.assertEqual(result.statut, "installe", result.detail)
+                self.assertEqual(settings.read_text(encoding="utf-8"), source)
 
 
 if __name__ == "__main__":
