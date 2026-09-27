@@ -6,9 +6,11 @@ enchainements d'etapes dependantes, et choix du creneau de soumission.
 
 from __future__ import annotations
 
+import hashlib
 import posixpath
 import shlex
 import time
+import uuid
 from typing import Any
 from .cluster import (
     ARCHS,
@@ -293,7 +295,9 @@ def job_status(job_id: str) -> dict[str, Any]:
     description=(
         "Sortie d'un job, tronquee par defaut. N'affiche JAMAIS un log entier : "
         "utilise `lines` pour la fin du fichier et `grep` pour cibler. Le mode "
-        "stream='auto' montre la sortie d'erreur si elle n'est pas vide."
+        "stream='auto' privilegie les extraits stderr non blancs apres filtre. "
+        "has_stderr_content indique la presence d'octets dans les fichiers "
+        "stderr, independamment du filtre et du flux affiche."
     ),
 )
 def job_output(
@@ -333,13 +337,20 @@ def job_output(
                 "soumis par ce serveur et SLURM ne le connait plus.".format(jid)
             )
 
-    targets = {"out": out_glob, "err": err_glob}
+    targets = {}
+    for label, glob in (("err", err_glob), ("out", out_glob)):
+        if not glob:
+            continue
+        # Quoter le repertoire tout en laissant le motif s'etendre.
+        dossier = posixpath.dirname(glob)
+        motif = posixpath.basename(glob)
+        targets[label] = "{}/{}".format(shlex.quote(dossier), motif) if dossier else motif
     if stream in ("out", "err"):
-        wanted = [(stream, targets[stream])]
+        wanted = [stream]
     elif stream == "both":
-        wanted = [("err", err_glob), ("out", out_glob)]
+        wanted = ["err", "out"]
     else:  # auto : l'erreur d'abord si elle contient quelque chose
-        wanted = [("err", err_glob), ("out", out_glob)]
+        wanted = ["err", "out"]
 
     filter_cmd = (
         "grep -E -- {} ".format(shlex.quote(grep)) if grep else "cat"
@@ -351,19 +362,26 @@ def job_output(
     # ne peut pas contenir.
     jeton = nouveau_jeton()
     parts = []
-    for label, glob in wanted:
-        if not glob:
-            continue
-        # Le repertoire est quote, le motif reste libre : c'est lui qui doit
-        # s'etendre. Sans cela, un workdir contenant une espace se scindait en
-        # deux mots et la boucle ne trouvait aucun fichier.
-        dossier = posixpath.dirname(glob)
-        motif = posixpath.basename(glob)
-        cible = "{}/{}".format(shlex.quote(dossier), motif) if dossier else motif
+    if "err" in targets:
+        # Sonder les fichiers avant tout extrait : ni les en-tetes, ni grep,
+        # ni le budget d'affichage ne doivent changer cet indicateur.
         parts.append(
-            "echo '{marqueur}'; for f in {cible}; do [ -f \"$f\" ] || continue; "
-            "echo \"--- $f\"; {filt} \"$f\" | tail -n {n}; done".format(
-                marqueur=marqueur(jeton, label), cible=cible,
+            "echo '{marqueur}'; for f in {cible}; do "
+            'if [ -f "$f" ] && [ -s "$f" ]; then echo 1; break; fi; done'.format(
+                marqueur=marqueur(jeton, "stderr_nonempty"), cible=targets["err"],
+            )
+        )
+    for label in wanted:
+        if label not in targets:
+            continue
+        # Une section par fichier : la premiere ligne porte le chemin, les
+        # suivantes uniquement le contenu. Ajouter les en-tetes cote Python.
+        parts.append(
+            'romeo_log_index=0; for f in {cible}; do [ -f "$f" ] || continue; '
+            'printf \'%s\\n\' "{marqueur}_$romeo_log_index" "$f"; '
+            '{filt} "$f" | tail -n {n}; printf \'\\n\'; '
+            'romeo_log_index=$((romeo_log_index + 1)); done'.format(
+                marqueur=marqueur(jeton, label), cible=targets[label],
                 filt=filter_cmd, n=lines,
             )
         )
@@ -376,8 +394,15 @@ def job_output(
         return _error(str(exc))
 
     sections = decouper(result.stdout, jeton)
-    err_text = "\n".join(sections.get("err", [])).strip()
-    out_text = "\n".join(sections.get("out", [])).strip()
+    logs = {"err": [], "out": []}
+    for key, file_lines in sections.items():
+        label = key.rpartition("_")[0]
+        if label in logs and file_lines:
+            payload = "\n".join(file_lines[1:]).rstrip()
+            if payload.strip():
+                logs[label].append("--- {}\n{}".format(file_lines[0], payload))
+    err_text = "\n".join(logs["err"])
+    out_text = "\n".join(logs["out"])
 
     if stream == "auto":
         chosen = "err" if err_text else "out"
@@ -398,7 +423,7 @@ def job_output(
         "stream": chosen,
         "lines_requested": lines,
         "grep": grep,
-        "has_stderr_content": bool(err_text),
+        "has_stderr_content": "1" in sections.get("stderr_nonempty", []),
         "content": body or "(aucune sortie pour l'instant)",
     }
 
@@ -605,17 +630,9 @@ def submit_array_job(
         )
     max_concurrent = max(1, min(int(max_concurrent), len(parameters)))
 
-    # Les parametres vivent dans un fichier a cote du script : la ligne N est
-    # lue par la tache N, ce qui evite de fabriquer une commande geante.
-    fichier = "parametres.txt"
-    preambule = (
-        'PARAMS="$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" {})"\n'
-        'echo "[romeo-mcp] tache $SLURM_ARRAY_TASK_ID : $PARAMS"\n'
-    ).format(fichier)
-
     spec = JobSpec(
         name=name,
-        command=preambule + command,
+        command=command,
         time=time_limit,
         cpus_per_task=cpus_per_task,
         gpus_per_node=gpus_per_node,
@@ -630,6 +647,16 @@ def submit_array_job(
     try:
         if workdir:
             spec.workdir = check_path(workdir, s.home, s.scratch, s.path_aliases)
+        plan = plan_job(spec, s.scratch)
+        # Resoudre d'abord le dossier, puis y reserver des noms propres a cet
+        # appel. N tableaux peuvent ainsi partager le meme workdir et nom.
+        submission_id = uuid.uuid4().hex
+        params_path = posixpath.join(plan.workdir, "parametres-{}.txt".format(submission_id))
+        script_path = posixpath.join(plan.workdir, "{}-{}.sbatch".format(name, submission_id))
+        spec.command = (
+            'PARAMS="$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" {})"\n'
+            'echo "[romeo-mcp] tache $SLURM_ARRAY_TASK_ID : $PARAMS"\n'
+        ).format(shlex.quote(params_path)) + command
         plan = plan_job(spec, s.scratch)
     except (ClusterError, GuardError, SSHError, SSHTimeout) as exc:
         return _error(str(exc))
@@ -657,14 +684,21 @@ def submit_array_job(
 
     # Le fichier de parametres doit exister avant la soumission : la tache 0
     # peut demarrer immediatement.
-    params_path = posixpath.join(plan.workdir, fichier)
+    parameters_text = "\n".join(parameters) + "\n"
     try:
-        s.write_file(params_path, "\n".join(parameters) + "\n")
+        s.write_file(params_path, parameters_text, mode="400")
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
 
     soumission = _soumettre_sbatch(
-        s, plan, spec.name, note="tableau de {} taches".format(len(parameters))
+        s, plan, spec.name, note="tableau de {} taches".format(len(parameters)),
+        script_path=script_path,
+        artifacts={"parameters": {
+            "path": params_path,
+            "source": "generated_content",
+            "sha256": hashlib.sha256(parameters_text.encode("utf-8")).hexdigest(),
+            "rows": len(parameters),
+        }},
     )
     if not soumission["ok"]:
         return soumission
@@ -672,6 +706,7 @@ def submit_array_job(
         "ok": True, "submitted": True, "job_id": soumission["job_id"],
         "resolved": resume, "warnings": plan.warnings,
         "parameters_file": params_path,
+        "script_path": soumission["script_path"],
         "next_step": "Suis l'avancement avec job_status('{}').".format(
             soumission["job_id"]),
     }
@@ -779,6 +814,7 @@ def submit_resilient_job(
 
     identifiants: list[str] = []
     precedent = None
+    script_path = None
     for index in range(segments):
         options = ()
         if precedent:
@@ -792,6 +828,7 @@ def submit_resilient_job(
             # Le script est identique pour tous les segments : on ne l'ecrit
             # qu'une fois, le reste de la chaine le reutilise.
             ecrire=(index == 0),
+            script_path=script_path,
         )
         if not soumission["ok"]:
             # Les segments deja soumis existent sur le cluster : les taire
@@ -802,6 +839,7 @@ def submit_resilient_job(
             soumission["job_ids"] = identifiants
             return soumission
         precedent = soumission["job_id"]
+        script_path = soumission["script_path"]
         identifiants.append(precedent)
 
     return {

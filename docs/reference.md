@@ -2,7 +2,7 @@
 
 [Accueil](../README.md) › [Documentation](README.md) › Référence technique
 
-[Outils](#outils-exposés) · [Calcul parallèle](#calcul-parallèle) ·
+[Outils](#outils-exposés) · [Jobs et journaux](#jobs-et-journaux) · [Calcul parallèle](#calcul-parallèle) ·
 [Diagnostic](#diagnostic-des-échecs) · [Documentation locale](#documentation-hors-ligne) ·
 [Conception du serveur](#partis-pris-de-conception)
 
@@ -83,6 +83,37 @@ sources et lignes), `read_doc` (page ou plage de lignes, pagination sans perte).
 **Échappatoire** : `run_login_command`, encadrée, avec un `allow_heavy` explicite
 pour les cas que la documentation ROMEO autorise (par exemple un `pip install`
 en environnement virtuel à destination du x86_64).
+
+## Jobs et journaux
+
+### Plusieurs tableaux dans le même dossier
+
+`submit_array_job` permet de soumettre plusieurs tableaux avec le même nom
+et le même `workdir`, même lorsque les précédents attendent encore dans Slurm.
+Chaque appel crée un fichier `parametres-UUID.txt` et un script `NOM-UUID.sbatch`
+dans ce dossier. Le script lit les paramètres par leur chemin absolu, et le
+fichier de paramètres est placé en lecture seule. La réponse fournit
+`parameters_file` et `script_path` ; leurs empreintes SHA-256 sont conservées
+dans la [provenance du job](reproducibility.md).
+
+Les scripts des autres soumissions reçoivent aussi un nom unique. Les segments
+d'une même chaîne reprenable réutilisent leur propre script. La simulation
+n'écrit aucun fichier ; une soumission confirmée reçoit son propre UUID.
+Conservez les paramètres tant que des tâches peuvent encore démarrer ou être
+remises en file. Les noms des fichiers de résultats produits par votre commande
+restent à choisir pour éviter les collisions entre vos expériences.
+
+### Lire les journaux
+
+`job_output.has_stderr_content` indique si au moins un fichier stderr existe
+et contient des octets. Un fichier vide ou absent donne `false` ; des espaces
+ou sauts de ligne seuls donnent `true`. Ce booléen est indépendant de `grep`,
+du nombre de lignes et du flux demandé, y compris `stream="out"`.
+
+L'affichage ajoute un en-tête seulement aux extraits qui contiennent du texte
+non blanc. En mode `auto`, stderr est choisi si un tel extrait subsiste après
+filtrage ; sinon stdout est affiché. La présence de stderr ne constitue pas
+un verdict d'échec du job : son état et son code de sortie sont dans `job_status`.
 
 ## Calcul parallèle
 

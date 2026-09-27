@@ -12,12 +12,14 @@ dependre de tous les autres.
 from __future__ import annotations
 
 import functools
+import hashlib
 import inspect
 import os
 import posixpath
 import re
 import shlex
 import time
+import uuid
 from pathlib import Path
 from .profiles import ProfiledServer
 from mcp.types import ToolAnnotations
@@ -280,7 +282,8 @@ def _job_id_depuis_sbatch(sortie_sbatch: str) -> str:
     return candidat if candidat.isdigit() else ""
 
 def _soumettre_sbatch(
-    s, plan, nom: str, *, note: str = "", options: tuple = (), ecrire: bool = True
+    s, plan, nom: str, *, note: str = "", options: tuple = (), ecrire: bool = True,
+    script_path: str | None = None, artifacts: dict | None = None,
 ) -> dict:
     """Depose le script, le soumet, valide l'identifiant et l'enregistre.
 
@@ -293,12 +296,23 @@ def _soumettre_sbatch(
     Rend soit ``{"ok": True, "job_id", "script_path", "stdout", "stderr"}``,
     soit une erreur structuree.
     """
-    chemin_script = posixpath.join(plan.workdir, "{}.sbatch".format(nom))
+    # Un nom de job peut etre reutilise pendant qu'une autre soumission est
+    # encore en cours. Son script doit donc avoir sa propre adresse.
+    if not ecrire and not script_path:
+        return _error("le chemin du script existant est requis pour le reutiliser.")
+    chemin_script = script_path or posixpath.join(
+        plan.workdir, "{}-{}.sbatch".format(nom, uuid.uuid4().hex))
     try:
         if ecrire:
             s.write_file(chemin_script, plan.script, mode="700")
         from .reproducibility import submission_provenance
+        from .privacy import sanitize
         provenance = submission_provenance(s, plan)
+        provenance["artifacts"] = sanitize({
+            **(artifacts or {}),
+            "script": {"path": chemin_script, "source": "generated_content",
+                       "sha256": hashlib.sha256(plan.script.encode("utf-8")).hexdigest()},
+        })
         commande = ["sbatch", "--parsable", *options, shlex.quote(chemin_script)]
         resultat = _sh(s, " ".join(commande), timeout=60, cwd=plan.workdir)
     except (SSHError, SSHTimeout) as exc:
