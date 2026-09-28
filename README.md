@@ -156,7 +156,7 @@ Puis préparez un petit calcul :
 
 > Prépare en simulation un job `hello-romeo`, sur un seul nœud `x64cpu`, avec un cœur, 1 Go de RAM et une minute. La commande est `hostname`. Montre-moi le script et les avertissements avant toute soumission.
 
-L’appel correspondant à `submit_job` est :
+L’appel correspondant à `job_prepare` est :
 
 ```json
 {
@@ -166,14 +166,13 @@ L’appel correspondant à `submit_job` est :
   "time_limit": "1m",
   "nodes": 1,
   "cpus_per_task": 1,
-  "mem_gb": 1,
-  "confirm": false
+  "mem_gb": 1
 }
 ```
 
-La simulation retourne le script sans soumettre le calcul. Elle peut consulter les chemins distants par SSH. Après lecture, autorisez la soumission si vous la souhaitez : `confirm: true`. Suivez ensuite l’identifiant reçu avec `job_status`, `job_output` et `job_efficiency`.
+La préparation retourne le script et un `plan_id`, sans soumettre le calcul. Elle peut consulter les chemins distants par SSH et conserve le plan localement pendant 24 heures. Après lecture, soumettez exactement ce plan avec `job_submit({"plan_id": "IDENTIFIANT_RECU", "confirm": true})`. Suivez ensuite le job reçu avec `job_status`, `job_log_tail` et `job_efficiency`.
 
-La simulation concerne les outils de soumission qui exposent `confirm`. D’autres actions, comme `build_on_node`, les transferts, l’annulation ou les sondes GPU, agissent directement : conservez les demandes d’autorisation de votre client pour ces outils.
+Les tableaux et pipelines suivent le même parcours avec `job_array_prepare` / `job_array_submit` et `job_pipeline_prepare` / `job_pipeline_submit`. Les préparations ne prennent pas de paramètre `confirm`. Un aperçu hors ligne aux chemins illustratifs ne peut pas être soumis. D’autres actions, comme `build_on_node`, les transferts, l’annulation ou `cluster_gpu_health_run`, agissent directement.
 
 ## Des demandes utiles
 
@@ -190,11 +189,11 @@ La [référence technique](docs/reference.md) détaille les outils, MPI, PyTorch
 
 ## Un profil essentiel pour commencer
 
-Le profil `essential` présente **17 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
+Le profil `essential` présente **20 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
 
 Pour accéder aux tableaux de paramètres, aux pipelines, aux services interactifs ou au profilage, demandez à l’assistant :
 
-> Passe le profil d’outils ROMEO à `full` avec `tool_profile`.
+> Passe le profil d’outils ROMEO à `full` avec `tool_profile_set`.
 
 Le client reçoit une notification de changement du catalogue. Le choix vaut pour le processus MCP actuel. Pour le conserver au prochain lancement :
 
@@ -208,7 +207,7 @@ Cette commande conserve votre projet et votre alias SSH. Sans choix explicite, l
 
 `export_job_report` crée un dossier privé avec `report.json`, `report.md` et `script.sbatch.txt`. Les nouveaux jobs conservent les ressources demandées et tentent de relever le commit Git, l’environnement chargé et les empreintes des fichiers choisis avant le calcul. L’export ajoute les mesures disponibles dans Slurm.
 
-Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à `submit_job`. Les fichiers choisis seulement à l’export sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
+Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à `job_prepare`. Les fichiers choisis seulement à l’export sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
 
 Les exports restent **hors des dépôts Git**. Les secrets reconnaissables sont masqués ; le contenu des données, les variables d’environnement complètes et les adresses des dépôts Git ne sont pas exportés. Les informations absentes sont signalées. [Exemples, protection des données et limites](docs/reproducibility.md).
 

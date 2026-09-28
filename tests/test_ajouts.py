@@ -143,7 +143,7 @@ expect_error("etape non-objet", lambda: ordre(["a"]), "objet")
 expect_error("trop d'etapes",
              lambda: ordre([{"name": "e{}".format(i), "command": "x"}
                             for i in range(40)]),
-             "submit_array_job")
+             "job_array_prepare")
 
 print("\n-- enchainements : heritage --")
 # Le point de l'heritage : une etape sans GPU d'un enchainement aarch64 ne doit

@@ -16,8 +16,8 @@ from romeo_mcp import server as srv  # noqa: E402
 
 
 def lancer_et_attendre(nom, commande, time_limit="5m", attente=420):
-    r = srv.submit_job(name=nom, command=commande, time_limit=time_limit,
-                       cpus_per_task=2, confirm=True)
+    plan = srv.job_prepare(name=nom, command=commande, time_limit=time_limit, cpus_per_task=2)
+    r = srv.job_submit(plan["plan_id"], confirm=True) if plan["ok"] else plan
     if not r.get("ok"):
         return None, r.get("error")
     jid = r["job_id"]
@@ -65,7 +65,7 @@ def main() -> int:
 
     print("\n== 3. Tableau de balayage parametrique ==")
     params = ["lr=0.1 seed=1", "lr=0.01 seed=2", "lr=0.001 seed=3", "lr=0.0001 seed=4"]
-    dry = srv.submit_array_job(name="mcp-ia-sweep", command='echo "run: $PARAMS"',
+    dry = srv.job_array_prepare(name="mcp-ia-sweep", command='echo "run: $PARAMS"',
                                parameters=params, max_concurrent=2, time_limit="5m")
     check("simulation ne soumet rien", dry.get("submitted") is False)
     check("plage de tableau correcte",
@@ -73,9 +73,7 @@ def main() -> int:
           dry.get("resolved", {}).get("array"))
     check("PARAMS injecte dans le script", "$SLURM_ARRAY_TASK_ID" in dry.get("script", ""))
 
-    reel = srv.submit_array_job(name="mcp-ia-sweep", command='echo "run: $PARAMS"',
-                                parameters=params, max_concurrent=2,
-                                time_limit="5m", confirm=True)
+    reel = srv.job_array_submit(dry["plan_id"], confirm=True) if dry["ok"] else dry
     if not reel.get("ok"):
         check("soumission du tableau", False, reel.get("error"))
     else:
@@ -83,7 +81,7 @@ def main() -> int:
         print("   tableau {} ({} taches)".format(aid, len(params)))
         srv.wait_for_job(aid, timeout_seconds=420, poll_seconds=10)
         time.sleep(5)
-        sortie = srv.job_output(aid, stream="out", lines=60)
+        sortie = srv.job_log_tail(aid, stream="out", lines=60)
         contenu = sortie.get("content", "")
         trouves = sum(1 for p in params if "run: {}".format(p) in contenu)
         print("   jeux retrouves dans les sorties : {}/{}".format(trouves, len(params)))
@@ -106,7 +104,7 @@ def main() -> int:
     check("arch armgpu retenue", dbg.get("resolved", {}).get("arch") == "armgpu")
 
     print("\n== 6. Inventaire du stockage ==")
-    st = srv.storage_cleanup_helper(top=5)
+    st = srv.storage_usage_audit(top=5)
     check("inventaire rendu", st.get("ok") is True, st.get("error"))
     if st.get("ok"):
         print("   repertoires : {}".format(
@@ -122,10 +120,11 @@ def main() -> int:
     check("jobs en cours lisible", "Jobs en cours" in jobs)
 
     print("\n== 8. Telemetrie en direct et trace de pile ==")
-    temoin = srv.submit_job(
+    plan_temoin = srv.job_prepare(
         name="mcp-live", time_limit="10m", gpus_per_node=1, cpus_per_task=8,
         command='python3 -c "import time; [time.sleep(1) for _ in range(500)]"',
-        confirm=True)
+    )
+    temoin = srv.job_submit(plan_temoin["plan_id"], confirm=True) if plan_temoin["ok"] else plan_temoin
     if not temoin.get("ok"):
         check("job temoin", False, temoin.get("error"))
     else:

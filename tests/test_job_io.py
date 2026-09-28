@@ -116,12 +116,13 @@ class JobIOTests(unittest.TestCase):
         self.enterContext(patch.object(jobs, "_controle_du_script_genere", return_value=[]))
         self.workdir = self.session.scratch + "/campagne d'essais"
 
-    def submit_array(self, parameters, **kwargs):
-        return jobs.submit_array_job(
+    def submit_array(self, parameters, confirm=False, **kwargs):
+        plan = jobs.job_array_prepare(
             name="same-name", command='printf "fixture-result:%s\\n" "$PARAMS"',
             parameters=parameters, workdir=self.workdir, arch="x64cpu",
             **kwargs,
         )
+        return jobs.job_array_submit(plan["plan_id"], confirm=True) if confirm and plan["ok"] else plan
 
     def test_queued_arrays_keep_their_own_parameters_and_scripts(self):
         batches = [["batch-{} row-{} 'quoted'".format(batch, row)
@@ -183,7 +184,8 @@ class JobIOTests(unittest.TestCase):
 
     def test_regular_jobs_with_the_same_name_keep_distinct_scripts(self):
         for command in ("echo first", "echo second"):
-            result = jobs.submit_job(name="same-name", command=command, workdir=self.workdir, arch="x64cpu", confirm=True)
+            prepared = jobs.job_prepare(name="same-name", command=command, workdir=self.workdir, arch="x64cpu")
+            result = jobs.job_submit(prepared["plan_id"], confirm=True)
             self.assertTrue(result["ok"], result)
         self.assertNotEqual(self.session.pending[0][0], self.session.pending[1][0])
         for path, snapshot, _ in self.session.pending:
@@ -216,7 +218,7 @@ class JobIOTests(unittest.TestCase):
             self.prepare_logs(stderr)
             for stream in ("err", "both", "auto", "out"):
                 with self.subTest(stderr=stderr, stream=stream):
-                    result = jobs.job_output("123", stream=stream)
+                    result = jobs.job_log_tail("123", stream=stream)
                     self.assertTrue(result["ok"], result)
                     self.assertFalse(result["has_stderr_content"])
                     self.assertNotIn("job_0.err", result["content"])
@@ -227,28 +229,28 @@ class JobIOTests(unittest.TestCase):
 
     def test_whitespace_is_nonzero_bytes_but_auto_shows_useful_output(self):
         self.prepare_logs(" \t\n\n")
-        result = jobs.job_output("123")
+        result = jobs.job_log_tail("123")
         self.assertTrue(result["has_stderr_content"])
         self.assertEqual(result["stream"], "out")
         self.assertIn("useful stdout", result["content"])
 
     def test_real_stderr_is_reported_even_when_only_stdout_is_requested(self):
         self.prepare_logs("warning from program\n")
-        result = jobs.job_output("123", stream="out")
+        result = jobs.job_log_tail("123", stream="out")
         self.assertTrue(result["has_stderr_content"])
         self.assertIn("useful stdout", result["content"])
         self.assertNotIn("warning from program", result["content"])
-        result = jobs.job_output("123")
+        result = jobs.job_log_tail("123")
         self.assertEqual(result["stream"], "err")
         self.assertIn("warning from program", result["content"])
 
     def test_grep_does_not_turn_headers_into_matches_or_hide_file_presence(self):
         self.prepare_logs("warning from program\n")
-        result = jobs.job_output("123", grep="useful")
+        result = jobs.job_log_search("123", pattern="useful")
         self.assertTrue(result["has_stderr_content"])
         self.assertEqual(result["stream"], "out")
         self.assertIn("useful stdout", result["content"])
-        result = jobs.job_output("123", stream="err", grep="no-match")
+        result = jobs.job_log_search("123", stream="err", pattern="no-match")
         self.assertTrue(result["has_stderr_content"])
         self.assertEqual(result["content"], "(aucune sortie pour l'instant)")
 
@@ -257,7 +259,7 @@ class JobIOTests(unittest.TestCase):
         message = "  ### Validation ###\n--- user text\nRuntimeError: fixture"
         self.session.write_file(folder + "/job_1.err", message)
         self.session.write_file(folder + "/job_2.err", "last error")
-        result = jobs.job_output("123", stream="both")
+        result = jobs.job_log_tail("123", stream="both")
         self.assertTrue(result["has_stderr_content"])
         self.assertNotIn("job_0.err", result["content"])
         self.assertIn(message, result["content"])
@@ -266,14 +268,14 @@ class JobIOTests(unittest.TestCase):
 
     def test_tail_and_output_budget_remain_bounded(self):
         self.prepare_logs("\n".join("warning-{}".format(i) for i in range(200)))
-        result = jobs.job_output("123", lines=2)
+        result = jobs.job_log_tail("123", lines=2)
         self.assertNotIn("warning-197", result["content"])
         self.assertIn("warning-199", result["content"])
-        limited = jobs.job_output("123", max_chars=50)
+        limited = jobs.job_log_tail("123", max_chars=50)
         self.assertTrue(limited["has_stderr_content"])
         self.assertLessEqual(len(limited["content"]), 80)
         self.prepare_logs("warning " * 3000)
-        limited = jobs.job_output("123", max_chars=50)
+        limited = jobs.job_log_tail("123", max_chars=50)
         self.assertTrue(limited["has_stderr_content"])
         self.assertLessEqual(len(limited["content"]), 80)
 

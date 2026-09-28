@@ -23,7 +23,7 @@ from .registry import registry
 from .sortie import premiere_ligne
 from .slurm import JobSpec, gpus_from_tres, parse_mem_mb, plan_job
 from .ssh import SSHError, SSHTimeout, session
-from .outils_calcul import job_efficiency, job_output, job_status
+from .outils_calcul import job_efficiency, job_log_tail, job_status
 from .noyau import (
     MUTATING,
     READ_ONLY,
@@ -72,11 +72,11 @@ def diagnose_job(job_id: str, lines: int = 80) -> dict[str, Any]:
             "etat": etat.get("state"),
             "message": (
                 "Le job n'est pas termine : rien a diagnostiquer pour l'instant. "
-                "Suis-le avec job_status, ou consulte sa sortie avec job_output."
+                "Suis-le avec job_status, ou consulte sa sortie avec job_log_tail."
             ),
         }
 
-    journaux = job_output(jid, stream="both", lines=lines, max_chars=14_000)
+    journaux = job_log_tail(jid, stream="both", lines=lines, max_chars=14_000)
     texte = journaux.get("content", "") if journaux.get("ok") else ""
 
     limites = {}
@@ -232,7 +232,7 @@ def job_live_metrics(job_id: str) -> dict[str, Any]:
                 "attend probablement des donnees. Regarde le chargement des "
                 "donnees, le nombre de processus de lecture, ou envisage de "
                 "mettre le jeu de donnees en memoire vive "
-                "(submit_job(stage_archive=...)).".format(moyenne)
+                "(job_prepare(stage_archive=...)).".format(moyenne)
             )
         elif moyenne > 90:
             constats.append(
@@ -468,7 +468,7 @@ def job_system_health(job_id: str) -> dict[str, Any]:
             "Le noeud passe {:.0f} % de son temps a attendre les entrees-"
             "sorties : le calcul est limite par le systeme de fichiers. "
             "Envisage un repertoire temporaire local "
-            "(submit_job(job_tmpdir=True)) ou la mise en cache en memoire "
+            "(job_prepare(job_tmpdir=True)) ou la mise en cache en memoire "
             "vive.".format(iowait_pct)
         )
     if max_rss and memoire_demandee:
@@ -623,7 +623,7 @@ def profile_job(
 )
 def profile_report(job_id: str, top: int = 5) -> dict[str, Any]:
     """Lit et condense la sortie statistique produite par le job de profilage."""
-    sortie = job_output(job_id, stream="out", lines=400, max_chars=40_000)
+    sortie = job_log_tail(job_id, stream="out", lines=400, max_chars=40_000)
     if not sortie.get("ok"):
         return sortie
     contenu = sortie.get("content", "")
@@ -706,59 +706,28 @@ def profile_report(job_id: str, top: int = 5) -> dict[str, Any]:
 # Sante du parc
 # =============================================================================
 @outil(
-    annotations=READ_ONLY,
+    annotations=MUTATING,
     description=(
-        "Verifie la sante des GPU sur un ou plusieurs noeuds : bridage "
+        "Reserve des ressources GPU via srun et verifie leur sante sur un ou plusieurs noeuds : bridage "
         "thermique ou de puissance, erreurs memoire non corrigees, frequence "
         "anormalement basse. Un noeud degrade ne plante pas, il ralentit tout "
         "un job reparti sans erreur visible. Rend une clause --exclude prete a "
-        "l'emploi pour les noeuds suspects."
+        "l'emploi pour les noeuds suspects. Seul check_type='gpu' est disponible ; NCCL est desactive."
     ),
 )
-def run_cluster_sanity_check(
+def cluster_gpu_health_run(
     nodes: list[str] | None = None,
     check_type: str = "gpu",
     max_nodes: int = 4,
     minutes: int = 5,
 ) -> dict[str, Any]:
     """Sonde l'etat materiel de quelques noeuds GPU."""
+    genre = (check_type or "gpu").strip().lower()
+    if genre != "gpu":
+        return _error("Seul check_type='gpu' est disponible. Le mode nccl est desactive : "
+                      "aucun benchmark NCCL n'est implemente.")
     account = require_account()
     s = session()
-    genre = (check_type or "gpu").strip().lower()
-    if genre not in ("gpu", "nccl"):
-        return _error("check_type doit valoir 'gpu' ou 'nccl'.")
-
-    if genre == "nccl":
-        # Les bancs d'essai NCCL officiels ne sont pas fournis : le dire est
-        # plus utile que d'echouer avec un binaire introuvable.
-        binaire = posixpath.join(s.scratch, ".nccl-tests", "build", "all_reduce_perf")
-        try:
-            present = _sh(
-                s, "test -x {} && echo PRESENT || echo ABSENT".format(
-                    shlex.quote(binaire)), timeout=30
-            ).stdout.strip()
-        except (SSHError, SSHTimeout) as exc:
-            return _error(str(exc))
-        if present != "PRESENT":
-            return _error(
-                "les bancs d'essai NCCL ne sont pas installes : le paquet "
-                "`nccl-tests` est absent du catalogue Spack de ROMEO, seule la "
-                "bibliotheque `nccl` y figure. Compile-les une fois avec "
-                "build_on_node, puis relance.",
-                recette=[
-                    "git clone https://github.com/NVIDIA/nccl-tests {}".format(
-                        posixpath.dirname(binaire.rsplit("/build", 1)[0])
-                    ),
-                    "cd {} && make MPI=0 "
-                    "NCCL_HOME=$(spack location -i nccl)".format(
-                        binaire.rsplit("/build", 1)[0]
-                    ),
-                ],
-                alternative=(
-                    "En attendant, `check_type='gpu'` detecte deja les noeuds "
-                    "brides ou en erreur memoire, sans logiciel supplementaire."
-                ),
-            )
 
     max_nodes = max(1, min(int(max_nodes), 8))
     # Ce bornage doit precede son usage dans le delai SSH : la valeur brute y
@@ -805,6 +774,9 @@ def run_cluster_sanity_check(
     except SSHError as exc:
         return _error(str(exc))
 
+    if not resultat.ok:
+        return _error("La sonde GPU a echoue : " + resultat.stdout.strip()[:500])
+
     par_noeud: dict[str, list[dict]] = {}
     courant = None
     for ligne in resultat.stdout.splitlines():
@@ -831,6 +803,10 @@ def run_cluster_sanity_check(
             }
         )
 
+    if not par_noeud or any(not mesures for mesures in par_noeud.values()):
+        return _error("Sonde GPU incomplete : aucune mesure exploitable pour au moins un noeud.",
+                      noeuds_sondes=list(par_noeud))
+
     rapports, suspects = [], []
     for noeud, mesures in par_noeud.items():
         anomalies = []
@@ -846,9 +822,7 @@ def run_cluster_sanity_check(
             suspects.append(noeud)
 
     conclusion = []
-    if not par_noeud:
-        conclusion.append("aucune mesure recuperee : la sonde n'a rien renvoye.")
-    elif suspects:
+    if suspects:
         conclusion.append(
             "{} noeud(s) presentent une anomalie. Ecarte-les de tes prochaines "
             "soumissions.".format(len(suspects))

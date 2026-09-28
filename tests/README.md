@@ -14,7 +14,7 @@ python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
 ```
 
-Sans option, le lanceur exécute dix suites dans des processus séparés et
+Sans option, le lanceur exécute onze suites dans des processus séparés et
 affiche un bilan. Il retourne un code non nul si une suite échoue. Les suites
 hors ligne utilisent une configuration fictive et ne nécessitent pas d’accès
 SSH au calculateur.
@@ -27,6 +27,7 @@ SSH au calculateur.
 | `workloads` | [test_workloads.py](test_workloads.py) | Lanceurs, gabarits, diagnostics et modèles matériels |
 | `regressions` | [test_regressions.py](test_regressions.py) | Corrections de défauts déjà rencontrés |
 | `job-io` | [test_job_io.py](test_job_io.py) | Huit tableaux soumis simultanément dans le même dossier, scripts isolés, empreintes et lecture des journaux |
+| `tool-actions` | [test_tool_actions.py](test_tool_actions.py) | Contrats MCP, effets annoncés, plans persistants, scripts exacts, appels concurrents et reprise après échec |
 | `ajouts` | [test_ajouts.py](test_ajouts.py) | Pipelines et confrontation du modèle de cluster |
 | `docs` | [test_docs.py](test_docs.py) | Recherche, sections, pagination, portabilité et protocole documentaire |
 | `setup` | [test_setup.py](test_setup.py) | Configuration personnelle, installation et confidentialité |

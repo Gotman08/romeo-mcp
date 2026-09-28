@@ -369,7 +369,7 @@ class RomeoSession:
                 self._reset()
                 raise SSHTimeout(
                     "delai de {:.0f} s depasse. Une commande longue n'a rien a "
-                    "faire sur le noeud de login : passe par submit_job.".format(timeout)
+                    "faire sur le noeud de login : passe par job_prepare.".format(timeout)
                 )
             try:
                 line = self._out.get(timeout=min(remaining, 1.0))

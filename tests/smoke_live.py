@@ -38,12 +38,12 @@ def main() -> int:
     show("romeo_quota", srv.romeo_quota(), ["filesystems", "home", "scratch"])
 
     # --- simulation : rien ne doit partir --------------------------------
-    dry = srv.submit_job(
+    dry = srv.job_prepare(
         name="mcp-verif",
         command='echo "bonjour depuis $(hostname)"; sleep 5',
         time_limit="5m",
     )
-    print("\n== submit_job (simulation) ==")
+    print("\n== job_prepare (simulation) ==")
     print("  submitted:", dry.get("submitted"), "| partition:",
           dry.get("resolved", {}).get("partition"), "| arch:",
           dry.get("resolved", {}).get("arch"))
@@ -62,13 +62,13 @@ def main() -> int:
         if not ok:
             failures.append("refus manquant: " + bad)
 
-    gpu_on_cpu = srv.submit_job(name="x", command="a", arch="x64cpu", gpus_per_node=2)
+    gpu_on_cpu = srv.job_prepare(name="x", command="a", arch="x64cpu", gpus_per_node=2)
     print("  gpu sur x64cpu refuse :", not gpu_on_cpu.get("ok"),
           "->", str(gpu_on_cpu.get("error"))[:90])
     if gpu_on_cpu.get("ok"):
         failures.append("incoherence arch/gpu non detectee")
 
-    too_long = srv.submit_job(name="x", command="a", time_limit="5h",
+    too_long = srv.job_prepare(name="x", command="a", time_limit="5h",
                               partition="instant")
     print("  temps > partition refuse :", not too_long.get("ok"),
           "->", str(too_long.get("error"))[:90])
@@ -80,23 +80,23 @@ def main() -> int:
         failures.append("run_login_command")
 
     # --- soumission reelle d'un job minuscule -----------------------------
-    live = srv.submit_job(
+    prepared = srv.job_prepare(
         name="mcp-verif",
         command='echo "bonjour depuis $(hostname) en $(uname -m)"; sleep 5; echo fini',
         time_limit="5m",
-        confirm=True,
     )
-    show("submit_job (reel)", live, ["job_id", "resolved", "script_path", "stdout"])
+    live = srv.job_submit(prepared["plan_id"], confirm=True) if prepared["ok"] else prepared
+    show("job_submit (reel)", live, ["job_id", "resolved", "script_path", "stdout"])
     if not live.get("ok"):
-        return _finish(failures + ["submit_job reel"])
+        return _finish(failures + ["job_prepare reel"])
     job_id = live["job_id"]
 
     waited = srv.wait_for_job(job_id, timeout_seconds=180, poll_seconds=8)
     print("\n== wait_for_job ==\n  etat:", waited.get("state"),
           "| termine:", waited.get("finished"))
 
-    out = srv.job_output(job_id, stream="out", lines=20)
-    print("\n== job_output ==\n", out.get("content"))
+    out = srv.job_log_tail(job_id, stream="out", lines=20)
+    print("\n== job_log_tail ==\n", out.get("content"))
     if "bonjour depuis" not in str(out.get("content", "")):
         failures.append("sortie du job absente")
 

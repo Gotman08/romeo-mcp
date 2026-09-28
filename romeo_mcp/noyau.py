@@ -45,21 +45,23 @@ Acces au supercalculateur ROMEO (URCA), ordonnance par SLURM.
 A savoir avant toute action :
 
 - Le profil essential presente les outils courants. Si un outil avance manque
-  au catalogue, appelle `tool_profile` avec profile="full", puis relis tools/list.
+  au catalogue, appelle `tool_profile_set` avec profile="full", puis relis tools/list.
 - Le noeud de login est en x86_64, les noeuds GPU sont en aarch64. Ne compile
   et n'installe jamais depuis le login : passe par `build_on_node`.
 - Les logiciels se chargent via Spack, propre a chaque architecture. Cherche-les
   avec `romeo_software`, puis passe-les en `spack_packages`. Ne conclus jamais
   qu'un outil est absent parce que `command -v` ne le trouve pas sur le login.
-- Aucun calcul sur le noeud de login. Tout passe par `submit_job`.
+- Aucun calcul sur le noeud de login. Tout passe par `job_prepare`.
 - ROMEO est un calculateur generaliste : chimie, mecanique des fluides,
   bio-informatique, statistique, apprentissage automatique. Le parallelisme
   courant est MPI (`distributed='mpi'`, simple prefixe srun). Les options
   propres a PyTorch, aux conteneurs ou aux caches Python sont facultatives et
   desactivees par defaut : ne les active que si la charge de travail les
   concerne reellement.
-- `submit_job` fonctionne en simulation par defaut : il rend le script sbatch
-  genere et les avertissements. Relance avec `confirm=true` pour soumettre.
+- `job_prepare` conserve le script exact et rend un plan_id. Relis ce plan,
+  puis utilise `job_submit(plan_id=..., confirm=true)` pour le soumettre.
+  Meme parcours pour job_array_prepare/job_array_submit et job_pipeline_prepare/job_pipeline_submit.
+  La preparation ecrit seulement un plan local ; la soumission modifie ROMEO.
 - Les partitions sont `instant` (1 h), `short` (1 jour) et `long` (30 jours).
   Ne precise pas la partition : elle est deduite du temps demande.
 - Apres un job, lis `job_efficiency` : il remplace `seff` (absent) et indique
@@ -170,7 +172,7 @@ FENETRE_DOUBLON_SECONDES = 900
 
 #: Etats SLURM dans lesquels un job precedent rend un doublon reellement
 #: genant : il occupe deja la file ou tourne.
-ETATS_ACTIFS = {"PENDING", "RUNNING", "CONFIGURING", "SUSPENDED", "soumis"}
+ETATS_ACTIFS = {"PENDING", "RUNNING", "CONFIGURING", "SUSPENDED", "SUBMITTED", "soumis"}
 
 def _doublon_recent(script: str) -> dict | None:
     """Job identique soumis il y a peu et toujours actif, s'il en existe un.

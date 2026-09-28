@@ -36,6 +36,8 @@ SUITES = [
      "defauts constates : ils doivent rester corriges", False),
     ("job-io", "tests/test_job_io.py",
      "tableaux concurrents dans un meme dossier et contenu reel des journaux", False),
+    ("tool-actions", "tests/test_tool_actions.py",
+     "effets MCP, plans persistants, soumission exacte et recherches bornees", False),
     ("ajouts", "tests/test_ajouts.py",
      "enchainements de jobs, controle de derive du modele", False),
     ("docs", "tests/test_docs.py",

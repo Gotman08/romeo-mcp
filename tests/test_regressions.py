@@ -24,7 +24,7 @@ SCRATCH = "/scratch_p/moi"
 
 section("A1 : un journal contenant ### ne doit pas creer de sections parasites")
 # Reproduit un vrai journal de calcul : banniere de script, titre encadre, et
-# la trace d'erreur en fin de fichier, exactement ce que job_output va chercher.
+# la trace d'erreur en fin de fichier, exactement ce que job_log_tail va chercher.
 jeton = sortie.nouveau_jeton()
 journal = "\n".join([
     sortie.marqueur(jeton, "err"),
@@ -126,7 +126,7 @@ _PAQUET = Path(__file__).resolve().parents[1] / "romeo_mcp"
 _SOURCES = {f.name: f.read_text(encoding="utf-8") for f in _PAQUET.glob("*.py")}
 check("bornage present dans le code source",
       any("minutes = max(2, min(int(minutes), 15))" in t for t in _SOURCES.values()),
-      "le bornage de `minutes` manque dans run_cluster_sanity_check")
+      "le bornage de `minutes` manque dans cluster_gpu_health_run")
 
 section("Lot 3 : aucun outil ne doit laisser echapper une exception")
 from romeo_mcp import server as srv  # noqa: E402

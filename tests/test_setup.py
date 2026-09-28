@@ -97,13 +97,13 @@ from romeo_mcp import cluster, slurm, outils_calcul as jobs, outils_execution as
 assert cluster.DEFAULT_ACCOUNT == ""
 assert cluster.USER_MAX_CPUS == cluster.USER_MAX_GPUS == cluster.USER_MAX_JOBS == 0
 calls = [
-    (jobs, lambda: jobs.submit_job(name="example", command="hostname")),
-    (jobs, lambda: jobs.submit_array_job(name="example", command="hostname", parameters=["one"])),
+    (jobs, lambda: jobs.job_prepare(name="example", command="hostname")),
+    (jobs, lambda: jobs.job_array_prepare(name="example", command="hostname", parameters=["one"])),
     (jobs, lambda: jobs.submit_resilient_job(name="example", command="hostname")),
-    (jobs, lambda: jobs.submit_pipeline(name="example", stages=[])),
+    (jobs, lambda: jobs.job_pipeline_prepare(name="example", stages=[])),
     (jobs, lambda: jobs.romeo_fairshare_forecast()),
     (build, lambda: build.build_on_node(commands=["true"])),
-    (measure, lambda: measure.run_cluster_sanity_check()),
+    (measure, lambda: measure.cluster_gpu_health_run()),
 ]
 for module, call in calls:
     with patch.object(module, "session", side_effect=AssertionError("SSH must not be reached")) as ssh:
@@ -230,7 +230,7 @@ command = "other"
 command = "old-python"
 default_tools_approval_mode = "%s"
 enabled = false
-enabled_tools = ["tool_profile", "cancel_job"]
+enabled_tools = ["tool_profile_set", "cancel_job"]
 disabled_tools = ["cancel_job"]
 tool_timeout_sec = 120.5
 startup_timeout_sec = 90

@@ -24,22 +24,22 @@ Pour utiliser le MCP sans modifier Python, commencer par la
    dans le registre personnel. L’outil rend une réponse structurée au client.
 
 La connexion SSH effectue les opérations distantes ; Slurm attribue les nœuds
-qui exécutent le calcul. La simulation de `submit_job` reste distincte de sa
-soumission avec `confirm: true`.
+qui exécutent le calcul. La préparation par `job_prepare` conserve un plan local ;
+`job_submit` en soumet le script exact avec `plan_id` et `confirm: true`.
 
 ## Sections fonctionnelles
 
 | Module | Responsabilité | Exemples d’outils |
 |---|---|---|
 | [outils_contexte.py](outils_contexte.py) | Se situer sur le cluster et lire la documentation | `romeo_status`, `romeo_quota`, `romeo_software`, `search_docs`, `read_doc`, `romeo_selfcheck` |
-| [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | `submit_job`, `submit_array_job`, `submit_pipeline`, `job_status`, `job_output`, `job_efficiency` |
+| [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | `job_prepare` / `job_submit`, `job_array_prepare` / `job_array_submit`, `job_pipeline_prepare` / `job_pipeline_submit`, `job_status`, `job_log_tail`, `job_efficiency` |
 | [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | `list_dir`, `upload_to_romeo`, `download_from_romeo`, `stage_dataset`, `sbatch_lint` |
 | [outils_execution.py](outils_execution.py) | Construire des environnements et lancer des services | `build_on_node`, `build_wheel`, `romeo_pip_install`, `launch_interactive_service` |
 | [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | `diagnose_job`, `job_live_metrics`, `profile_job`, `job_system_health` |
-| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile`, `export_job_report` |
+| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile_get` / `tool_profile_set`, `export_job_report` |
 
 La [référence utilisateur](../docs/reference.md) détaille les fonctions et leurs
-limites. Le profil `essential` annonce 17 outils ; `full` annonce le catalogue
+limites. Le profil `essential` annonce 20 outils ; `full` annonce le catalogue
 complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 
 ## Modules de support

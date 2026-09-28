@@ -1,7 +1,7 @@
 """Enchainements de jobs : validation du graphe de dependances.
 
 Le serveur savait deja soumettre un job isole, un balayage parametrique
-(`submit_array_job`) et une chaine de segments reprenables
+(`job_array_prepare`) et une chaine de segments reprenables
 (`submit_resilient_job`). Il ne savait pas exprimer la forme la plus courante
 d'un calcul serieux : *preparer, calculer, rassembler*, chaque etape n'ayant de
 sens qu'apres la precedente.
@@ -22,7 +22,7 @@ from __future__ import annotations
 from .cluster import ClusterError
 
 #: Champs qu'une etape peut porter. Tout le reste vient de l'enchainement ou
-#: des defauts de `submit_job` : une etape decrit une intention de calcul, pas
+#: des defauts de `job_prepare` : une etape decrit une intention de calcul, pas
 #: un en-tete sbatch.
 CHAMPS_ETAPE = {
     "name", "command", "time_limit", "nodes", "ntasks_per_node",
@@ -51,7 +51,7 @@ def valider_etapes(etapes: list[dict]) -> list[dict]:
     if len(etapes) > 32:
         raise ClusterError(
             "{} etapes demandees : au-dela de 32, il s'agit probablement d'un "
-            "balayage parametrique. Utilise submit_array_job, qui n'occupe "
+            "balayage parametrique. Utilise job_array_prepare, qui n'occupe "
             "qu'une entree de file.".format(len(etapes))
         )
 

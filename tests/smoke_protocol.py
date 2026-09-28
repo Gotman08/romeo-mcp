@@ -17,9 +17,10 @@ OUTILS_ATTENDUS = {
     # contexte cluster
     "romeo_status", "romeo_modules", "romeo_software", "romeo_quota",
     # jobs
-    "submit_job", "submit_array_job", "submit_resilient_job", "submit_pipeline",
+    "job_prepare", "job_submit", "job_array_prepare", "job_array_submit", "submit_resilient_job",
+    "job_pipeline_prepare", "job_pipeline_submit",
     "job_status",
-    "job_output", "job_efficiency", "diagnose_job", "cancel_job", "list_jobs",
+    "job_log_tail", "job_log_search", "job_efficiency", "diagnose_job", "cancel_job", "list_jobs",
     "wait_for_job",
     # execution et interactif
     "build_on_node", "build_wheel", "romeo_pip_install",
@@ -27,17 +28,17 @@ OUTILS_ATTENDUS = {
     # observation
     "job_live_metrics", "job_stack_trace", "job_system_health",
     "job_energy_footprint", "profile_job", "profile_report",
-    "run_cluster_sanity_check",
+    "cluster_gpu_health_run",
     # fichiers et stockage
     "list_dir", "read_remote_file", "write_remote_file", "upload_to_romeo",
-    "download_from_romeo", "storage_cleanup_helper", "audit_orphan_files",
+    "download_from_romeo", "storage_usage_audit", "audit_orphan_files",
     "stage_dataset", "inject_io_staging",
     # ordonnancement
     "romeo_fairshare_forecast", "suggest_submission_slot",
     # divers
-    "run_login_command", "sbatch_lint", "secret_env_setup", "romeo_selfcheck",
+    "run_login_command", "sbatch_lint", "secret_env_prepare", "romeo_selfcheck",
     "search_docs", "read_doc",
-    "tool_profile", "export_job_report",
+    "tool_profile_get", "tool_profile_set", "export_job_report",
 }
 
 
@@ -129,7 +130,7 @@ async def main() -> int:
             assert data.get("ok") is True
 
             # Simulation de soumission : doit rendre un script sans rien soumettre.
-            dry = await sess.call_tool("submit_job", {
+            dry = await sess.call_tool("job_prepare", {
                 "name": "protocole", "command": "echo test",
                 "time_limit": "10m", "gpus_per_node": 2, "cpus_per_task": 32,
             })

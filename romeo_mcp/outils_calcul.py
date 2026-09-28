@@ -11,11 +11,13 @@ import posixpath
 import shlex
 import time
 import uuid
-from typing import Any
+from dataclasses import asdict
+from typing import Any, Literal
 from .cluster import (
     ARCHS,
     ClusterError,
     DEFAULT_ACCOUNT,
+    DEFAULT_HOST,
     require_account,
     PARTITIONS,
     PARTITION_ORDER,
@@ -23,11 +25,12 @@ from .cluster import (
     parse_duration,
 )
 from .guard import GuardError, check_path
-from .registry import registry
+from .registry import PLAN_TTL_SECONDS, registry
 from .sortie import decouper, marqueur, nouveau_jeton
 from .pipeline import clause_dependance, heriter, ordonner, valider_etapes
 from .slurm import (
     JobSpec,
+    Plan,
     TERMINAL_STATES,
     parse_pipe_table,
     plan_job,
@@ -53,26 +56,154 @@ from .noyau import (
 # =============================================================================
 # Jobs
 # =============================================================================
-@outil(
-    annotations=MUTATING,
-    description=(
-        "Prepare et soumet un job SLURM. `distributed='mpi'` couvre le "
-        "calcul parallele courant (prefixe srun, avec ou sans GPU) ; les "
-        "familles ddp, accelerate, deepspeed et srun sont propres a "
-        "PyTorch et ajoutent son point de rendez-vous. Options : "
-        "`container` pour une image Apptainer, `redirect_caches` pour "
-        "detourner les caches Python hors du home, `stage_archive` pour "
-        "mettre un jeu de donnees en memoire vive. `data_files` choisit les "
-        "entrees a empreinter au demarrage pour export_job_report (20 fichiers, 64 Mio). En simulation par "
-        "defaut : rend le "
-        "script sbatch genere, la partition et l'architecture deduites, et les "
-        "avertissements de dimensionnement, SANS rien soumettre. Relance avec "
-        "confirm=true pour soumettre reellement. La partition est deduite du "
-        "temps demande et l'architecture du besoin en GPU : ne les force que si "
-        "tu as une raison precise."
-    ),
-)
-def submit_job(
+_SUBMIT_TOOLS = {"job": "job_submit", "array": "job_array_submit", "pipeline": "job_pipeline_submit"}
+
+
+def _submission_target(s, home: str, scratch: str) -> dict:
+    return {"host": getattr(s, "host", DEFAULT_HOST), "account": require_account(),
+            "home": home, "scratch": scratch}
+
+
+def _prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dict:
+    """Fige les scripts ; une simulation illustrative ne devient jamais executable."""
+    result = {"ok": True, "submitted": False, "mode": "prepared", **preview,
+              "submittable": not bool(offline)}
+    if offline:
+        return {**result, "mode": "simulation", "plan_id": None,
+                "next_step": "Reconnecte-toi ou configure ROMEO_SCRATCH, puis prepare un nouveau plan."}
+    payload = {"kind": kind, "target": _submission_target(s, home, scratch),
+               "entries": entries, "preview": preview}
+    identity = registry().prepare_submission(payload)
+    return {**result, **identity,
+            "next_step": "Relis les scripts et avertissements, puis appelle {} avec ce plan_id et confirm=true."
+                         .format(_SUBMIT_TOOLS[kind])}
+
+
+def _submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
+    """Execute une seule fois le contenu conserve, sans regenerer de script."""
+    if confirm is not True:
+        return _error("La soumission exige confirm=true apres lecture du plan.", submitted=False)
+    store = registry()
+    try:
+        saved = store.prepared_submission(plan_id)
+    except ValueError as exc:
+        return _error(str(exc), submitted=False)
+    if not saved or saved["payload"]["kind"] != kind:
+        return _error("Plan introuvable ou incompatible avec cet outil. Prepare un nouveau plan.", submitted=False)
+    if saved["state"] != "ready":
+        if saved["state"] == "submitted":
+            return {**saved["result"], "already_submitted": True}
+        return _error("Ce plan a deja fait l'objet d'une tentative de soumission. "
+                      "Consulte list_jobs avant de preparer un autre plan.",
+                      plan_id=plan_id, state=saved["state"], previous_result=saved["result"])
+    if saved["created_at"] <= time.time() - PLAN_TTL_SECONDS:
+        return _error("Plan expire (24 h). Prepare un nouveau plan.", submitted=False)
+    require_account()
+    s = session()
+    home, scratch, _, _ = _contexte_chemins(s, True)
+    payload = saved["payload"]
+    if payload["target"] != _submission_target(s, home, scratch):
+        return _error("La cible SSH, le compte ou les racines ont change. Prepare un nouveau plan.", submitted=False)
+    plans = []
+    for entry in payload["entries"]:
+        serialized = entry["plan"]
+        plan = Plan(**{**serialized, "spec": JobSpec(**serialized["spec"])})
+        problems = _controle_du_script_genere(plan.script)
+        if problems:
+            return _error("Controle du script : " + " ; ".join(problems), submitted=False)
+        plans.append((entry, plan))
+    if kind == "job":
+        previous = _doublon_recent(plans[0][1].script)
+        if previous:
+            return _error("Un job identique est deja actif. Consulte job_status.",
+                          duplicate_of=previous["job_id"], submitted=False)
+    if not store.claim_submission(plan_id):
+        return _error("Plan deja reserve par une autre soumission ou expire. Consulte list_jobs.", plan_id=plan_id)
+
+    submitted, identifiers = [], {}
+    result = {}
+    try:
+        for entry, plan in plans:
+            artifacts = {}
+            if "parameters_path" in entry:
+                s.write_file(entry["parameters_path"], entry["parameters_text"], mode="400")
+                artifacts["parameters"] = {
+                    "path": entry["parameters_path"], "source": "generated_content",
+                    "sha256": hashlib.sha256(entry["parameters_text"].encode("utf-8")).hexdigest(),
+                    "rows": entry["parameter_count"],
+                }
+            stage = entry.get("stage")
+            clause = clause_dependance(stage, identifiers) if stage else ""
+            submission = _soumettre_sbatch(
+                s, plan, plan.spec.name, options=(clause,) if clause else (),
+                script_path=entry.get("script_path"), artifacts=artifacts,
+                note="plan {} ({})".format(plan_id, kind))
+            if not submission["ok"]:
+                result = {**submission, "submitted_stages": submitted,
+                          "job_ids": list(identifiers.values()),
+                          "next_step": "Consulte list_jobs avant une nouvelle preparation ; "
+                                       "les etapes deja soumises restent actives."}
+                if stage:
+                    result["failed_stage"] = stage["name"]
+                break
+            if stage:
+                identifiers[stage["name"]] = submission["job_id"]
+                submitted.append({"stage": stage["name"], "job_id": submission["job_id"],
+                                  "depends_on": [identifiers[d] for d in stage["depends_on"]]})
+                # Une interruption entre deux etapes ne doit pas effacer les
+                # identifiants deja obtenus ni permettre de relancer le plan.
+                store.update_submission(plan_id, "submitting", {"submitted_stages": submitted})
+        else:
+            preview = payload["preview"]
+            result = {"ok": True, "submitted": True, "warnings": preview["warnings"],
+                      "next_step": "Consulte job_status, job_log_tail puis job_efficiency."}
+            if kind == "pipeline":
+                result.update(pipeline=preview["pipeline"], stages=submitted,
+                              job_ids=list(identifiers.values()))
+            else:
+                result.update(submission, resolved=preview["resolved"])
+                if kind == "array":
+                    result["parameters_file"] = plans[0][0]["parameters_path"]
+    except Exception as exc:
+        # La tentative reste consommee : apres une coupure reseau, l'absence
+        # d'accuse de reception n'est pas une preuve d'absence du job.
+        result = _error("Soumission interrompue : {}. Verifie list_jobs avant toute nouvelle tentative."
+                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()))
+    result.update(plan_id=plan_id, plan_sha256=saved["sha256"])
+    store.update_submission(plan_id, "submitted" if result["ok"] else "failed", result)
+    return result
+
+
+@outil(annotations=MUTATING, description=(
+    "Soumet exactement le job conserve par job_prepare. Exige plan_id et confirm=true. "
+    "Ecrit le script sur ROMEO, appelle sbatch et enregistre le job. Un plan deja soumis ne relance aucun job."))
+def job_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return _submit_prepared("job", plan_id, confirm)
+
+
+@outil(annotations=MUTATING, description=(
+    "Soumet exactement le tableau conserve par job_array_prepare, avec son fichier de parametres. "
+    "Exige plan_id et confirm=true ; ecrit sur ROMEO et reserve les ressources via sbatch."))
+def job_array_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return _submit_prepared("array", plan_id, confirm)
+
+
+@outil(annotations=MUTATING, description=(
+    "Soumet les scripts exacts conserves par job_pipeline_prepare, dans l'ordre et avec les dependances preparees. "
+    "Exige plan_id et confirm=true. En cas d'echec, les etapes deja soumises restent actives et sont indiquees."))
+def job_pipeline_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return _submit_prepared("pipeline", plan_id, confirm)
+
+
+@outil(annotations=MUTATING, description=(
+    "Prepare un job SLURM valide : ressources, architecture, script exact et avertissements. "
+    "distributed='mpi' utilise srun ; les options PyTorch, conteneur, caches et staging sont facultatives. "
+    "data_files choisit jusqu'a 20 entrees a empreinter (64 Mio au total). "
+    "Enregistre un plan local valable 24 h ; aucune ecriture ni soumission sur ROMEO. "
+    "Relis le plan puis appelle job_submit(plan_id=..., confirm=true). "
+    "Un apercu aux chemins illustratifs ne peut pas etre soumis."
+))
+def job_prepare(
     name: str,
     command: str,
     time_limit: str = "1h",
@@ -97,9 +228,8 @@ def submit_job(
     cpu_bind: str | None = None,
     secret_env_file: str | None = None,
     data_files: list[str] | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Valide une intention de calcul, puis la soumet si `confirm` est vrai."""
+    """Prepare le script exact et conserve un plan local, sans soumettre."""
     require_account()
     s = session()
     spec = JobSpec(
@@ -130,7 +260,7 @@ def submit_job(
     )
 
     try:
-        foyer, racine, alias, hors_ligne = _contexte_chemins(s, confirm)
+        foyer, racine, alias, hors_ligne = _contexte_chemins(s, False)
         if workdir:
             spec.workdir = check_path(workdir, foyer, racine, alias)
         plan = plan_job(spec, racine)
@@ -159,59 +289,11 @@ def submit_job(
         "mem_gb": plan.spec.mem_gb,
     }
 
-    if not confirm:
-        return {
-            "ok": True,
-            "submitted": False,
-            "mode": "simulation",
-            "resolved": resolved,
-            "warnings": avertissements,
-            "script": plan.script,
-            "next_step": (
-                "Relis le script et les avertissements, puis rappelle submit_job "
-                "avec des parametres identiques et confirm=true pour soumettre."
-            ),
-        }
+    return _prepare_submission("job", s, foyer, racine, hors_ligne,
+        [{"plan": asdict(plan)}], {
+            "resolved": resolved, "warnings": avertissements, "script": plan.script,
+        })
 
-    precedent = _doublon_recent(plan.script)
-    if precedent:
-        return _error(
-            "job identique deja soumis il y a {} s (job {}, etat {}). Rien n'a "
-            "ete soumis. Si la repetition est voulue, change le nom du job ou "
-            "attends la fin du precedent ; sinon suis-le avec job_status.".format(
-                int(time.time() - precedent["submitted_at"]),
-                precedent["job_id"], precedent.get("last_state") or "soumis"),
-            duplicate_of=precedent["job_id"],
-        )
-
-    bloquants = _controle_du_script_genere(plan.script)
-    if bloquants:
-        return _error(
-            "le script genere ne passe pas le controle du serveur lui-meme : "
-            "{}. Rien n'a ete soumis -- c'est une anomalie du gabarit, pas de "
-            "ta demande.".format(" ; ".join(bloquants)),
-            inattendu=True,
-        )
-
-    soumission = _soumettre_sbatch(s, plan, spec.name)
-    if not soumission["ok"]:
-        return soumission
-    job_id = soumission["job_id"]
-
-    return {
-        "ok": True,
-        "submitted": True,
-        "job_id": job_id,
-        "resolved": resolved,
-        "warnings": plan.warnings,
-        "script_path": soumission["script_path"],
-        "stdout": soumission["stdout"],
-        "stderr": soumission["stderr"],
-        "next_step": (
-            "Le job est en file. Consulte job_status('{}') ; ne bloque pas en "
-            "attente, reviens plus tard.".format(job_id)
-        ),
-    }
 
 @outil(
     annotations=READ_ONLY,
@@ -281,7 +363,7 @@ def job_status(job_id: str) -> dict[str, Any]:
             "exit_code": parts[5].strip() if len(parts) > 5 else "",
             "start": parts[6].strip() if len(parts) > 6 else "",
             "end": parts[7].strip() if len(parts) > 7 else "",
-            "next_step": "Consulte job_output puis job_efficiency.",
+            "next_step": "Consulte job_log_tail puis job_efficiency.",
         }
 
     return _error(
@@ -293,24 +375,53 @@ def job_status(job_id: str) -> dict[str, Any]:
 @outil(
     annotations=READ_ONLY,
     description=(
-        "Sortie d'un job, tronquee par defaut. N'affiche JAMAIS un log entier : "
-        "utilise `lines` pour la fin du fichier et `grep` pour cibler. Le mode "
+        "Lit les dernieres lignes des journaux d'un job. lines (1-500), max_files "
+        "(1-40 par flux) et max_chars (1-40000) bornent la sortie. Le mode "
         "stream='auto' privilegie les extraits stderr non blancs apres filtre. "
         "has_stderr_content indique la presence d'octets dans les fichiers "
         "stderr, independamment du filtre et du flux affiche."
     ),
 )
-def job_output(
+def job_log_tail(
     job_id: str,
-    stream: str = "auto",
+    stream: Literal["auto", "out", "err", "both"] = "auto",
     lines: int = 60,
-    grep: str | None = None,
     max_chars: int = 8000,
+    max_files: int = 10,
 ) -> dict[str, Any]:
     """Lit la fin des fichiers de sortie d'un job."""
+    return _read_job_logs(job_id, stream, lines, None, max_chars, max_files)
+
+
+@outil(annotations=READ_ONLY, description=(
+    "Recherche un motif grep -E obligatoire dans les journaux d'un job. "
+    "Lit au plus les derniers max_bytes_per_file octets (1-16777216) de chaque fichier ; "
+    "max_matches (1-500) limite les correspondances par fichier, max_files (1-40) les fichiers par flux, "
+    "et max_chars (1-40000) la sortie. Les bornes appliquees sont rendues dans la reponse."))
+def job_log_search(
+    job_id: str,
+    pattern: str,
+    stream: Literal["auto", "out", "err", "both"] = "auto",
+    max_matches: int = 60,
+    max_chars: int = 8000,
+    max_files: int = 10,
+    max_bytes_per_file: int = 1048576,
+) -> dict[str, Any]:
+    if not pattern or len(pattern) > 4096 or "\x00" in pattern:
+        return _error("pattern doit contenir 1 a 4096 caracteres, sans octet nul.")
+    return _read_job_logs(job_id, stream, max_matches, pattern, max_chars,
+                          max_files, max_bytes_per_file)
+
+
+def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_bytes_per_file=1048576):
+    if stream not in {"auto", "out", "err", "both"}:
+        return _error("stream doit valoir auto, out, err ou both.")
     s = session()
     jid = str(job_id).strip()
     lines = max(1, min(int(lines), 500))
+    max_chars = max(1, min(int(max_chars), 40000))
+    max_files = max(1, min(int(max_files), 40))
+    max_bytes_per_file = max(1, min(int(max_bytes_per_file), 16777216))
 
     record = registry().get(jid)
     if record:
@@ -352,9 +463,9 @@ def job_output(
     else:  # auto : l'erreur d'abord si elle contient quelque chose
         wanted = ["err", "out"]
 
-    filter_cmd = (
-        "grep -E -- {} ".format(shlex.quote(grep)) if grep else "cat"
-    )
+    read_cmd = ('tail -c {budget} -- "$f" | grep -aE -m {n} -- {pattern}'.format(
+        budget=max_bytes_per_file, n=lines, pattern=shlex.quote(pattern)) if pattern is not None
+        else 'tail -n {} -- "$f"'.format(lines))
     # Seul outil a voir du texte utilisateur arbitraire : un journal contenant
     # `### Validation ###` ou une banniere `##########` creait des sections
     # parasites et faisait disparaitre la fin du journal, precisement la trace
@@ -362,6 +473,12 @@ def job_output(
     # ne peut pas contenir.
     jeton = nouveau_jeton()
     parts = []
+    if pattern is not None:
+        # grep=1 signifie aucune correspondance ; grep=2 est une erreur de
+        # motif. La distinguer avant que les pipelines ne masquent son code.
+        parts.append("grep -E -- {} </dev/null >/dev/null; romeo_grep_rc=$?; "
+                     "if [ $romeo_grep_rc -gt 1 ]; then exit $romeo_grep_rc; fi"
+                     .format(shlex.quote(pattern)))
     if "err" in targets:
         # Sonder les fichiers avant tout extrait : ni les en-tetes, ni grep,
         # ni le budget d'affichage ne doivent changer cet indicateur.
@@ -378,11 +495,12 @@ def job_output(
         # suivantes uniquement le contenu. Ajouter les en-tetes cote Python.
         parts.append(
             'romeo_log_index=0; for f in {cible}; do [ -f "$f" ] || continue; '
+            'if [ "$romeo_log_index" -ge {max_files} ]; then echo "{limited}"; break; fi; '
             'printf \'%s\\n\' "{marqueur}_$romeo_log_index" "$f"; '
-            '{filt} "$f" | tail -n {n}; printf \'\\n\'; '
+            '{read}; printf \'\\n\'; '
             'romeo_log_index=$((romeo_log_index + 1)); done'.format(
                 marqueur=marqueur(jeton, label), cible=targets[label],
-                filt=filter_cmd, n=lines,
+                read=read_cmd, max_files=max_files, limited=marqueur(jeton, "files_limited"),
             )
         )
 
@@ -392,6 +510,8 @@ def job_output(
         )
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
+    if not result.ok:
+        return _error("Lecture ou motif de recherche invalide : " + result.stdout.strip()[:500])
 
     sections = decouper(result.stdout, jeton)
     logs = {"err": [], "out": []}
@@ -414,17 +534,23 @@ def job_output(
         chosen = stream
         body = err_text if stream == "err" else out_text
 
+    truncated = len(body) > max_chars or result.truncated
     if len(body) > max_chars:
-        body = "[... debut tronque ...]\n" + body[-max_chars:]
+        body = body[-max_chars:]
 
     return {
         "ok": True,
         "job_id": jid,
         "stream": chosen,
         "lines_requested": lines,
-        "grep": grep,
+        "pattern": pattern,
+        "limits": {"max_chars": max_chars, "max_files_per_stream": max_files,
+                   **({"max_matches_per_file": lines, "max_bytes_per_file": max_bytes_per_file,
+                       "search_window": "end_of_file"} if pattern is not None else {"lines_per_file": lines})},
+        "truncated": truncated,
+        "files_limited": "files_limited" in sections,
         "has_stderr_content": "1" in sections.get("stderr_nonempty", []),
-        "content": body or "(aucune sortie pour l'instant)",
+        "content": (body or "(aucune sortie pour l'instant)")[:max_chars],
     }
 
 @outil(
@@ -579,18 +705,14 @@ def wait_for_job(job_id: str, timeout_seconds: int = 120, poll_seconds: int = 10
 # =============================================================================
 # Balayages parametriques
 # =============================================================================
-@outil(
-    annotations=MUTATING,
-    description=(
-        "Soumet un balayage parametrique en tableau SLURM : une tache par jeu "
-        "de parametres, avec un plafond de taches simultanees. Chaque tache "
-        "recoit sa ligne de parametres dans la variable $PARAMS, que ta "
-        "commande peut interpoler. Ideal pour une recherche d'hyperparametres "
-        "ou une evaluation sur plusieurs jeux de donnees. Simulation par "
-        "defaut, comme submit_job."
-    ),
-)
-def submit_array_job(
+@outil(annotations=MUTATING, description=(
+    "Prepare un tableau SLURM : une tache par ligne de parameters, exposee via $PARAMS, "
+    "avec max_concurrent taches simultanees. Fige le script et le fichier de parametres. "
+    "Enregistre un plan local valable 24 h ; aucune ecriture ni soumission sur ROMEO. "
+    "Relis le plan puis appelle job_array_submit(plan_id=..., confirm=true). "
+    "Un apercu aux chemins illustratifs ne peut pas etre soumis."
+))
+def job_array_prepare(
     name: str,
     command: str,
     parameters: list[str],
@@ -603,7 +725,6 @@ def submit_array_job(
     modules: list[str] | None = None,
     spack_packages: list[str] | None = None,
     workdir: str | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
     """Genere un tableau SLURM pilote par un fichier de parametres."""
     require_account()
@@ -645,9 +766,10 @@ def submit_array_job(
     )
 
     try:
+        foyer, racine, alias, hors_ligne = _contexte_chemins(s, False)
         if workdir:
-            spec.workdir = check_path(workdir, s.home, s.scratch, s.path_aliases)
-        plan = plan_job(spec, s.scratch)
+            spec.workdir = check_path(workdir, foyer, racine, alias)
+        plan = plan_job(spec, racine)
         # Resoudre d'abord le dossier, puis y reserver des noms propres a cet
         # appel. N tableaux peuvent ainsi partager le meme workdir et nom.
         submission_id = uuid.uuid4().hex
@@ -657,7 +779,7 @@ def submit_array_job(
             'PARAMS="$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" {})"\n'
             'echo "[romeo-mcp] tache $SLURM_ARRAY_TASK_ID : $PARAMS"\n'
         ).format(shlex.quote(params_path)) + command
-        plan = plan_job(spec, s.scratch)
+        plan = plan_job(spec, racine)
     except (ClusterError, GuardError, SSHError, SSHTimeout) as exc:
         return _error(str(exc))
 
@@ -670,46 +792,17 @@ def submit_array_job(
         "array": spec.array,
     }
 
-    if not confirm:
-        return {
-            "ok": True,
-            "submitted": False,
-            "mode": "simulation",
-            "resolved": resume,
-            "warnings": plan.warnings,
-            "parameters_preview": parameters[:5],
-            "script": plan.script,
-            "next_step": "Rappelle avec confirm=true pour soumettre le tableau.",
-        }
-
-    # Le fichier de parametres doit exister avant la soumission : la tache 0
-    # peut demarrer immediatement.
     parameters_text = "\n".join(parameters) + "\n"
-    try:
-        s.write_file(params_path, parameters_text, mode="400")
-    except (SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
+    return _prepare_submission("array", s, foyer, racine, hors_ligne,
+        [{"plan": asdict(plan), "script_path": script_path,
+          "parameters_path": params_path, "parameters_text": parameters_text,
+          "parameter_count": len(parameters)}], {
+            "resolved": resume, "warnings": ([hors_ligne] if hors_ligne else []) + plan.warnings,
+            "parameters_preview": parameters[:5], "parameters_file": params_path,
+            "parameters_sha256": hashlib.sha256(parameters_text.encode("utf-8")).hexdigest(),
+            "script": plan.script,
+        })
 
-    soumission = _soumettre_sbatch(
-        s, plan, spec.name, note="tableau de {} taches".format(len(parameters)),
-        script_path=script_path,
-        artifacts={"parameters": {
-            "path": params_path,
-            "source": "generated_content",
-            "sha256": hashlib.sha256(parameters_text.encode("utf-8")).hexdigest(),
-            "rows": len(parameters),
-        }},
-    )
-    if not soumission["ok"]:
-        return soumission
-    return {
-        "ok": True, "submitted": True, "job_id": soumission["job_id"],
-        "resolved": resume, "warnings": plan.warnings,
-        "parameters_file": params_path,
-        "script_path": soumission["script_path"],
-        "next_step": "Suis l'avancement avec job_status('{}').".format(
-            soumission["job_id"]),
-    }
 
 # =============================================================================
 # Resilience : chaine de segments reprenables
@@ -1083,28 +1176,21 @@ def suggest_submission_slot(
 # =============================================================================
 # Enchainements de jobs
 # =============================================================================
-@outil(
-    annotations=MUTATING,
-    description=(
-        "Soumet un enchainement de jobs relies par des dependances SLURM : "
-        "preparer, calculer, rassembler. Chaque etape decrit une intention "
-        "(commande, temps, ressources) et les etapes dont elle depend ; le "
-        "serveur ordonne, valide chacune comme submit_job le ferait, et pose "
-        "les --dependency. L'architecture declaree pour l'enchainement est "
-        "heritee par toutes les etapes, ce qui evite qu'une etape sans GPU "
-        "parte sur x86_64 alors que les autres tournent en aarch64. "
-        "SIMULATION PAR DEFAUT : rappelle avec confirm=true pour soumettre."
-    ),
-)
-def submit_pipeline(
+@outil(annotations=MUTATING, description=(
+    "Prepare et valide toutes les etapes d'un pipeline SLURM, leur ordre et leurs dependances. "
+    "Les etapes heritent de l'architecture et des logiciels declares. Fige tous les scripts. "
+    "Enregistre un plan local valable 24 h ; aucune ecriture ni soumission sur ROMEO. "
+    "Relis le plan puis appelle job_pipeline_submit(plan_id=..., confirm=true). "
+    "Un apercu aux chemins illustratifs ne peut pas etre soumis."
+))
+def job_pipeline_prepare(
     name: str,
     stages: list[dict],
     arch: str | None = None,
     spack_packages: list[str] | None = None,
     modules: list[str] | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Valide et soumet un graphe d'etapes dependantes."""
+    """Valide et conserve les scripts et dependances d'un pipeline."""
     require_account()
     s = session()
     if not _NOM_ENCHAINEMENT.match(name or ""):
@@ -1119,7 +1205,7 @@ def submit_pipeline(
         return _error(str(exc))
 
     try:
-        foyer, racine, alias, hors_ligne = _contexte_chemins(s, confirm)
+        foyer, racine, alias, hors_ligne = _contexte_chemins(s, False)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
 
@@ -1172,63 +1258,9 @@ def submit_pipeline(
             "workdir": plan.workdir,
         })
 
-    if not confirm:
-        return {
-            "ok": True,
-            "submitted": False,
-            "mode": "simulation",
-            "pipeline": name,
-            "order": [e["name"] for e, _ in plans],
-            "stages": resume,
-            "warnings": avertissements,
+    return _prepare_submission("pipeline", s, foyer, racine, hors_ligne,
+        [{"stage": etape, "plan": asdict(plan)} for etape, plan in plans], {
+            "pipeline": name, "order": [e["name"] for e, _ in plans],
+            "stages": resume, "warnings": avertissements,
             "scripts": {e["name"]: p.script for e, p in plans},
-            "next_step": (
-                "Relis l'ordre, les architectures et les avertissements, puis "
-                "rappelle submit_pipeline avec confirm=true pour soumettre."
-            ),
-        }
-
-    identifiants: dict[str, str] = {}
-    soumis: list[dict] = []
-    for etape, plan in plans:
-        options = ()
-        clause = clause_dependance(etape, identifiants)
-        if clause:
-            options = (clause,)
-        resultat = _soumettre_sbatch(
-            s, plan, "{}-{}".format(name, etape["name"]),
-            note="enchainement {}".format(name), options=options,
-        )
-        if not resultat["ok"]:
-            # On ne rattrape pas les etapes deja parties : les annuler
-            # detruirait un calcul peut-etre deja en cours. On dit exactement
-            # ou l'enchainement s'est arrete, et ce qui tourne encore.
-            return _error(
-                "etape {!r} refusee : {}. Les etapes precedentes sont DEJA "
-                "soumises ({}) et vont s'executer. Annule-les avec cancel_job "
-                "si l'enchainement incomplet n'a pas de sens.".format(
-                    etape["name"], resultat.get("error", ""),
-                    ", ".join("{}={}".format(k, v) for k, v in identifiants.items())
-                    or "aucune"),
-                submitted_stages=soumis,
-            )
-        identifiants[etape["name"]] = resultat["job_id"]
-        soumis.append({
-            "stage": etape["name"],
-            "job_id": resultat["job_id"],
-            "depends_on": [identifiants[d] for d in etape["depends_on"]],
         })
-
-    return {
-        "ok": True,
-        "submitted": True,
-        "pipeline": name,
-        "stages": soumis,
-        "job_ids": list(identifiants.values()),
-        "warnings": avertissements,
-        "next_step": (
-            "Suis l'enchainement avec list_jobs. Une etape en etat "
-            "DependencyNeverSatisfied signale qu'une etape amont a echoue : "
-            "diagnose_job sur celle-ci."
-        ),
-    }

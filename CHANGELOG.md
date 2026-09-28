@@ -4,6 +4,19 @@
 
 ## Non publié
 
+- Séparation des actions MCP : `tool_profile_get` / `tool_profile_set`,
+  `job_log_tail` / `job_log_search`, préparation et soumission des jobs,
+  tableaux et pipelines. Les plans privés conservent les scripts exacts,
+  expirent pour soumission après 24 h et empêchent une répétition après
+  succès, appel concurrent ou échec partiel.
+- `secret_env_prepare` annonce ses écritures et changements de permissions ;
+  `cluster_gpu_health_run` annonce son allocation GPU. Le faux mode NCCL
+  est désactivé. `storage_usage_audit` remplace le nom suggérant un nettoyage.
+- `stage_dataset` n’installe plus implicitement `huggingface_hub` : un venv
+  `env_path` préparé explicitement est requis pour les datasets Hugging Face.
+- Ces changements retirent les anciens noms du catalogue MCP. Voir le
+  [guide de migration](docs/reference.md#migration-des-anciens-noms).
+
 - Isolation des fichiers de paramètres et des scripts Slurm par soumission,
   avec noms uniques dans le même dossier et empreintes conservées dans la
   provenance. Plusieurs tableaux peuvent partager le même nom et le même

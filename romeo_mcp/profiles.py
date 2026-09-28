@@ -8,8 +8,8 @@ from .config import setting
 
 PROFILES = ("essential", "full")
 ESSENTIAL_TOOLS = frozenset({
-    "tool_profile", "search_docs", "read_doc", "romeo_status", "romeo_quota",
-    "romeo_software", "submit_job", "job_status", "job_output", "list_jobs",
+    "tool_profile_get", "tool_profile_set", "search_docs", "read_doc", "romeo_status", "romeo_quota",
+    "romeo_software", "job_prepare", "job_submit", "job_status", "job_log_tail", "job_log_search", "list_jobs",
     "cancel_job", "diagnose_job", "job_efficiency", "list_dir",
     "upload_to_romeo", "download_from_romeo", "export_job_report",
 })

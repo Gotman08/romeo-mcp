@@ -3,7 +3,7 @@
 Raison d'etre : le contexte d'un modele est volatil, pas ROMEO. Sans trace
 locale, un modele qui perd son contexte perd aussi la trace des jobs qu'il a
 lances (repertoire de travail, script exact, chemins des logs). Le registre
-permet a `list_jobs` et `job_output` de retrouver tout cela apres coup.
+permet a `list_jobs` et `job_log_tail` de retrouver tout cela apres coup.
 
 SQLite, dans ``~/.romeo-mcp/jobs.db``.
 """
@@ -11,11 +11,15 @@ SQLite, dans ``~/.romeo-mcp/jobs.db``.
 from __future__ import annotations
 
 import os
+import hashlib
 import json
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
+
+PLAN_TTL_SECONDS = 24 * 60 * 60
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
@@ -35,6 +39,14 @@ CREATE INDEX IF NOT EXISTS jobs_submitted_at ON jobs(submitted_at DESC);
 CREATE TABLE IF NOT EXISTS job_provenance (
     job_id TEXT PRIMARY KEY,
     payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS prepared_submissions (
+    plan_id TEXT PRIMARY KEY,
+    created_at REAL NOT NULL,
+    payload TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    state TEXT NOT NULL,
+    result TEXT
 );
 """
 
@@ -129,6 +141,45 @@ class Registry:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    def prepare_submission(self, payload: dict) -> dict:
+        """Conserve le contenu exact du plan, independamment du processus MCP."""
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        plan_id, created = uuid.uuid4().hex, time.time()
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO prepared_submissions VALUES (?, ?, ?, ?, 'ready', NULL)",
+                (plan_id, created, encoded, digest))
+        return {"plan_id": plan_id, "plan_sha256": digest, "expires_at": created + PLAN_TTL_SECONDS}
+
+    def prepared_submission(self, plan_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM prepared_submissions WHERE plan_id = ?", (plan_id,)).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        if hashlib.sha256(result["payload"].encode("utf-8")).hexdigest() != result["sha256"]:
+            raise ValueError("Plan altere : prepare un nouveau plan avant de soumettre.")
+        result["payload"] = json.loads(result["payload"])
+        result["result"] = json.loads(result["result"]) if result["result"] else None
+        return result
+
+    def claim_submission(self, plan_id: str) -> bool:
+        """Une seule tentative, y compris entre deux processus et apres un crash."""
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE prepared_submissions SET state = 'submitting' "
+                "WHERE plan_id = ? AND state = 'ready' AND created_at > ?",
+                (plan_id, time.time() - PLAN_TTL_SECONDS))
+            return cursor.rowcount == 1
+
+    def update_submission(self, plan_id: str, state: str, result: dict) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE prepared_submissions SET state = ?, result = ? WHERE plan_id = ?",
+                (state, json.dumps(result, ensure_ascii=False), plan_id))
 
 
 _REGISTRY: Registry | None = None

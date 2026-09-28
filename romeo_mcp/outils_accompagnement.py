@@ -4,20 +4,27 @@ from typing import Any, Literal
 
 from mcp.server.mcpserver import Context
 
-from .noyau import MUTATING, outil, server
+from .noyau import MUTATING, READ_ONLY, outil, server
 from .reproducibility import export_report
 
 
+@outil(annotations=READ_ONLY, description=(
+    "Consulte le profil et le catalogue d'outils de cette connexion, sans les modifier."))
+async def tool_profile_get() -> dict[str, Any]:
+    tools = await server.list_tools()
+    return {"ok": True, "profile": server.tool_profile, "tools": [t.name for t in tools],
+            "count": len(tools), "scope": "current_stdio_process", "persistent": False}
+
+
 @outil(annotations=MUTATING, description=(
-    "Consulte ou change le profil d'outils pour cette connexion : essential ou full. "
+    "Change le profil d'outils pour cette connexion : essential ou full. "
     "full reaffiche immediatement les outils avances. Aucun job ni fichier distant n'est modifie."))
-async def tool_profile(profile: Literal["essential", "full"] | None = None,
-                       ctx: Context | None = None) -> dict[str, Any]:
-    if profile is not None and profile not in {"essential", "full"}:
+async def tool_profile_set(profile: Literal["essential", "full"],
+                           ctx: Context | None = None) -> dict[str, Any]:
+    if profile not in {"essential", "full"}:
         raise ValueError("Profil inconnu : essential ou full.")
-    changed = profile is not None and profile != server.tool_profile
-    if profile is not None:
-        server.tool_profile = profile
+    changed = profile != server.tool_profile
+    server.tool_profile = profile
     notified = False
     if changed and ctx is not None:
         try:
@@ -26,10 +33,7 @@ async def tool_profile(profile: Literal["essential", "full"] | None = None,
         except Exception:
             # Le choix est applique, meme si le client ne recoit plus les notifications.
             pass
-    tools = await server.list_tools()
-    return {"ok": True, "profile": server.tool_profile, "tools": [t.name for t in tools],
-            "count": len(tools), "changed": changed, "client_notified": notified,
-            "scope": "current_stdio_process", "persistent": False,
+    return {**await tool_profile_get(), "changed": changed, "client_notified": notified,
             "next_step": "Relire tools/list. Pour conserver ce choix au prochain lancement : configure --profile essential ou full."}
 
 

@@ -36,14 +36,14 @@ HEAVY_COMMANDS = {
     "cargo": "build_on_node",
     "rustc": "build_on_node",
     "go": "build_on_node",
-    "mpirun": "submit_job",
-    "mpiexec": "submit_job",
+    "mpirun": "job_prepare",
+    "mpiexec": "job_prepare",
     # `srun` n'est volontairement PAS bloque : la documentation ROMEO le
     # presente comme la voie normale vers un noeud de calcul (`srun --pty bash`),
     # et c'est d'ailleurs ce que `build_on_node` execute depuis le login.
-    "julia": "submit_job",
-    "matlab": "submit_job",
-    "Rscript": "submit_job",
+    "julia": "job_prepare",
+    "matlab": "job_prepare",
+    "Rscript": "job_prepare",
 }
 
 #: `pip install` compile des roues natives : c'est le piege d'architecture.
@@ -136,7 +136,7 @@ def check_login_command(command: str, allow_heavy: bool = False) -> None:
     if len(text) > 4_000:
         raise GuardError(
             "commande trop longue pour le noeud de login. Un script de cette "
-            "taille doit etre soumis via `submit_job`."
+            "taille doit etre soumis via `job_prepare`."
         )
 
     if allow_heavy:
@@ -168,14 +168,14 @@ def check_login_command(command: str, allow_heavy: bool = False) -> None:
         if head in ("python", "python3") and re.search(r"\S+\.py\b", segment):
             raise GuardError(
                 "executer un script Python sur le noeud de login est interdit. "
-                "Passe par `submit_job`. Les formes courtes `python -c` et "
+                "Passe par `job_prepare`. Les formes courtes `python -c` et "
                 "`python --version` restent autorisees pour l'inspection."
             )
 
     if len(text) > 4_000:
         raise GuardError(
             "commande trop longue pour le noeud de login. Un script de cette "
-            "taille doit etre soumis via `submit_job`."
+            "taille doit etre soumis via `job_prepare`."
         )
 
 
