@@ -8,7 +8,7 @@ dates différentes et signale les informations manquantes.
 
 ## Choisir les données avant le calcul
 
-Dans `submit_job`, ajoutez les chemins absolus des entrées scientifiques à
+Dans `job_prepare`, ajoutez les chemins absolus des entrées scientifiques à
 `data_files`. Exemple à adapter avec votre propre répertoire scratch :
 
 ```json
@@ -20,12 +20,11 @@ Dans `submit_job`, ajoutez les chemins absolus des entrées scientifiques à
   "cpus_per_task": 1,
   "mem_gb": 2,
   "workdir": "/scratch_p/VOTRE_IDENTIFIANT/experience",
-  "data_files": ["/scratch_p/VOTRE_IDENTIFIANT/experience/entrees.csv"],
-  "confirm": false
+  "data_files": ["/scratch_p/VOTRE_IDENTIFIANT/experience/entrees.csv"]
 }
 ```
 
-Vérifiez la simulation, puis soumettez avec `confirm: true`. Le dossier de
+Vérifiez le plan, puis appelez `job_submit` avec son `plan_id` et `confirm: true`. Le dossier de
 travail peut être un checkout Git : la capture y cherche `HEAD`, sans lancer
 de filtre Git, de commande du projet ou de parcours des fichiers non suivis.
 

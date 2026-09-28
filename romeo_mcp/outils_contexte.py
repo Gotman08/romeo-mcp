@@ -201,7 +201,7 @@ _SPACK_CACHE: dict[str, list[str]] = {}
         "logiciels. ATTENTION : le catalogue differe selon l'architecture. Des "
         "outils absents du PATH du noeud de login (conda via `anaconda3`, "
         "`apptainer`, plusieurs versions de `cuda`) s'y trouvent. Les paquets "
-        "trouves se passent ensuite a submit_job ou build_on_node via "
+        "trouves se passent ensuite a job_prepare ou build_on_node via "
         "`spack_packages`."
     ),
 )
@@ -274,7 +274,7 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
         "truncated": len(packages) > limit,
         "packages": shown,
         "usage": (
-            "Passe ces noms a submit_job(spack_packages=[...]) ou "
+            "Passe ces noms a job_prepare(spack_packages=[...]) ou "
             "build_on_node(spack_packages=[...]) : le script generera "
             "`{}` puis `spack load`.".format(node["env_loader"])
         ),
@@ -501,7 +501,7 @@ def limits_resource() -> str:
             ),
             "",
             "Cherche-les avec `romeo_software`, puis passe-les en "
-            "`spack_packages` a `submit_job` ou `build_on_node`.",
+            "`spack_packages` a `job_prepare` ou `build_on_node`.",
             "",
             "## Limites de temps",
             "",
@@ -668,7 +668,7 @@ def prompt_debug_slurm(job_id: str = "") -> str:
         "2. Si une cause est identifiee, applique le remede propose et explique "
         "a l'utilisateur pourquoi cette cause explique ce symptome.\n"
         "3. Si aucune cause n'est reconnue, lis la sortie complete avec "
-        "`job_output(stream='both')` puis le script soumis.\n"
+        "`job_log_tail(stream='both')` puis le script soumis.\n"
         "4. Dans tous les cas, termine par `job_efficiency` : un job peut "
         "avoir echoue pour une raison evidente tout en revelant un "
         "dimensionnement a corriger.\n\n"
@@ -689,7 +689,7 @@ def prompt_scale_multi_node(script_path: str = "", nodes: str = "2") -> str:
     return (
         "Adapte {} pour un entrainement reparti sur {} noeuds GPU de ROMEO.\n\n"
         "Ce que le serveur prend deja en charge, et que tu n'as donc pas a "
-        "ecrire a la main : `submit_job(distributed=...)` genere `MASTER_ADDR` "
+        "ecrire a la main : `job_prepare(distributed=...)` genere `MASTER_ADDR` "
         "depuis le premier noeud alloue, `MASTER_PORT`, `WORLD_SIZE`, et le "
         "lanceur adapte. Choisis la famille :\n"
         "- `ddp` : torchrun deploie un processus par GPU, une tache SLURM par "
@@ -702,7 +702,7 @@ def prompt_scale_multi_node(script_path: str = "", nodes: str = "2") -> str:
         "des metriques, et sauvegarde depuis le seul rang 0.\n\n"
         "Verifie enfin la coherence du dimensionnement : {} noeuds a 4 GPU "
         "restent sous le plafond de 60 GPU du compte, mais la partition "
-        "choisie doit exposer assez de noeuds : `submit_job` le controle et "
+        "choisie doit exposer assez de noeuds : `job_prepare` le controle et "
         "refuse le cas echeant.".format(cible, nodes, nodes)
     )
 

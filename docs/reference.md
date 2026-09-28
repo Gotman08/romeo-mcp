@@ -10,8 +10,8 @@ Commandes à exécuter depuis la racine du dépôt. Les valeurs matérielles son
 
 ## Outils exposés
 
-Le profil `full` expose ce catalogue. Le profil `essential` en annonce 17 ;
-`tool_profile` permet de changer de profil pendant la connexion. Voir les
+Le profil `full` expose ce catalogue. Le profil `essential` en annonce 20 ;
+`tool_profile_set` permet de changer de profil pendant la connexion. Voir les
 [profils d’outils](configuration.md#profils-doutils).
 
 **Contexte cluster**
@@ -28,11 +28,11 @@ Le profil `full` expose ce catalogue. Le profil `essential` en annonce 17 ;
 
 | Outil | Rôle |
 |---|---|
-| `submit_job` | Prépare et soumet. **Simulation par défaut** : rend le script sbatch et les avertissements sans rien soumettre |
-| `submit_array_job` | Balayage paramétrique en tableau SLURM, une tâche par jeu de paramètres |
-| `submit_pipeline` | **Enchaînement d'étapes dépendantes** : préparer, calculer, rassembler. Ordonné, validé en entier avant la première soumission, architecture héritée |
+| `job_prepare` / `job_submit` | Prépare et conserve le script exact ; soumet ce plan avec son `plan_id` et `confirm=true` |
+| `job_array_prepare` / `job_array_submit` | Balayage paramétrique en tableau SLURM, une tâche par jeu de paramètres |
+| `job_pipeline_prepare` / `job_pipeline_submit` | **Enchaînement d'étapes dépendantes** : préparer, calculer, rassembler. Ordonné, validé en entier avant la première soumission, architecture héritée |
 | `job_status` | File d'attente, puis historique `sacct` ; démarrage estimé |
-| `job_output` | Fin des logs, tronquée, avec filtre `grep` |
+| `job_log_tail` / `job_log_search` | Dernières lignes des logs / recherche bornée avec un `pattern` obligatoire |
 | `diagnose_job` | **Autopsie d'un échec en un appel** : état, journaux, causes reconnues, remèdes |
 | `submit_resilient_job` | Chaîne de segments reprenables, pour dépasser la limite d'une partition rapide |
 | `job_live_metrics` | **Télémétrie d'un job en cours** : occupation et VRAM des GPU, température, puissance |
@@ -53,16 +53,16 @@ Le profil `full` expose ce catalogue. Le profil `essential` en annonce 17 ;
 | `launch_interactive_service` | Lance JupyterLab, TensorBoard, vLLM ou MLflow sur un nœud et rend la commande de pont SSH |
 | `allocate_debug_node` | Réserve un nœud pour de la mise au point interactive |
 | `spawn_remote_workspace` | JupyterLab authentifié : jeton généré, tunnel et URL directe |
-| `run_cluster_sanity_check` | Détecte les nœuds dégradés (bridage, ECC, fréquence) |
+| `cluster_gpu_health_run` | Réserve des ressources GPU via `srun` et sonde bridage, ECC et fréquence ; mode NCCL désactivé |
 
 **Stockage**
 
 | Outil | Rôle |
 |---|---|
-| `storage_cleanup_helper` | Repère ce qui occupe l'espace ; propose les commandes, n'efface rien |
-| `stage_dataset` | Télécharge un jeu de données depuis un nœud de calcul, pas depuis le login |
+| `storage_usage_audit` | Repère ce qui occupe l'espace ; propose les commandes, n'efface rien |
+| `stage_dataset` | Télécharge depuis un nœud de calcul ; Hugging Face exige un venv `env_path` déjà préparé |
 | `audit_orphan_files` | Fichiers volumineux abandonnés, répertoires de jobs morts |
-| `secret_env_setup` | Prépare un fichier de secrets : les valeurs ne transitent jamais par le serveur |
+| `secret_env_prepare` | Crée le dossier et le fichier distants, impose les droits 700/600, sans lire les secrets |
 | `inject_io_staging` | Greffe la mise en cache en mémoire vive dans un script sbatch existant |
 
 **Environnements et ordonnancement**
@@ -86,28 +86,88 @@ en environnement virtuel à destination du x86_64).
 
 ## Jobs et journaux
 
+### Préparer puis soumettre le plan exact
+
+`job_prepare` rend le script, les ressources, les avertissements, un `plan_id`,
+son empreinte `plan_sha256` et sa date d’expiration `expires_at` (timestamp Unix).
+Le plan est conservé dans le registre local privé `jobs.db` pendant au moins
+24 heures ; il est soumettable seulement durant ces 24 heures. Aucun fichier
+n’est écrit sur ROMEO à cette étape. Une lecture SSH peut résoudre les chemins.
+
+Après vérification, appeler `job_submit(plan_id=..., confirm=true)`. Cet outil
+n’accepte aucun nouveau paramètre de calcul : il utilise le script enregistré.
+Pour modifier la demande, préparer un nouveau plan. Un changement de cible SSH,
+de projet Slurm ou de racines impose aussi une nouvelle préparation.
+Un aperçu dont les chemins sont illustratifs rend `submittable=false` et
+`plan_id=null` ; reconnectez-vous ou configurez les racines, puis préparez à nouveau.
+
+Le même contrat s’applique aux tableaux et pipelines. Les paramètres et leur
+chemin sont figés dès `job_array_prepare`. `job_pipeline_prepare` valide tous
+les scripts et les dépendances avant la première soumission. Seuls les identifiants
+Slurm nécessaires aux clauses `--dependency` sont obtenus à l’exécution.
+
+Un appel répété après succès rend les mêmes identifiants avec
+`already_submitted=true`. Une tentative en cours, interrompue ou partiellement
+échouée ne peut pas être rejouée automatiquement : consulter `list_jobs` avant
+de préparer un autre plan. Les étapes déjà soumises d’un pipeline restent actives
+et figurent dans `submitted_stages`. Ces protections persistent après redémarrage.
+
+### Migration des anciens noms
+
+Les anciens noms ne sont plus exposés. Relire `tools/list` après mise à jour
+et adapter les listes d’outils autorisés dans le client.
+
+| Ancien outil | Remplacement |
+|---|---|
+| `tool_profile()` / `tool_profile(profile=...)` | `tool_profile_get()` / `tool_profile_set(profile=...)` |
+| `job_output(..., lines=...)` / `job_output(..., grep=...)` | `job_log_tail(..., lines=...)` / `job_log_search(..., pattern=...)` |
+| `submit_job` | `job_prepare` puis `job_submit` avec `plan_id` |
+| `submit_array_job` | `job_array_prepare` puis `job_array_submit` avec `plan_id` |
+| `submit_pipeline` | `job_pipeline_prepare` puis `job_pipeline_submit` avec `plan_id` |
+| `secret_env_setup` | `secret_env_prepare` (écrit sur ROMEO) |
+| `run_cluster_sanity_check` | `cluster_gpu_health_run` (réserve des GPU) |
+| `storage_cleanup_helper` | `storage_usage_audit` (lecture seule) |
+
+Pour Hugging Face, créer un venv sur l’architecture de téléchargement, installer
+`huggingface_hub` explicitement avec `romeo_pip_install`, puis transmettre ce
+chemin à `stage_dataset(..., kind="huggingface", env_path=...)` sur la même
+architecture. Le job télécharge un dépôt de type `dataset` et échoue clairement
+si le paquet manque ; il ne lance jamais d’installation.
+
 ### Plusieurs tableaux dans le même dossier
 
-`submit_array_job` permet de soumettre plusieurs tableaux avec le même nom
+`job_array_prepare` puis `job_array_submit` permettent de soumettre plusieurs tableaux avec le même nom
 et le même `workdir`, même lorsque les précédents attendent encore dans Slurm.
-Chaque appel crée un fichier `parametres-UUID.txt` et un script `NOM-UUID.sbatch`
+La préparation réserve les noms ; la soumission crée un fichier `parametres-UUID.txt` et un script `NOM-UUID.sbatch`
 dans ce dossier. Le script lit les paramètres par leur chemin absolu, et le
 fichier de paramètres est placé en lecture seule. La réponse fournit
 `parameters_file` et `script_path` ; leurs empreintes SHA-256 sont conservées
 dans la [provenance du job](reproducibility.md).
 
 Les scripts des autres soumissions reçoivent aussi un nom unique. Les segments
-d'une même chaîne reprenable réutilisent leur propre script. La simulation
-n'écrit aucun fichier ; une soumission confirmée reçoit son propre UUID.
+d'une même chaîne reprenable réutilisent leur propre script. La préparation
+écrit le plan local et ne crée aucun fichier distant ; l’UUID des paramètres
+est conservé jusqu’à la soumission.
 Conservez les paramètres tant que des tâches peuvent encore démarrer ou être
 remises en file. Les noms des fichiers de résultats produits par votre commande
 restent à choisir pour éviter les collisions entre vos expériences.
 
 ### Lire les journaux
 
-`job_output.has_stderr_content` indique si au moins un fichier stderr existe
+`job_log_tail` lit au plus 500 lignes par fichier. `job_log_search` exige un
+motif `pattern` compatible `grep -E` ; un motif invalide produit une erreur.
+La recherche porte sur les derniers `max_bytes_per_file` octets de chaque
+fichier (1 Mio par défaut, 16 Mio au maximum) et rend au plus `max_matches`
+correspondances par fichier (60 par défaut, 500 au maximum). Une fenêtre peut
+commencer au milieu d’une ligne ; ce n’est pas une recherche exhaustive.
+Les deux outils limitent les fichiers par flux (`max_files`, 10 par défaut,
+40 au maximum) et le texte renvoyé (`max_chars`, 8 000 par défaut, 40 000 au
+maximum). `limits` donne les bornes appliquées, `files_limited` signale un
+plafond de fichiers atteint et `truncated` une sortie abrégée.
+
+`job_log_tail.has_stderr_content` indique si au moins un fichier stderr existe
 et contient des octets. Un fichier vide ou absent donne `false` ; des espaces
-ou sauts de ligne seuls donnent `true`. Ce booléen est indépendant de `grep`,
+ou sauts de ligne seuls donnent `true`. Ce booléen existe aussi dans `job_log_search` et est indépendant de `pattern`,
 du nombre de lignes et du flux demandé, y compris `stream="out"`.
 
 L'affichage ajoute un en-tête seulement aux extraits qui contiennent du texte
@@ -215,7 +275,7 @@ traiter `SIGUSR1`.
 ## Entrées-sorties en mémoire vive
 
 Lire des milliers de petits fichiers depuis GPFS effondre le débit.
-`submit_job(stage_archive=...)` déballe l'archive dans `/dev/shm` au démarrage,
+`job_prepare(stage_archive=...)` déballe l'archive dans `/dev/shm` au démarrage,
 pointe une variable dessus et nettoie par un piège `EXIT`.
 
 Deux limites réelles, mesurées et encodées : `/dev/shm` fait **239 Go** (et non
@@ -240,15 +300,15 @@ plusieurs gigaoctets. `profile_report` condense ensuite la sortie `nsys stats`
 en quelques constats : part des transferts mémoire face au calcul, noyau
 dominant, présence de GEMM suggérant d'activer bf16.
 
-`run_cluster_sanity_check` repère les **nœuds dégradés**, qui ne plantent pas
+`cluster_gpu_health_run` repère les **nœuds dégradés**, qui ne plantent pas
 mais divisent le débit d'un job réparti sans erreur visible : raisons de bridage
 décodées depuis le champ de bits de `nvidia-smi`, erreurs mémoire non corrigées,
 fréquence anormalement basse sous charge. Il rend une clause `--exclude=` prête
 à l'emploi.
 
-Le mode `nccl` **annonce son prérequis manquant** au lieu d'échouer : le paquet
-`nccl-tests` est absent du catalogue Spack de ROMEO (seule la bibliothèque
-`nccl` y figure), et l'outil fournit la recette de compilation.
+Cet outil réserve des GPU avec `srun` : il n’est pas en lecture seule.
+Le mode `nccl` est désactivé avant toute connexion ou allocation, car aucun
+benchmark NCCL n’est implémenté. `check_type="gpu"` est le seul mode disponible.
 
 ## Énergie : un modèle, pas une mesure
 
@@ -287,7 +347,7 @@ piège unique déroule : le répertoire temporaire et la mise en cache mémoire
 cohabitent sans se neutraliser.
 
 **Secrets** (`secret_env_file`). Les valeurs ne transitent **jamais** par le
-serveur : `secret_env_setup` crée un fichier en droits 600 que tu remplis
+serveur : `secret_env_prepare` crée un fichier en droits 600 que tu remplis
 toi-même sur le cluster, et le script le source au démarrage. Ni le `.sbatch`,
 ni le registre SQLite, ni la conversation ne contiennent la valeur.
 
@@ -461,10 +521,10 @@ reste **portée par utilisateur** : `/gpfs/scratch/<moi>` est accepté,
 
 ## Partis pris de conception
 
-**La soumission est en simulation par défaut.** `submit_job` rend le script
-sbatch généré, la partition et l'architecture déduites, et les avertissements de
-dimensionnement, sans rien soumettre. Il faut rappeler l'outil avec
-`confirm=true`. Cela évite qu'un modèle remplisse la file de jobs mal calibrés.
+**La préparation et la soumission sont distinctes.** `job_prepare` rend et
+conserve le script sbatch exact, les ressources et les avertissements, sans
+soumettre. `job_submit` exige l’identifiant de ce plan et `confirm=true`.
+Le client peut ainsi distinguer les écritures locales de la soumission sur ROMEO.
 
 **Une session SSH persistante.** Le multiplexage `ControlMaster` d'OpenSSH est
 inopérant sous Windows/MSYS : chaque `ssh` coûterait environ 600 ms, prohibitif
@@ -487,7 +547,7 @@ serveur produit `--account`, `--partition`, `--constraint`, `--gpus-per-node`,
 
 **La simulation doit tenir sans le cluster.** Vérifier un dimensionnement est
 le mode le plus utile du serveur, et c'était paradoxalement le plus contraint :
-`submit_job` ouvrait une session SSH pour la seule raison de connaître le
+`job_prepare` ouvrait une session SSH pour la seule raison de connaître le
 scratch. Une simulation doit pouvoir tourner depuis un portable, et la suite de
 tests doit pouvoir l'exercer sans cluster. `ROMEO_SCRATCH` fige les racines ;
 à défaut, une simulation hors ligne rend le script en annonçant que ses chemins

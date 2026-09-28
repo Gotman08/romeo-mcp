@@ -126,8 +126,8 @@ def build_on_node(
     except SSHTimeout:
         return _error(
             "la construction a depasse {} s (attente en file comprise). "
-            "Relance-la comme un job normal via submit_job, puis suis-la avec "
-            "job_output.".format(budget),
+            "Relance-la comme un job normal via job_prepare, puis suis-la avec "
+            "job_log_tail.".format(budget),
             script_path=script_path,
         )
     except SSHError as exc:
@@ -288,7 +288,7 @@ def launch_interactive_service(
     reponse["next_step"] = (
         "Execute la commande `tunnel` dans un terminal LOCAL, en la laissant "
         "ouverte, puis ouvre `url` dans ton navigateur. Pour JupyterLab, le "
-        "jeton figure dans la sortie du job : job_output('{}').".format(job_id)
+        "jeton figure dans la sortie du job : job_log_tail('{}').".format(job_id)
     )
     return reponse
 
@@ -477,7 +477,7 @@ def romeo_pip_install(
         "Insere la mise en cache d'un jeu de donnees en memoire vive dans un "
         "script sbatch existant, que ce serveur n'a pas genere. Rend le script "
         "modifie sans rien ecrire : a toi de le relire puis de le deposer. "
-        "Pour un job cree ici, prefere submit_job(stage_archive=...)."
+        "Pour un job cree ici, prefere job_prepare(stage_archive=...)."
     ),
 )
 def inject_io_staging(

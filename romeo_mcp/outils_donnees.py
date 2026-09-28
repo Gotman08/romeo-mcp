@@ -262,7 +262,7 @@ def download_from_romeo(
         "utiliser quand romeo_quota signale un depassement."
     ),
 )
-def storage_cleanup_helper(path: str = "", top: int = 12) -> dict[str, Any]:
+def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
     """Inventaire des gros consommateurs d'espace, sans rien effacer."""
     s = session()
     try:
@@ -349,7 +349,9 @@ def storage_cleanup_helper(path: str = "", top: int = 12) -> dict[str, Any]:
     description=(
         "Telecharge un jeu de donnees depuis un noeud de calcul plutot que "
         "depuis le noeud de login, dont la bande passante est partagee. "
-        "Accepte une URL directe, un depot Hugging Face ou un depot git."
+        "Accepte une URL directe, un dataset Hugging Face ou un depot git. "
+        "Hugging Face exige env_path avec huggingface_hub deja installe via romeo_pip_install ; "
+        "ce telechargement n'installe aucun paquet."
     ),
 )
 def stage_dataset(
@@ -359,6 +361,7 @@ def stage_dataset(
     minutes: int = 60,
     time_limit: str | None = None,
     arch: str = "x64cpu",
+    env_path: str | None = None,
     confirm: bool = False,
 ) -> dict[str, Any]:
     """Rapatrie des donnees via un job, pour epargner le noeud de login."""
@@ -391,11 +394,24 @@ def stage_dataset(
         )
         paquets = []
     elif nature == "huggingface":
+        if not env_path:
+            return _error("Hugging Face requiert env_path, un venv existant contenant huggingface_hub. "
+                          "Installe ce paquet explicitement avec romeo_pip_install sur la meme architecture.")
+        try:
+            environnement = check_path(env_path, s.home, s.scratch, s.path_aliases)
+        except GuardError as exc:
+            return _error(str(exc))
+        python = shlex.quote(posixpath.join(environnement, "bin", "python"))
+        # L'API Python publique evite de dependre du chemin interne de la CLI.
+        # Le job de telechargement ne lance jamais d'installateur.
+        code = ("import sys; from huggingface_hub import snapshot_download; "
+                "snapshot_download(repo_id=sys.argv[1], local_dir=sys.argv[2], repo_type='dataset')")
         commande = (
-            "python -m pip install --quiet --user huggingface_hub && "
-            "python -m huggingface_hub.commands.huggingface_cli download "
-            "{} --local-dir {}".format(shlex.quote(source), shlex.quote(cible))
-        )
+            "{python} -c 'import huggingface_hub' || {{ "
+            "echo 'huggingface_hub absent : utilise romeo_pip_install dans ce venv.' >&2; exit 1; }}; "
+            "{python} -c {code} {source} {destination}"
+        ).format(python=python, code=shlex.quote(code), source=shlex.quote(source),
+                 destination=shlex.quote(cible))
         paquets = []
     else:
         return _error(
@@ -535,7 +551,7 @@ def sbatch_lint(script: str = "", path: str = "") -> dict[str, Any]:
             "Une valeur ressemblant a un secret est ecrite en clair dans le "
             "script. Elle serait lisible par quiconque accede au fichier.",
             remede="Depose-la dans un fichier a droits 600 et passe "
-                   "`secret_env_file` a submit_job.",
+                   "`secret_env_file` a job_prepare.",
         )
 
     if re.search(r"\bmodule\s+load\b", script) and "romeo_load_" not in script:
@@ -776,20 +792,21 @@ def audit_orphan_files(
 # Secrets
 # =============================================================================
 @outil(
-    annotations=READ_ONLY,
+    annotations=MUTATING,
     description=(
-        "Explique et prepare le stockage des variables sensibles (jetons, mots "
+        "Cree le dossier et le fichier de secrets sur ROMEO, puis impose les "
+        "permissions 700/600. Prepare le stockage des variables sensibles (jetons, mots "
         "de passe) pour les jobs. Les valeurs ne transitent JAMAIS par ce "
         "serveur : tu les ecris toi-meme dans un fichier a droits restreints, "
-        "que submit_job source au demarrage via `secret_env_file`. Elles "
+        "que le job source au demarrage (chemin fourni a job_prepare via `secret_env_file`). Elles "
         "n'apparaissent ainsi ni dans le script sbatch, ni dans le registre "
         "local, ni dans cette conversation."
     ),
 )
-def secret_env_setup(name: str = "secrets.env") -> dict[str, Any]:
+def secret_env_prepare(name: str = "secrets.env") -> dict[str, Any]:
     """Prepare un fichier de secrets a droits restreints, sans jamais lire son contenu."""
     s = session()
-    if not re.match(r"^[\w.-]{1,64}$", name):
+    if name in {".", ".."} or not re.fullmatch(r"[\w.-]{1,64}", name):
         return _error("nom de fichier invalide : {!r}".format(name))
 
     dossier = posixpath.join(s.home, ".romeo-mcp")
@@ -797,7 +814,7 @@ def secret_env_setup(name: str = "secrets.env") -> dict[str, Any]:
     try:
         resultat = _sh(
             s,
-            "mkdir -p {d} && chmod 700 {d} && touch {f} && chmod 600 {f} && "
+            "umask 077; mkdir -p {d} && chmod 700 {d} && touch {f} && chmod 600 {f} && "
             "stat -c '%a %n' {f}".format(d=shlex.quote(dossier), f=shlex.quote(chemin)),
             timeout=45,
         )
@@ -815,7 +832,7 @@ def secret_env_setup(name: str = "secrets.env") -> dict[str, Any]:
             "variable : `MA_CLE=valeur`.",
             "Ne colle jamais la valeur dans cette conversation : elle serait "
             "conservee dans l'historique.",
-            "Passe ensuite `secret_env_file='{}'` a submit_job : le script "
+            "Passe ensuite `secret_env_file='{}'` a job_prepare : le script "
             "sourcera le fichier au demarrage.".format(chemin),
         ],
         "garanties": [

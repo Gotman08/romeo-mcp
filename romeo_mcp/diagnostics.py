@@ -79,7 +79,7 @@ _MOTIFS: list[tuple[str, Cause]] = [
                 "gradient pour conserver le lot effectif.",
                 "Active la precision mixte (bf16 est bien supporte sur Hopper) "
                 "et le `gradient checkpointing`.",
-                "Repartis sur plusieurs GPU : `submit_job(gpus_per_node=4, "
+                "Repartis sur plusieurs GPU : `job_prepare(gpus_per_node=4, "
                 "distributed='ddp')`.",
                 "Contre la fragmentation : "
                 "`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`.",
@@ -148,9 +148,9 @@ _MOTIFS: list[tuple[str, Cause]] = [
             "du quota souple n'ouvre qu'un delai de grace de 7 jours.",
             [
                 "Verifie l'etat exact avec `romeo_quota`.",
-                "Fais le menage avec `storage_cleanup_helper`.",
+                "Fais le menage avec `storage_usage_audit`.",
                 "Redirige les caches des bibliotheques IA hors du home : "
-                "`submit_job(redirect_caches=True)` s'en charge.",
+                "`job_prepare(redirect_caches=True)` s'en charge.",
             ],
         ),
     ),
@@ -163,7 +163,7 @@ _MOTIFS: list[tuple[str, Cause]] = [
             "d'aucun environnement par defaut : sans chargement explicite, "
             "meme `spack` est absent.",
             [
-                "Passe les paquets voulus en `spack_packages` a `submit_job`.",
+                "Passe les paquets voulus en `spack_packages` a `job_prepare`.",
                 "Si tu utilises un environnement virtuel, active-le dans la "
                 "commande du job.",
                 "Verifie que l'environnement a ete cree sur la meme "
@@ -424,7 +424,7 @@ def analyser(
             )
         resultat["causes"] = []
         resultat["indice"] = (
-            indice + ". Relis la sortie complete avec `job_output(stream='both')`."
+            indice + ". Relis la sortie complete avec `job_log_tail(stream='both')`."
         )
 
     if limites:

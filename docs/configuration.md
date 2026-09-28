@@ -40,7 +40,7 @@ variables déjà définies dans le client.
 
 | Profil | Outils annoncés |
 |---|---|
-| `essential` | `tool_profile`, `search_docs`, `read_doc`, `romeo_status`, `romeo_quota`, `romeo_software`, `submit_job`, `job_status`, `job_output`, `list_jobs`, `cancel_job`, `diagnose_job`, `job_efficiency`, `list_dir`, `upload_to_romeo`, `download_from_romeo`, `export_job_report` |
+| `essential` | `tool_profile_get`, `tool_profile_set`, `search_docs`, `read_doc`, `romeo_status`, `romeo_quota`, `romeo_software`, `job_prepare`, `job_submit`, `job_status`, `job_log_tail`, `job_log_search`, `list_jobs`, `cancel_job`, `diagnose_job`, `job_efficiency`, `list_dir`, `upload_to_romeo`, `download_from_romeo`, `export_job_report` |
 | `full` | Tout le catalogue de la [référence](reference.md), y compris les tableaux, pipelines et outils avancés |
 
 Trois façons de choisir :
@@ -53,14 +53,14 @@ python -m romeo_mcp configure --profile essential
 python -m romeo_mcp serve --profile essential
 ```
 
-Pendant une conversation, l’outil `tool_profile({"profile": "full"})` change le
+Pendant une conversation, l’outil `tool_profile_set({"profile": "full"})` change le
 catalogue du processus actuel et émet `notifications/tools/list_changed`.
-Sans argument, il indique le profil et les outils annoncés. Certains clients
+`tool_profile_get()` consulte le profil et les outils annoncés sans modifier le catalogue. Certains clients
 gardent leur catalogue en cache : relire `tools/list` ou relancer le MCP si
 les outils avancés n’apparaissent pas.
 
 La priorité du démarrage est **`serve --profile` → `ROMEO_TOOL_PROFILE` →
-fichier personnel → `full`**. Le choix fait avec `tool_profile` ne modifie
+fichier personnel → `full`**. Le choix fait avec `tool_profile_set` ne modifie
 aucun fichier. Un profil réduit la liste présentée au modèle ; il ne constitue
 pas une restriction de sécurité. Les gestionnaires avancés restent enregistrés.
 

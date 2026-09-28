@@ -61,20 +61,20 @@ async def main(resume=""):
                         raise AssertionError(tool + " a echoue ; voir le dossier prive du test")
                     return payload
 
-                profile = await call("tool_profile", {})
-                assert profile["profile"] == "essential" and profile["count"] == 17
+                profile = await call("tool_profile_get", {})
+                assert profile["profile"] == "essential" and profile["count"] == 20
                 spec = {"name": name, "command": "python3 calculation.py", "arch": "x64cpu",
                         "nodes": 1, "cpus_per_task": 1, "mem_gb": 1, "time_limit": "1m",
-                        "workdir": remote, "data_files": [remote + "/input.txt"], "confirm": False}
+                        "workdir": remote, "data_files": [remote + "/input.txt"]}
                 if saved:
                     jid = saved["job_id"]
                     print("Reprise du controle du job : " + jid, flush=True)
                 else:
-                    preview = await call("submit_job", spec)
+                    preview = await call("job_prepare", spec)
                     assert not preview["submitted"]
                     ssh.write_file(remote + "/preview.sbatch", preview["script"], mode="600")
                     ssh.run("bash -n " + shlex.quote(remote + "/preview.sbatch")).check("syntaxe Bash")
-                    submitted = await call("submit_job", {**spec, "confirm": True})
+                    submitted = await call("job_submit", {"plan_id": preview["plan_id"], "confirm": True})
                     jid = submitted["job_id"]
                     (local / "job.json").write_text(json.dumps({"job_id": jid, "workdir": remote}), encoding="utf-8")
                     print("Job de controle soumis : " + jid, flush=True)
@@ -93,7 +93,7 @@ async def main(resume=""):
                     await asyncio.sleep(5)
                 else:
                     raise AssertionError("Attente depassee ; le job reste soumis, consulter son etat avant de relancer")
-                output = await call("job_output", {"job_id": jid, "stream": "out"})
+                output = await call("job_log_tail", {"job_id": jid, "stream": "out"})
                 assert "REPRO_SCIENCE_OK" in json.dumps(output), "Resultat scientifique absent"
                 result = await call("export_job_report", {"job_id": jid, "output_dir": str(local),
                                                            "data_files": [remote + "/input.txt"]})
