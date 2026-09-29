@@ -184,11 +184,11 @@ from unittest.mock import patch as _patch
 
 
 def _lint_offline(script):
-    module = sys.modules[server.sbatch_lint.__module__]
+    module = sys.modules[server.sbatch_validate.__module__]
     fake = _SimpleNamespace(home="/home/user", scratch="/scratch_p/user", path_aliases=[])
     with _patch.object(module, "session", return_value=fake):
         with _patch.object(module, "_sh", side_effect=AssertionError("aucun reseau dans ce test")):
-            return server.sbatch_lint(script=script)
+            return server.sbatch_validate(script=script)
 
 
 def _variables_signalees(script):

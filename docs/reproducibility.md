@@ -34,36 +34,37 @@ et reste non bloquante en cas d’échec. Elle écrit
 `.romeo-provenance/IDENTIFIANT_JOB.json` dans le dossier de travail. Ajoutez
 `.romeo-provenance/` au `.gitignore` de vos projets de calcul.
 
-## Exporter après le calcul
+## Collecter puis exporter après le calcul
 
-Demandez à l’assistant d’appeler :
+1. Appeler `job_report_collect(job_id="123456", data_files=[...])`. La collecte
+   lit ROMEO et enregistre un relevé immuable dans le registre local ; elle
+   rend `report_id`, `created_at` et `report_sha256`.
+2. Relire ce relevé avec `job_report_get(report_id)` si nécessaire.
+3. Appeler `job_report_export(report_id, output_dir=...)`. L'export écrit
+   uniquement les fichiers locaux, sans SSH ni nouvelles empreintes.
 
-```json
-{
-  "job_id": "123456",
-  "live": true
-}
-```
+Deux exports du même relevé ont le même contenu et le même horodatage de
+collecte. Pour obtenir des mesures plus récentes, effectuer une nouvelle
+collecte, qui reçoit un nouvel identifiant. Les informations indisponibles
+sont conservées comme manquantes dans le relevé.
 
-L’outil est `export_job_report`. `job_id` doit appartenir au registre local
-du MCP. Une tâche de tableau peut être désignée par `123456_4`, avec le script
-conservé pour le tableau parent. Pour un tableau, exportez chaque tâche voulue.
+`job_report_from_record(job_id)` crée un relevé depuis le registre local,
+sans SSH. Il s'exporte ensuite de la même façon. Un `job_id` doit être connu
+du registre ; une tâche de tableau peut être désignée par `123456_4`.
 
-La commande équivalente, avec le Python de votre venv :
+La CLI conserve un raccourci qui compose explicitement collecte et export :
 
 ```sh
 python -m romeo_mcp export-job 123456
 python -m romeo_mcp export-job 123456 --offline
 ```
 
-Options facultatives :
-
-| Option CLI | Argument MCP | Utilité |
+| Option CLI | Outil MCP correspondant | Utilité |
 |---|---|---|
-| `--output-dir DOSSIER` | `output_dir` | Dossier parent local, obligatoirement hors d’un dépôt Git |
-| `--code-dir CHEMIN` | `code_dir` | Répertoire Git distant observé lors de l’export ; sinon celui du job |
-| `--data-file CHEMIN` (répétable) | `data_files` | Fichiers distants dont relever l’empreinte **au moment de l’export** |
-| `--offline` | `live: false` | Produire la fiche à partir du registre local uniquement |
+| `--output-dir DOSSIER` | `job_report_export(..., output_dir=...)` | Destination locale hors de Git |
+| `--code-dir CHEMIN` | `job_report_collect(..., code_dir=...)` | Répertoire Git observé lors de la collecte |
+| `--data-file CHEMIN` | `job_report_collect(..., data_files=[...])` | Empreintes au moment de la collecte |
+| `--offline` | `job_report_from_record(job_id)` | Relevé depuis le registre local |
 
 Chaque export crée un nouveau dossier sous `~/.romeo-mcp/reports/` par défaut :
 
@@ -74,7 +75,7 @@ Chaque export crée un nouveau dossier sous `~/.romeo-mcp/reports/` par défaut 
 `~` désigne le dossier personnel du compte qui lance le MCP. Les fichiers
 existants ne sont jamais écrasés. Sur les systèmes Unix, les dossiers sont
 créés en mode `700` et les fichiers en mode `600` ; sur Windows, ils héritent
-des autorisations du dossier choisi. L’export lit ROMEO sans soumettre de job.
+des autorisations du dossier choisi. La collecte lit ROMEO sans soumettre de job ; l’export ne contacte pas ROMEO.
 
 ## Ce qui est réellement mesuré
 
@@ -82,7 +83,7 @@ des autorisations du dossier choisi. L’export lit ROMEO sans soumettre de job.
 |---|---|
 | Avant la soumission | Version du MCP, ressources demandées, modules et paquets Spack demandés, référence du conteneur, architecture et commit Git disponible |
 | Avant la commande sur le nœud | Commit Git, architecture, version de Python, modules chargés, identifiants Spack chargés et SHA-256 des entrées sélectionnées |
-| À l’export | Capture conservée sur le nœud, état et mesures `sacct`, commit et empreintes demandés après coup |
+| À la collecte | Capture conservée sur le nœud, état et mesures `sacct`, commit et empreintes demandés après coup |
 
 Les ressources Slurm comprennent l’allocation, le temps écoulé, le temps CPU,
 la mémoire maximale lorsqu’elle est disponible et les codes de sortie.

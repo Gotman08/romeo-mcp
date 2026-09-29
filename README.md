@@ -172,7 +172,7 @@ L’appel correspondant à `job_prepare` est :
 
 La préparation retourne le script et un `plan_id`, sans soumettre le calcul. Elle peut consulter les chemins distants par SSH et conserve le plan localement pendant 24 heures. Après lecture, soumettez exactement ce plan avec `job_submit({"plan_id": "IDENTIFIANT_RECU", "confirm": true})`. Suivez ensuite le job reçu avec `job_status`, `job_log_tail` et `job_efficiency`.
 
-Les tableaux et pipelines suivent le même parcours avec `job_array_prepare` / `job_array_submit` et `job_pipeline_prepare` / `job_pipeline_submit`. Les préparations ne prennent pas de paramètre `confirm`. Un aperçu hors ligne aux chemins illustratifs ne peut pas être soumis. D’autres actions, comme `build_on_node`, les transferts, l’annulation ou `cluster_gpu_health_run`, agissent directement.
+Les tableaux et pipelines suivent le même parcours avec `job_array_prepare` / `job_array_submit` et `job_pipeline_prepare` / `job_pipeline_submit`. Les préparations ne prennent pas de paramètre `confirm`. Un aperçu hors ligne aux chemins illustratifs ne peut pas être soumis. D’autres actions, comme les transferts, l’annulation ou `cluster_gpu_health_run`, agissent directement.
 
 ## Des demandes utiles
 
@@ -189,7 +189,7 @@ La [référence technique](docs/reference.md) détaille les outils, MPI, PyTorch
 
 ## Un profil essentiel pour commencer
 
-Le profil `essential` présente **20 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
+Le profil `essential` présente **22 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
 
 Pour accéder aux tableaux de paramètres, aux pipelines, aux services interactifs ou au profilage, demandez à l’assistant :
 
@@ -201,13 +201,13 @@ Le client reçoit une notification de changement du catalogue. Le choix vaut pou
 python -m romeo_mcp configure --profile essential
 ```
 
-Cette commande conserve votre projet et votre alias SSH. Sans choix explicite, le profil reste `full`, pour préserver les installations existantes. Les profils modifient la découverte des outils ; les autorisations restent celles du client et de ROMEO. [Liste et configuration des profils](docs/configuration.md#profils-doutils).
+Cette commande conserve votre projet et votre alias SSH. Sans choix explicite, le profil reste `full`, pour les opérations métier. Le profil `expert` ajoute les exécuteurs de commandes arbitraires. Les profils modifient la découverte des outils ; les autorisations restent celles du client et de ROMEO. [Liste et configuration des profils](docs/configuration.md#profils-doutils).
 
 ## Une fiche de reproductibilité par job
 
-`export_job_report` crée un dossier privé avec `report.json`, `report.md` et `script.sbatch.txt`. Les nouveaux jobs conservent les ressources demandées et tentent de relever le commit Git, l’environnement chargé et les empreintes des fichiers choisis avant le calcul. L’export ajoute les mesures disponibles dans Slurm.
+`job_report_export` crée un dossier privé avec `report.json`, `report.md` et `script.sbatch.txt`. Les nouveaux jobs conservent les ressources demandées et tentent de relever le commit Git, l’environnement chargé et les empreintes des fichiers choisis avant le calcul. `job_report_collect(job_id)` enregistre un relevé daté et rend `report_id`. `job_report_export(report_id)` exporte exactement ce relevé, sans SSH.
 
-Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à `job_prepare`. Les fichiers choisis seulement à l’export sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
+Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à `job_prepare`. Les fichiers choisis seulement à la collecte sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
 
 Les exports restent **hors des dépôts Git**. Les secrets reconnaissables sont masqués ; le contenu des données, les variables d’environnement complètes et les adresses des dépôts Git ne sont pas exportés. Les informations absentes sont signalées. [Exemples, protection des données et limites](docs/reproducibility.md).
 
@@ -247,7 +247,7 @@ Après déplacement du dossier, recréez le venv et relancez l’installateur po
 | `No module named romeo_mcp` | Réinstaller avec le Python du venv utilisé par le client |
 | Documentation introuvable | Exécuter `doctor` et retirer un ancien `ROMEO_DOCS_DIR` s’il n’est plus valable |
 | Un job attend longtemps | Lire le motif Slurm ; vérifier disponibilité, compte, QOS, dépendances et limites |
-| Binaire incompatible sur GPU | Recompiler pour `aarch64` sur un nœud adapté avec `build_on_node` |
+| Binaire incompatible sur GPU | Recompiler pour `aarch64` sur un nœud adapté avec `compute_command_prepare` |
 
 ## Contribuer et vérifier
 

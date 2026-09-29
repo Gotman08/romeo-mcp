@@ -5,6 +5,7 @@ enchainements d'etapes dependantes, et choix du creneau de soumission.
 """
 
 from __future__ import annotations
+from . import workload_preparation
 
 import hashlib
 import posixpath
@@ -17,25 +18,16 @@ from .cluster import (
     ARCHS,
     ClusterError,
     DEFAULT_ACCOUNT,
-    DEFAULT_HOST,
     require_account,
     PARTITIONS,
     PARTITION_ORDER,
     format_slurm_time,
-    parse_duration,
 )
 from .guard import GuardError, check_path
-from .registry import PLAN_TTL_SECONDS, registry
+from .registry import registry
 from .sortie import decouper, marqueur, nouveau_jeton
-from .pipeline import clause_dependance, heriter, ordonner, valider_etapes
-from .slurm import (
-    JobSpec,
-    Plan,
-    TERMINAL_STATES,
-    parse_pipe_table,
-    plan_job,
-    summarize_efficiency,
-)
+from .pipeline import heriter, ordonner, valider_etapes
+from .slurm import JobSpec, TERMINAL_STATES, parse_pipe_table, plan_job, summarize_efficiency
 from .ssh import SSHError, SSHTimeout, session
 from .outils_contexte import romeo_status
 from .noyau import (
@@ -44,11 +36,8 @@ from .noyau import (
     READ_ONLY,
     _NOM_ENCHAINEMENT,
     _contexte_chemins,
-    _controle_du_script_genere,
-    _doublon_recent,
     _error,
     _sh,
-    _soumettre_sbatch,
     outil,
 )
 
@@ -56,122 +45,12 @@ from .noyau import (
 # =============================================================================
 # Jobs
 # =============================================================================
-_SUBMIT_TOOLS = {"job": "job_submit", "array": "job_array_submit", "pipeline": "job_pipeline_submit"}
+from .plans import prepare_submission as _prepare_submission, submit_prepared as _submit_prepared, get_plan
 
 
-def _submission_target(s, home: str, scratch: str) -> dict:
-    return {"host": getattr(s, "host", DEFAULT_HOST), "account": require_account(),
-            "home": home, "scratch": scratch}
-
-
-def _prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dict:
-    """Fige les scripts ; une simulation illustrative ne devient jamais executable."""
-    result = {"ok": True, "submitted": False, "mode": "prepared", **preview,
-              "submittable": not bool(offline)}
-    if offline:
-        return {**result, "mode": "simulation", "plan_id": None,
-                "next_step": "Reconnecte-toi ou configure ROMEO_SCRATCH, puis prepare un nouveau plan."}
-    payload = {"kind": kind, "target": _submission_target(s, home, scratch),
-               "entries": entries, "preview": preview}
-    identity = registry().prepare_submission(payload)
-    return {**result, **identity,
-            "next_step": "Relis les scripts et avertissements, puis appelle {} avec ce plan_id et confirm=true."
-                         .format(_SUBMIT_TOOLS[kind])}
-
-
-def _submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
-    """Execute une seule fois le contenu conserve, sans regenerer de script."""
-    if confirm is not True:
-        return _error("La soumission exige confirm=true apres lecture du plan.", submitted=False)
-    store = registry()
-    try:
-        saved = store.prepared_submission(plan_id)
-    except ValueError as exc:
-        return _error(str(exc), submitted=False)
-    if not saved or saved["payload"]["kind"] != kind:
-        return _error("Plan introuvable ou incompatible avec cet outil. Prepare un nouveau plan.", submitted=False)
-    if saved["state"] != "ready":
-        if saved["state"] == "submitted":
-            return {**saved["result"], "already_submitted": True}
-        return _error("Ce plan a deja fait l'objet d'une tentative de soumission. "
-                      "Consulte list_jobs avant de preparer un autre plan.",
-                      plan_id=plan_id, state=saved["state"], previous_result=saved["result"])
-    if saved["created_at"] <= time.time() - PLAN_TTL_SECONDS:
-        return _error("Plan expire (24 h). Prepare un nouveau plan.", submitted=False)
-    require_account()
-    s = session()
-    home, scratch, _, _ = _contexte_chemins(s, True)
-    payload = saved["payload"]
-    if payload["target"] != _submission_target(s, home, scratch):
-        return _error("La cible SSH, le compte ou les racines ont change. Prepare un nouveau plan.", submitted=False)
-    plans = []
-    for entry in payload["entries"]:
-        serialized = entry["plan"]
-        plan = Plan(**{**serialized, "spec": JobSpec(**serialized["spec"])})
-        problems = _controle_du_script_genere(plan.script)
-        if problems:
-            return _error("Controle du script : " + " ; ".join(problems), submitted=False)
-        plans.append((entry, plan))
-    if kind == "job":
-        previous = _doublon_recent(plans[0][1].script)
-        if previous:
-            return _error("Un job identique est deja actif. Consulte job_status.",
-                          duplicate_of=previous["job_id"], submitted=False)
-    if not store.claim_submission(plan_id):
-        return _error("Plan deja reserve par une autre soumission ou expire. Consulte list_jobs.", plan_id=plan_id)
-
-    submitted, identifiers = [], {}
-    result = {}
-    try:
-        for entry, plan in plans:
-            artifacts = {}
-            if "parameters_path" in entry:
-                s.write_file(entry["parameters_path"], entry["parameters_text"], mode="400")
-                artifacts["parameters"] = {
-                    "path": entry["parameters_path"], "source": "generated_content",
-                    "sha256": hashlib.sha256(entry["parameters_text"].encode("utf-8")).hexdigest(),
-                    "rows": entry["parameter_count"],
-                }
-            stage = entry.get("stage")
-            clause = clause_dependance(stage, identifiers) if stage else ""
-            submission = _soumettre_sbatch(
-                s, plan, plan.spec.name, options=(clause,) if clause else (),
-                script_path=entry.get("script_path"), artifacts=artifacts,
-                note="plan {} ({})".format(plan_id, kind))
-            if not submission["ok"]:
-                result = {**submission, "submitted_stages": submitted,
-                          "job_ids": list(identifiers.values()),
-                          "next_step": "Consulte list_jobs avant une nouvelle preparation ; "
-                                       "les etapes deja soumises restent actives."}
-                if stage:
-                    result["failed_stage"] = stage["name"]
-                break
-            if stage:
-                identifiers[stage["name"]] = submission["job_id"]
-                submitted.append({"stage": stage["name"], "job_id": submission["job_id"],
-                                  "depends_on": [identifiers[d] for d in stage["depends_on"]]})
-                # Une interruption entre deux etapes ne doit pas effacer les
-                # identifiants deja obtenus ni permettre de relancer le plan.
-                store.update_submission(plan_id, "submitting", {"submitted_stages": submitted})
-        else:
-            preview = payload["preview"]
-            result = {"ok": True, "submitted": True, "warnings": preview["warnings"],
-                      "next_step": "Consulte job_status, job_log_tail puis job_efficiency."}
-            if kind == "pipeline":
-                result.update(pipeline=preview["pipeline"], stages=submitted,
-                              job_ids=list(identifiers.values()))
-            else:
-                result.update(submission, resolved=preview["resolved"])
-                if kind == "array":
-                    result["parameters_file"] = plans[0][0]["parameters_path"]
-    except Exception as exc:
-        # La tentative reste consommee : apres une coupure reseau, l'absence
-        # d'accuse de reception n'est pas une preuve d'absence du job.
-        result = _error("Soumission interrompue : {}. Verifie list_jobs avant toute nouvelle tentative."
-                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()))
-    result.update(plan_id=plan_id, plan_sha256=saved["sha256"])
-    store.update_submission(plan_id, "submitted" if result["ok"] else "failed", result)
-    return result
+@outil(annotations=READ_ONLY, description="Relit un plan local : scripts exacts, ressources, cible, empreinte, expiration et resultat de la tentative. Aucun acces SSH.")
+def plan_get(plan_id: str) -> dict[str, Any]:
+    return get_plan(plan_id)
 
 
 @outil(annotations=MUTATING, description=(
@@ -810,7 +689,7 @@ def job_array_prepare(
 @outil(
     annotations=MUTATING,
     description=(
-        "Soumet un calcul long sous forme de chaine de segments reprenables, "
+        "Prepare un plan local (24 h), sans soumettre. Decompose un calcul long sous forme de chaine de segments reprenables, "
         "pour depasser la limite de temps d'une partition rapide. Chaque "
         "segment recoit SIGUSR1 avant son expiration pour sauvegarder, et le "
         "suivant demarre apres lui via une dependance, en reprenant du dernier "
@@ -819,7 +698,7 @@ def job_array_prepare(
         "reprendre depuis checkpoint_dir et, idealement, traiter SIGUSR1."
     ),
 )
-def submit_resilient_job(
+def job_resilient_prepare(
     name: str,
     command: str,
     segment_time: str = "1h",
@@ -833,117 +712,19 @@ def submit_resilient_job(
     spack_packages: list[str] | None = None,
     stage_archive: str | None = None,
     workdir: str | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Chaine plusieurs segments dependants autour d'un point de reprise."""
-    require_account()
-    s = session()
-    try:
-        duree_segment = parse_duration(segment_time)
-        duree_totale = parse_duration(max_total_time)
-    except ClusterError as exc:
-        return _error(str(exc))
-
-    if duree_segment < 600:
-        return _error(
-            "un segment de moins de 10 minutes laisse trop peu de temps utile "
-            "une fois le preavis de sauvegarde deduit."
-        )
-    if signal_before >= duree_segment:
-        return _error(
-            "le preavis ({} s) doit rester inferieur a la duree d'un segment "
-            "({} s).".format(signal_before, duree_segment)
-        )
-
-    segments = max(1, -(-duree_totale // duree_segment))
-    if segments > 20:
-        return _error(
-            "{} segments seraient necessaires : reduis max_total_time ou "
-            "allonge segment_time.".format(segments)
-        )
-
-    dossier = checkpoint_dir or posixpath.join(s.scratch, "ckpts", name)
-    try:
-        dossier = check_path(dossier, s.home, s.scratch, s.path_aliases)
-    except GuardError as exc:
-        return _error(str(exc))
-
-    spec = JobSpec(
-        name=name, command=command, time=segment_time,
+    return workload_preparation.job_resilient_prepare(
+        name=name, command=command, segment_time=segment_time,
+        max_total_time=max_total_time, checkpoint_dir=checkpoint_dir, signal_before=signal_before,
         cpus_per_task=cpus_per_task, gpus_per_node=gpus_per_node, mem_gb=mem_gb,
-        arch=arch, spack_packages=spack_packages or [], workdir=workdir,
-        checkpoint_dir=dossier, signal_before=int(signal_before),
-        stage_archive=stage_archive,
+        arch=arch, spack_packages=spack_packages, stage_archive=stage_archive,
+        workdir=workdir,
     )
-    try:
-        if workdir:
-            spec.workdir = check_path(workdir, s.home, s.scratch, s.path_aliases)
-        plan = plan_job(spec, s.scratch)
-    except (ClusterError, GuardError, SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
 
-    resume = {
-        "segments": segments,
-        "duree_par_segment": format_slurm_time(duree_segment),
-        "duree_cumulee": format_slurm_time(duree_segment * segments),
-        "partition": plan.partition,
-        "arch": plan.arch,
-        "checkpoint_dir": dossier,
-        "preavis_s": int(signal_before),
-    }
 
-    if not confirm:
-        return {
-            "ok": True, "submitted": False, "mode": "simulation",
-            "resolved": resume, "warnings": plan.warnings, "script": plan.script,
-            "prerequis": (
-                "Ton programme doit (1) reprendre automatiquement depuis "
-                "{} s'il y trouve un etat, et (2) sauvegarder en recevant "
-                "SIGUSR1 ou en voyant apparaitre le fichier "
-                "SAUVEGARDE_DEMANDEE.".format(dossier)
-            ),
-            "next_step": "Rappelle avec confirm=true pour soumettre la chaine.",
-        }
-
-    identifiants: list[str] = []
-    precedent = None
-    script_path = None
-    for index in range(segments):
-        options = ()
-        if precedent:
-            # `afterany` enchaine quel que soit le sort du segment precedent :
-            # un depassement de temps est justement le cas nominal ici.
-            options = ("--dependency=afterany:{}".format(precedent),)
-        soumission = _soumettre_sbatch(
-            s, plan, name,
-            note="segment {}/{} de chaine reprenable".format(index + 1, segments),
-            options=options,
-            # Le script est identique pour tous les segments : on ne l'ecrit
-            # qu'une fois, le reste de la chaine le reutilise.
-            ecrire=(index == 0),
-            script_path=script_path,
-        )
-        if not soumission["ok"]:
-            # Les segments deja soumis existent sur le cluster : les taire
-            # laisserait des jobs orphelins que personne ne penserait a annuler.
-            soumission["error"] = "{} (segments deja soumis : {})".format(
-                soumission.get("error", "echec de soumission"), identifiants
-            )
-            soumission["job_ids"] = identifiants
-            return soumission
-        precedent = soumission["job_id"]
-        script_path = soumission["script_path"]
-        identifiants.append(precedent)
-
-    return {
-        "ok": True, "submitted": True, "job_ids": identifiants,
-        "resolved": resume, "warnings": plan.warnings,
-        "next_step": (
-            "Les segments s'enchainent automatiquement. Suis le premier avec "
-            "job_status('{}'). Pour tout arreter, annule-les tous : la "
-            "dependance seule ne suffit pas.".format(identifiants[0])
-        ),
-    }
+@outil(annotations=MUTATING, description="Soumet la chaine exacte conservee par job_resilient_prepare. Exige confirm=true ; rend tous les job_ids deja soumis, meme en cas d'echec partiel.")
+def job_resilient_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return _submit_prepared("resilient", plan_id, confirm)
 
 # =============================================================================
 # Ordonnancement : part d'usage et creneau

@@ -18,9 +18,9 @@ Pour utiliser le MCP sans modifier Python, commencer par la
 2. [server.py](server.py) importe les modules thématiques, qui enregistrent
    leurs outils grâce au décorateur `outil` de [noyau.py](noyau.py).
 3. L’outil valide sa demande et consulte soit le corpus local, soit ROMEO.
-4. Pour une soumission, [slurm.py](slurm.py) construit le script et choisit
+4. Pour une préparation, [slurm.py](slurm.py) construit le script et choisit
    les ressources à partir du modèle de cluster et des paramètres fournis.
-5. Après soumission, [registry.py](registry.py) conserve les références du job
+5. [plans.py](plans.py) fige le script ; la soumission exécute ce contenu via [execution_backend.py](execution_backend.py). Après soumission, [registry.py](registry.py) conserve les références du job
    dans le registre personnel. L’outil rend une réponse structurée au client.
 
 La connexion SSH effectue les opérations distantes ; Slurm attribue les nœuds
@@ -33,13 +33,13 @@ qui exécutent le calcul. La préparation par `job_prepare` conserve un plan loc
 |---|---|---|
 | [outils_contexte.py](outils_contexte.py) | Se situer sur le cluster et lire la documentation | `romeo_status`, `romeo_quota`, `romeo_software`, `search_docs`, `read_doc`, `romeo_selfcheck` |
 | [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | `job_prepare` / `job_submit`, `job_array_prepare` / `job_array_submit`, `job_pipeline_prepare` / `job_pipeline_submit`, `job_status`, `job_log_tail`, `job_efficiency` |
-| [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | `list_dir`, `upload_to_romeo`, `download_from_romeo`, `stage_dataset`, `sbatch_lint` |
-| [outils_execution.py](outils_execution.py) | Construire des environnements et lancer des services | `build_on_node`, `build_wheel`, `romeo_pip_install`, `launch_interactive_service` |
-| [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | `diagnose_job`, `job_live_metrics`, `profile_job`, `job_system_health` |
-| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile_get` / `tool_profile_set`, `export_job_report` |
+| [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | `list_dir`, `upload_to_romeo`, `download_from_romeo`, `dataset_prepare`, `sbatch_validate` |
+| [outils_execution.py](outils_execution.py) | Construire des environnements et lancer des services | `compute_command_prepare`, `python_wheel_prepare`, `python_packages_prepare`, `service_prepare` |
+| [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | `diagnose_job`, `job_live_metrics`, `job_profile_prepare`, `job_system_health` |
+| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile_get` / `tool_profile_set`, `job_report_export` |
 
 La [référence utilisateur](../docs/reference.md) détaille les fonctions et leurs
-limites. Le profil `essential` annonce 20 outils ; `full` annonce le catalogue
+limites. Le profil `essential` annonce 22 outils ; `full` annonce les outils métier, `expert` ajoute les exécuteurs génériques au catalogue
 complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 
 ## Modules de support
@@ -51,7 +51,10 @@ complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 | Mises à jour et lancement des versions | [updates.py](updates.py), [guide utilisateur](../docs/updates.md) |
 | Ressources et vérification du modèle | [cluster.py](cluster.py), [verification.py](verification.py) |
 | Transport et fichiers | [ssh.py](ssh.py), [files.py](files.py), [sortie.py](sortie.py) |
-| Validation des commandes et chemins | [guard.py](guard.py) |
+| Validation locale | [validation.py](validation.py), [guard.py](guard.py) |
+| Plans et cycles de vie | [plans.py](plans.py), [services.py](services.py), [service_models.py](service_models.py) |
+| Opérations métier | [python_operations.py](python_operations.py), [workload_preparation.py](workload_preparation.py) |
+| Adaptateurs Slurm et fichiers atomiques | [execution_backend.py](execution_backend.py), [file_operations.py](file_operations.py) |
 | Scripts et dépendances entre jobs | [slurm.py](slurm.py), [templates.py](templates.py), [pipeline.py](pipeline.py) |
 | Analyse des échecs et du matériel | [diagnostics.py](diagnostics.py), [hardware.py](hardware.py) |
 | Registre, provenance et filtrage | [registry.py](registry.py), [reproducibility.py](reproducibility.py), [privacy.py](privacy.py) |
@@ -67,7 +70,7 @@ les règles de dimensionnement.
 |---|---|
 | Ce paquet | Code, gabarits et documentation officielle embarquée |
 | Configuration personnelle hors dépôt | Projet Slurm, alias SSH, QOS et profil d’outils |
-| `~/.romeo-mcp/jobs.db` | Registre local et scripts des jobs soumis |
+| `~/.romeo-mcp/jobs.db` | Registre local, plans exacts, scripts soumis et relevés immuables |
 | `~/.romeo-mcp/reports/` | Exports privés de reproductibilité par défaut |
 | Répertoire distant du job | Script, journaux, résultats et éventuelle capture `.romeo-provenance/` |
 

@@ -159,10 +159,10 @@ check("job absent", not slurm.summarize_efficiency(rows, "123")["found"])
 
 print("\n-- garde-fous du noeud de login --")
 for bad, needle in [
-    ("make -j 32", "build_on_node"),
-    ("cd src && make", "build_on_node"),
-    ("gcc -O3 main.c", "build_on_node"),
-    ("nvcc kernel.cu", "build_on_node"),
+    ("make -j 32", "compute_command_prepare"),
+    ("cd src && make", "compute_command_prepare"),
+    ("gcc -O3 main.c", "compute_command_prepare"),
+    ("nvcc kernel.cu", "compute_command_prepare"),
     ("mpirun -n 4 ./a.out", "job_prepare"),
     ("pip install torch", "aarch64"),
     ("python3 -m pip install numpy", "aarch64"),

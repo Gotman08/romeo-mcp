@@ -230,7 +230,7 @@ def _markdown(report: dict) -> str:
             "\n\n## Script Slurm filtre\n\n" + "\n".join("    " + line for line in script.splitlines()) + "\n")
 
 
-def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
+def collect_report(job_id: str, *, code_dir: str = "",
                   data_files: list[str] | None = None, live: bool = True,
                   connection=None, job_registry=None) -> dict:
     if not re.fullmatch(r"[0-9]+(?:_[0-9]+)?", job_id):
@@ -242,10 +242,6 @@ def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
     record = store.get(job_id) or store.get(job_id.split("_")[0])
     if record is None:
         raise ValueError("Job absent du registre local. La fiche exige le script conserve lors d'une soumission par ce MCP.")
-    destination = Path(output_dir).expanduser() if output_dir else Path.home() / ".romeo-mcp" / "reports"
-    destination = destination.resolve()
-    if any((p / ".git").exists() for p in [destination, *destination.parents]):
-        raise ValueError("Choisir un dossier d'export hors d'un depot Git pour proteger les donnees du job.")
     original_script = record.get("script") or ""
     script = redact_text(original_script)
     provenance = store.get_provenance(record["job_id"])
@@ -259,7 +255,7 @@ def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
               "runtime": None, "resource_usage_observed_at": None,
               "limits": ["La capture sur le noeud precede la commande : un environnement active par cette commande peut ensuite differer.",
                          "Un commit Git ne prouve pas l'absence de modifications locales ni le contenu des fichiers non suivis.",
-                         "Les empreintes collectees a l'export decrivent les fichiers a cette date, pas necessairement les entrees originales.",
+                         "Les empreintes collectees au releve decrivent les fichiers a cette date, pas necessairement les entrees originales.",
                          "Une revue du contenu reste necessaire pour les valeurs opaques sans marqueur."]}
     if live:
         connection = connection or session()
@@ -302,10 +298,28 @@ def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
         except (SSHError, SSHTimeout):
             missing.append("Lecture de la comptabilite Slurm impossible.")
     else:
-        missing.append("Export hors ligne : aucun etat Slurm ni fichier distant n'a ete relu.")
+        missing.append("Releve local : aucun etat Slurm ni fichier distant n'a ete relu.")
     if not data_files and not (report["runtime"] or {}).get("data"):
         missing.append("Aucun fichier de donnees selectionne pour empreinte.")
     report = sanitize(report)
+    return {"ok": True, **store.save_report(report), "missing_information": report["missing_information"]}
+
+
+def report_get(report_id: str, *, job_registry=None) -> dict:
+    saved = (job_registry or registry()).get_report(report_id)
+    if saved is None:
+        raise ValueError("Releve introuvable.")
+    return {"ok": True, **saved}
+
+
+def export_snapshot(report_id: str, *, output_dir: str = "", job_registry=None) -> dict:
+    saved = report_get(report_id, job_registry=job_registry)
+    report = saved["report"]
+    job_id = report["job_id"]
+    destination = Path(output_dir).expanduser() if output_dir else Path.home() / ".romeo-mcp" / "reports"
+    destination = destination.resolve()
+    if any((p / ".git").exists() for p in [destination, *destination.parents]):
+        raise ValueError("Choisir un dossier d'export hors d'un depot Git pour proteger les donnees du job.")
     destination.mkdir(parents=True, exist_ok=True, mode=0o700)
     folder = destination / ("job-{}-{}".format(job_id, uuid.uuid4().hex[:12]))
     folder.mkdir(mode=0o700)
@@ -315,9 +329,19 @@ def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
         fd = os.open(folder / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as stream:
             stream.write(content)
-    return {"ok": True, "job_id": job_id, "directory": str(folder),
+    return {"ok": True, "report_id": report_id, "report_sha256": saved["report_sha256"],
+            "created_at": report["created_at"], "job_id": job_id, "directory": str(folder),
             "files": {k: str(folder / k) for k in contents},
             "script_redacted": report["script"]["redacted"],
             "missing_information": report["missing_information"],
             "data_files_hashed": sum(f.get("status") == "hashed" for f in (report["observations"] or {}).get("data", [])),
             "runtime_data_files_hashed": sum(f.get("status") == "hashed" for f in (report["runtime"] or {}).get("data", []))}
+
+
+def export_report(job_id: str, *, output_dir: str = "", code_dir: str = "",
+                  data_files: list[str] | None = None, live: bool = True,
+                  connection=None, job_registry=None) -> dict:
+    """Parcours CLI historique : compose collecte et export, sans etre un outil MCP."""
+    collected = collect_report(job_id, code_dir=code_dir, data_files=data_files, live=live,
+                               connection=connection, job_registry=job_registry)
+    return export_snapshot(collected["report_id"], output_dir=output_dir, job_registry=job_registry)

@@ -10,7 +10,7 @@ Commandes à exécuter depuis la racine du dépôt. Les valeurs matérielles son
 
 ## Outils exposés
 
-Le profil `full` expose ce catalogue. Le profil `essential` en annonce 20 ;
+Le profil `full` expose les outils métier. `expert` ajoute les exécuteurs génériques. Le profil `essential` en annonce 22 ;
 `tool_profile_set` permet de changer de profil pendant la connexion. Voir les
 [profils d’outils](configuration.md#profils-doutils).
 
@@ -34,25 +34,28 @@ Le profil `full` expose ce catalogue. Le profil `essential` en annonce 20 ;
 | `job_status` | File d'attente, puis historique `sacct` ; démarrage estimé |
 | `job_log_tail` / `job_log_search` | Dernières lignes des logs / recherche bornée avec un `pattern` obligatoire |
 | `diagnose_job` | **Autopsie d'un échec en un appel** : état, journaux, causes reconnues, remèdes |
-| `submit_resilient_job` | Chaîne de segments reprenables, pour dépasser la limite d'une partition rapide |
+| `job_resilient_prepare` / `job_resilient_submit` | Chaîne de segments reprenables, pour dépasser la limite d'une partition rapide |
 | `job_live_metrics` | **Télémétrie d'un job en cours** : occupation et VRAM des GPU, température, puissance |
 | `job_stack_trace` | Pile d'appels d'un job bloqué (interblocage MPI, noyau CUDA figé) |
-| `profile_job` / `profile_report` | Profilage Nsight Systems fenêtré, puis résumé des goulots |
+| `job_profile_prepare` / `job_profile_submit` / `profile_report` | Profilage Nsight Systems fenêtré, puis résumé des goulots |
 | `job_energy_footprint` | Énergie et empreinte carbone : **modèle**, voir plus bas |
 | `job_system_health` | Charge CPU face aux cœurs réservés, attente d'E/S, mémoire réelle |
-| `sbatch_lint` | Vérifie un script **avant** l'envoi : CRLF, `--mem`, chemins, secrets |
+| `sbatch_validate` / `sbatch_check_paths` | Analyse locale du texte / vérification explicite des chemins par SSH |
 | `job_efficiency` | Efficacité CPU/mémoire/GPU et recommandations de redimensionnement |
-| `export_job_report` | [Fiche privée de reproductibilité](reproducibility.md) : script filtré, provenance, mesures Slurm et empreintes |
+| `job_report_collect` / `job_report_export` | Collecte un relevé daté puis exporte exactement ce relevé |
+| `job_report_from_record` / `job_report_get` | Crée un relevé hors ligne / relit un relevé enregistré |
+| `plan_get` | Relit scripts, ressources, expiration et état de la tentative |
 | `cancel_job`, `list_jobs`, `wait_for_job` | Gestion courante ; l’attente est plafonnée à 600 s |
 
 **Construction et interactif**
 
 | Outil | Rôle |
 |---|---|
-| `build_on_node` | Compile ou installe sur un nœud de l'architecture cible via `srun`. Indispensable pour aarch64 |
-| `launch_interactive_service` | Lance JupyterLab, TensorBoard, vLLM ou MLflow sur un nœud et rend la commande de pont SSH |
-| `allocate_debug_node` | Réserve un nœud pour de la mise au point interactive |
-| `spawn_remote_workspace` | JupyterLab authentifié : jeton généré, tunnel et URL directe |
+| `service_prepare` / `service_start` | Prépare puis soumet le service ; rend immédiatement un identifiant |
+| `service_status` / `service_connection_info` | Consulte l'état puis fournit l'accès quand le service répond |
+| `service_stop` | Demande explicitement l'arrêt du service |
+| `cluster_allocation_prepare` / `cluster_allocation_start` | Prépare puis réserve un nœud, sans attendre son affectation |
+| `cluster_allocation_connection_info` | Fournit la commande de shell pour une allocation en cours |
 | `cluster_gpu_health_run` | Réserve des ressources GPU via `srun` et sonde bridage, ECC et fréquence ; mode NCCL désactivé |
 
 **Stockage**
@@ -60,7 +63,7 @@ Le profil `full` expose ce catalogue. Le profil `essential` en annonce 20 ;
 | Outil | Rôle |
 |---|---|
 | `storage_usage_audit` | Repère ce qui occupe l'espace ; propose les commandes, n'efface rien |
-| `stage_dataset` | Télécharge depuis un nœud de calcul ; Hugging Face exige un venv `env_path` déjà préparé |
+| `dataset_prepare` / `dataset_download` | Prépare puis télécharge depuis un nœud de calcul ; Hugging Face exige un venv `env_path` déjà préparé |
 | `audit_orphan_files` | Fichiers volumineux abandonnés, répertoires de jobs morts |
 | `secret_env_prepare` | Crée le dossier et le fichier distants, impose les droits 700/600, sans lire les secrets |
 | `inject_io_staging` | Greffe la mise en cache en mémoire vive dans un script sbatch existant |
@@ -69,18 +72,19 @@ Le profil `full` expose ce catalogue. Le profil `essential` en annonce 20 ;
 
 | Outil | Rôle |
 |---|---|
-| `build_wheel` | Compile une roue binaire aarch64 dans un dépôt local |
-| `romeo_pip_install` | Installe dans un venv en réutilisant ces roues, sur la bonne architecture |
+| `python_env_prepare` / `python_env_create` | Prépare puis crée un venv neuf, sans installer de paquet applicatif |
+| `python_wheel_prepare` / `python_wheel_build` | Prépare puis compile une roue binaire aarch64 dans un dépôt local |
+| `python_packages_prepare` / `python_packages_install` | Prépare puis installe dans un venv en réutilisant ces roues, sur la bonne architecture |
 | `romeo_fairshare_forecast` | Effet d'une charge envisagée sur la part d'usage du compte |
 | `suggest_submission_slot` | Quelle partition démarrerait le plus vite pour la taille visée |
 
-**Fichiers** : `list_dir`, `read_remote_file`, `write_remote_file`,
+**Fichiers** : `list_dir`, `read_remote_file`, `file_create`, `file_replace`,
 `upload_to_romeo`, `download_from_romeo`.
 
 **Documentation hors ligne** : `search_docs` (classement lexical par sections,
 sources et lignes), `read_doc` (page ou plage de lignes, pagination sans perte).
 
-**Échappatoire** : `run_login_command`, encadrée, avec un `allow_heavy` explicite
+**Catalogue expert** : `compute_command_prepare` puis `compute_command_run` exécutent des commandes arbitraires via un job. `login_command_run` est une échappatoire, encadrée, avec un `allow_heavy` explicite
 pour les cas que la documentation ROMEO autorise (par exemple un `pip install`
 en environnement virtuel à destination du x86_64).
 
@@ -129,10 +133,75 @@ et adapter les listes d’outils autorisés dans le client.
 | `storage_cleanup_helper` | `storage_usage_audit` (lecture seule) |
 
 Pour Hugging Face, créer un venv sur l’architecture de téléchargement, installer
-`huggingface_hub` explicitement avec `romeo_pip_install`, puis transmettre ce
-chemin à `stage_dataset(..., kind="huggingface", env_path=...)` sur la même
-architecture. Le job télécharge un dépôt de type `dataset` et échoue clairement
+`huggingface_hub` avec `python_packages_prepare` puis `python_packages_install`, attendre le succès du job, puis transmettre ce
+chemin à `dataset_prepare(..., kind="huggingface", env_path=...)` sur la même
+architecture, puis appeler `dataset_download(plan_id, confirm=true)`. Le job télécharge un dépôt de type `dataset` et échoue clairement
 si le paquet manque ; il ne lance jamais d’installation.
+
+### Cycles de vie et migration des outils composites
+
+Toutes les paires ci-dessous utilisent le même registre local et la même expiration
+de 24 heures. La préparation peut lire les racines par SSH ; elle ne soumet rien.
+L'action exige seulement `plan_id` et `confirm=true`, sans régénérer le script.
+`plan_get(plan_id)` restitue le plan exact et le résultat de sa tentative.
+
+| Ancien outil | Parcours explicite |
+|---|---|
+| `launch_interactive_service`, `spawn_remote_workspace` | `service_prepare` → `service_start` → `service_status` → `service_connection_info` ; arrêt par `service_stop` |
+| `submit_resilient_job` | `job_resilient_prepare` → `job_resilient_submit` |
+| `profile_job` | `job_profile_prepare` → `job_profile_submit` |
+| `stage_dataset` | `dataset_prepare` → `dataset_download` |
+| `build_wheel` | `python_wheel_prepare` → `python_wheel_build` |
+| `romeo_pip_install` | `python_packages_prepare` → `python_packages_install` |
+| `allocate_debug_node` | `cluster_allocation_prepare` → `cluster_allocation_start` |
+| `build_on_node` | Outils Python précis ; commandes arbitraires via `compute_command_prepare` → `compute_command_run` dans `expert` |
+| `run_login_command` | `login_command_run`, dans `expert` |
+| `write_remote_file` | `file_create` ou `file_replace` |
+| `sbatch_lint` | `sbatch_validate(script)` ou `sbatch_check_paths(script)` |
+| `export_job_report` | `job_report_collect(job_id)` → `job_report_export(report_id)` |
+
+### Services interactifs
+
+Exemple de configuration pour `service_prepare` :
+
+```json
+{"config": {"service": "jupyter", "env_path": "/scratch_p/VOTRE_IDENTIFIANT/venv", "port": 8888}, "arch": "armgpu", "gpus_per_node": 1, "time_limit": "2h"}
+```
+
+Le venv et le service doivent déjà être installés sur cette architecture. La
+configuration est spécifique : TensorBoard exige `logdir`, vLLM exige `model`
+et un GPU, Jupyter et MLflow n'acceptent pas ces champs. Les champs sans objet
+sont refusés. La préparation ne crée aucun environnement et n'installe rien.
+
+`service_start` rend `service_id` et `job_id` après `sbatch`, sans attendre de nœud.
+`service_status` effectue une lecture Slurm et, si le job tourne, une sonde HTTP
+bornée à trois secondes. États : `waiting`, `starting`, `ready`, `failed`,
+`stopped`, `unknown`. Une panne de transport ne prouve pas un échec du service.
+Le même `service_id` reste utilisable après redémarrage du MCP.
+
+`service_connection_info(service_id, local_port=8888)` fournit la commande SSH
+et l'URL seulement quand le service répond. Il n'ouvre aucun tunnel. Jupyter
+et vLLM génèrent un jeton dans un fichier privé au démarrage ; TensorBoard et
+MLflow restent sans authentification et l'avertissement figure dans leur plan.
+`service_stop` demande l'annulation Slurm ; consulter ensuite l'état pour
+confirmer l'arrêt. La fin normale du job ferme également le service.
+
+### Fichiers et validation
+
+`file_create` refuse une cible existante. `file_replace` exige un fichier
+régulier existant et refuse un lien symbolique. Son `expected_sha256` facultatif
+empêche d'écraser un contenu qui ne correspond plus à l'empreinte attendue.
+La réponse donne la nouvelle empreinte. Les deux outils publient atomiquement
+le contenu, exigent un parent existant et acceptent jusqu'à 64 Kio de texte.
+Le verrou `.romeo-mcp-files.lock` coordonne ces outils entre processus ; une
+écriture concurrente par un autre programme doit respecter le même verrou.
+
+`sbatch_validate` ne reçoit que du texte et n'ouvre aucune connexion.
+`sbatch_check_paths` vérifie par SSH jusqu'à 20 chemins littéraux dans les
+racines autorisées et indique ceux laissés de côté. C'est une analyse lexicale,
+sans expansion des variables, des motifs ou du shell. Un chemin de sortie
+absent n'est pas nécessairement une erreur de script. Pour analyser un fichier
+distant, le lire explicitement avec `read_remote_file` puis valider son texte.
 
 ### Plusieurs tableaux dans le même dossier
 
@@ -259,7 +328,7 @@ attente sur verrou, ou attente d'entrée-sortie.
 
 ## Calculs longs sur partition courte
 
-`submit_resilient_job` découpe un calcul en segments enchaînés par
+`job_resilient_prepare` découpe un calcul en segments enchaînés par
 `--dependency=afterany`, ce qui permet d'occuper une partition rapide bien
 au-delà de sa limite de temps :
 
@@ -286,14 +355,14 @@ taille décompressée.
 ## Roues aarch64 précompilées
 
 Compiler `deepspeed`, `flash-attn` ou `bitsandbytes` prend de longues minutes,
-et recommencer à chaque environnement est du gâchis. `build_wheel` compile une
+et recommencer à chaque environnement est du gâchis. `python_wheel_prepare` puis `python_wheel_build` compilent une
 fois sur un nœud de la bonne architecture et dépose la roue dans
-`/scratch_p/$USER/.wheels/aarch64/` ; `romeo_pip_install` l'y retrouve via
+`/scratch_p/$USER/.wheels/aarch64/` ; `python_packages_prepare` puis `python_packages_install` l'y retrouvent via
 `--find-links`, toujours depuis un nœud de calcul.
 
 ## Profilage et santé du parc
 
-`profile_job` encapsule le calcul dans **Nsight Systems**, disponible via Spack
+`job_profile_prepare` prépare le script ; `job_profile_submit` lance le job. Le script encapsule le calcul dans **Nsight Systems**, disponible via Spack
 (`nvidia-nsight-systems@2024.6.1`). La capture est **fenêtrée** (un délai de
 mise en régime puis quelques dizaines de secondes), sans quoi la trace atteint
 plusieurs gigaoctets. `profile_report` condense ensuite la sortie `nsys stats`
@@ -368,7 +437,7 @@ sous deux formes selon qui le rapporte ; les deux sont traitées :
 Un binaire tué par SIGKILL n'a pas toujours le temps d'écrire quoi que ce soit :
 le code de sortie explique alors l'échec à lui seul.
 
-`sbatch_lint` vérifie un script **avant** l'envoi : fins de ligne Windows qui
+`sbatch_validate` vérifie un script **avant** l'envoi : fins de ligne Windows qui
 font échouer le shebang de façon opaque, `#SBATCH` placés après la première
 commande et donc ignorés, `--mem` manquant, chemins inexistants (vérifiés
 réellement sur le cluster), variables non définies, secrets en clair.
@@ -555,7 +624,7 @@ sont illustratifs. Une soumission réelle, elle, refuse plutôt que d'inventer u
 chemin.
 
 **Deux sessions SSH, pas une.** Le verrou du transport est détenu pendant toute
-la durée d'une commande. Avec une seule session, un `build_on_node` de quinze
+la durée d'une commande. Avec une seule session, une sonde synchrone de plusieurs
 minutes bloque en tête de file un simple `squeue`. Les commandes dont le délai
 dépasse deux minutes basculent donc sur une seconde connexion. Mesure : une
 lecture concurrente passe de 8 s d'attente à 0,5 s.
@@ -572,3 +641,13 @@ un résumé compact avec un plafond de taille ; les logs sont tronqués, jamais
 déversés.
 
 ---
+
+### Organisation des responsabilités
+
+- `outils_*.py` : interface MCP, schémas et annotations d'effets.
+- `plans.py`, `services.py`, `python_operations.py`, `workload_preparation.py` et `reproducibility.py` : règles métier et composition des opérations.
+- `execution_backend.py`, `ssh.py`, `registry.py`, `file_operations.py` : adaptateurs Slurm, transport SSH, SQLite et publication des fichiers.
+- `slurm.py`, `templates.py`, `validation.py` : génération et validation locale testables sans connexion.
+
+Les opérations existantes de diagnostic et les transferts avec vérification
+d'intégrité conservent leur intention unique.

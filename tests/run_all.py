@@ -38,6 +38,8 @@ SUITES = [
      "tableaux concurrents dans un meme dossier et contenu reel des journaux", False),
     ("tool-actions", "tests/test_tool_actions.py",
      "effets MCP, plans persistants, soumission exacte et recherches bornees", False),
+    ("lifecycles", "tests/test_lifecycles.py",
+     "services, configurations typees, fichiers atomiques et releves immuables", False),
     ("ajouts", "tests/test_ajouts.py",
      "enchainements de jobs, controle de derive du modele", False),
     ("docs", "tests/test_docs.py",

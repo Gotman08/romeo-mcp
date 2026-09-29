@@ -20,7 +20,7 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_ACCOUNT` | Aucune | Projet Slurm autorisé ; obligatoire pour préparer une allocation |
 | `ROMEO_HOST` | `romeo1` | Alias dans votre configuration OpenSSH |
 | `ROMEO_QOS` | `normal` | QOS autorisée pour le projet |
-| `ROMEO_TOOL_PROFILE` | `full` | Catalogue annoncé : `essential` ou `full` |
+| `ROMEO_TOOL_PROFILE` | `full` | Catalogue annoncé : `essential`, `full` ou `expert` |
 | `ROMEO_MAX_CPUS`, `ROMEO_MAX_GPUS`, `ROMEO_MAX_JOBS` | `0` | Seuils locaux indicatifs ; `0` signifie inconnu, sans avertissement de dépassement |
 | `ROMEO_MCP_DB` | `~/.romeo-mcp/jobs.db` | Registre privé des jobs et scripts soumis |
 | `ROMEO_SCRATCH`, `ROMEO_HOME` | Découverts par SSH | Racines distantes ; permettent aussi une simulation hors ligne |
@@ -40,8 +40,9 @@ variables déjà définies dans le client.
 
 | Profil | Outils annoncés |
 |---|---|
-| `essential` | `tool_profile_get`, `tool_profile_set`, `search_docs`, `read_doc`, `romeo_status`, `romeo_quota`, `romeo_software`, `job_prepare`, `job_submit`, `job_status`, `job_log_tail`, `job_log_search`, `list_jobs`, `cancel_job`, `diagnose_job`, `job_efficiency`, `list_dir`, `upload_to_romeo`, `download_from_romeo`, `export_job_report` |
-| `full` | Tout le catalogue de la [référence](reference.md), y compris les tableaux, pipelines et outils avancés |
+| `essential` | `tool_profile_get`, `tool_profile_set`, `search_docs`, `read_doc`, `romeo_status`, `romeo_quota`, `romeo_software`, `job_prepare`, `job_submit`, `job_status`, `job_log_tail`, `job_log_search`, `list_jobs`, `cancel_job`, `diagnose_job`, `job_efficiency`, `list_dir`, `upload_to_romeo`, `download_from_romeo`, `job_report_collect`, `job_report_export`, `plan_get` |
+| `full` | Catalogue métier : tableaux, pipelines, services, environnements, fichiers et rapports |
+| `expert` | Catalogue `full` plus `compute_command_prepare`, `compute_command_run` et `login_command_run` |
 
 Trois façons de choisir :
 

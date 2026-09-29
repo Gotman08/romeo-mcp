@@ -2,7 +2,7 @@
 
 Le serveur savait deja soumettre un job isole, un balayage parametrique
 (`job_array_prepare`) et une chaine de segments reprenables
-(`submit_resilient_job`). Il ne savait pas exprimer la forme la plus courante
+(`job_resilient_prepare`). Il ne savait pas exprimer la forme la plus courante
 d'un calcul serieux : *preparer, calculer, rassembler*, chaque etape n'ayant de
 sens qu'apres la precedente.
 

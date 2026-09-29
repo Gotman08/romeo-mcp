@@ -44,7 +44,7 @@ _MOTIFS: list[tuple[str, Cause]] = [
             "aarch64, donc tout artefact produit sur le login y est inutilisable.",
             [
                 "Recompile ou reinstalle sur la bonne famille de noeuds avec "
-                "`build_on_node(arch='armgpu', ...)`.",
+                "`compute_command_prepare(arch='armgpu', ...)`.",
                 "Pour un environnement Python, recree-le depuis un noeud de "
                 "calcul : les roues telechargees sur le login sont en x86_64.",
                 "Verifie l'architecture attendue avec `uname -m` dans le job.",
@@ -260,7 +260,7 @@ _SIGNAUX: dict[int, tuple[str, str, list[str]]] = {
           "qu'un symptome : verifie `uname -m`."]),
     15: ("SIGTERM", "arret demande proprement",
          ["Sur un cluster, c'est presque toujours la fin du temps alloue.",
-          "Augmente `time_limit`, ou passe par `submit_resilient_job` pour "
+          "Augmente `time_limit`, ou passe par `job_resilient_prepare` pour "
           "reprendre depuis un point de sauvegarde."]),
 }
 
@@ -279,7 +279,7 @@ _CODES_SHELL: dict[int, tuple[str, list[str]]] = {
            "courants sont absents.",
            "Verifie le `$PATH` effectif et l'orthographe de la commande.",
            "Un script avec des fins de ligne Windows produit aussi ce code : "
-           "verifie-le avec `sbatch_lint`."]),
+           "verifie-le avec `sbatch_validate`."]),
 }
 
 

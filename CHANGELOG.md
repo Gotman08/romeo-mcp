@@ -2,6 +2,17 @@
 
 [Accueil](README.md) · [Guide des mises à jour](docs/updates.md)
 
+## Non publié — intentions et cycles de vie explicites
+
+- Services unifiés : préparation, démarrage sans attente, état, connexion et arrêt.
+- Fichiers : création exclusive et remplacement atomique avec empreinte attendue facultative.
+- Validation locale séparée de la vérification distante des chemins.
+- Relevés de jobs immuables, consultables et exportables sans nouvelle collecte.
+- Plans consultables et communs aux installations, roues, téléchargements, profilages, chaînes reprenables et allocations.
+- Environnements Python structurés ; exécuteurs génériques limités au catalogue `expert`.
+- Migration incompatible des anciens outils composites : voir `docs/reference.md`.
+
+
 ## Non publié
 
 - Séparation des actions MCP : `tool_profile_get` / `tool_profile_set`,

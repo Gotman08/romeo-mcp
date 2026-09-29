@@ -5,14 +5,14 @@ sante du parc, empreinte energetique.
 """
 
 from __future__ import annotations
+from . import workload_preparation
+from .plans import submit_prepared
 
-import posixpath
 import re
 import shlex
 from typing import Any
-from .cluster import ClusterError, format_slurm_time, require_account
+from .cluster import format_slurm_time, require_account
 from .diagnostics import analyser, commande_recherche_checkpoints
-from .guard import GuardError, check_path
 from .hardware import (
     INTENSITE_CARBONE_G_KWH,
     analyser_gpu,
@@ -21,7 +21,7 @@ from .hardware import (
 )
 from .registry import registry
 from .sortie import premiere_ligne
-from .slurm import JobSpec, gpus_from_tres, parse_mem_mb, plan_job
+from .slurm import gpus_from_tres, parse_mem_mb
 from .ssh import SSHError, SSHTimeout, session
 from .outils_calcul import job_efficiency, job_log_tail, job_status
 from .noyau import (
@@ -32,7 +32,6 @@ from .noyau import (
     _flottant,
     _resumer_tableau,
     _sh,
-    _soumettre_sbatch,
     _srun_overlap,
     indices_pile,
     outil,
@@ -508,13 +507,13 @@ def job_system_health(job_id: str) -> dict[str, Any]:
 @outil(
     annotations=MUTATING,
     description=(
-        "Profile un calcul GPU avec NVIDIA Nsight Systems et produit un rapport "
+        "Prepare un plan local (24 h), sans soumettre. Profile un calcul GPU avec NVIDIA Nsight Systems et produit un rapport "
         "exploitable, au lieu de laisser deviner pourquoi un code est lent. La "
         "capture est fenetree pour ne pas produire une trace enorme. Lis ensuite "
         "le resume avec profile_report."
     ),
 )
-def profile_job(
+def job_profile_prepare(
     command: str,
     name: str = "mcp-profile",
     delay_seconds: int = 60,
@@ -527,95 +526,23 @@ def profile_job(
     arch: str = "armgpu",
     spack_packages: list[str] | None = None,
     workdir: str | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Soumet un job encapsule dans `nsys profile`, capture fenetree."""
-    s = session()
-    if not command.strip():
-        return _error("commande vide : il n'y a rien a profiler.")
-
-    delay_seconds = max(0, min(int(delay_seconds), 3600))
-    duration_seconds = max(5, min(int(duration_seconds), 600))
-    profils = posixpath.join(s.scratch, "profiles")
-    rapport = "{}/{}_$SLURM_JOB_ID".format(profils, name)
-
-    corps = [
-        "mkdir -p {}".format(shlex.quote(profils)),
-        "# Ces compteurs sont transmis au programme : une capture par etapes",
-        "# suppose que le code delimite ses iterations par des marqueurs NVTX.",
-        "export PROFILE_WARMUP_STEPS={}".format(int(warmup_steps)),
-        "export PROFILE_STEPS={}".format(int(profile_steps)),
-        "",
-        "# La fenetre de capture evite une trace de plusieurs gigaoctets : on",
-        "# laisse le calcul se stabiliser, puis on enregistre quelques dizaines",
-        "# de secondes representatives.",
-        "nsys profile \\",
-        "  --trace=cuda,nvtx,osrt \\",
-        "  --delay={} \\".format(delay_seconds),
-        "  --duration={} \\".format(duration_seconds),
-        "  --force-overwrite true \\",
-        '  -o "{}" \\'.format(rapport),
-        "  {}".format(command.strip()),
-        "",
-        'echo "###PROFIL_STATS"',
-        'nsys stats --report gpukernsum,gpumemtimesum "{}.nsys-rep" '
-        "2>&1 || true".format(rapport),
-    ]
-
-    spec = JobSpec(
-        name=name,
-        command="\n".join(corps),
-        time=time_limit,
-        gpus_per_node=gpus_per_node,
-        cpus_per_task=cpus_per_task,
-        arch=arch,
-        spack_packages=(spack_packages or []) + ["nvidia-nsight-systems"],
-        workdir=workdir,
+    return workload_preparation.job_profile_prepare(
+        command=command, name=name, delay_seconds=delay_seconds,
+        duration_seconds=duration_seconds, warmup_steps=warmup_steps, profile_steps=profile_steps,
+        time_limit=time_limit, gpus_per_node=gpus_per_node, cpus_per_task=cpus_per_task,
+        arch=arch, spack_packages=spack_packages, workdir=workdir,
     )
-    try:
-        if workdir:
-            spec.workdir = check_path(workdir, s.home, s.scratch, s.path_aliases)
-        plan = plan_job(spec, s.scratch)
-    except (ClusterError, GuardError, SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
 
-    resume = {
-        "profileur": "nsys",
-        "fenetre": "{} s apres {} s de mise en regime".format(
-            duration_seconds, delay_seconds
-        ),
-        "rapport": rapport + ".nsys-rep",
-        "arch": plan.arch,
-        "partition": plan.partition,
-    }
 
-    if not confirm:
-        return {
-            "ok": True, "submitted": False, "mode": "simulation",
-            "resolved": resume, "warnings": plan.warnings, "script": plan.script,
-            "note": (
-                "La capture par etapes (warmup_steps, profile_steps) n'a d'effet "
-                "que si ton code lit PROFILE_WARMUP_STEPS et PROFILE_STEPS et "
-                "delimite ses iterations par des marqueurs NVTX. Sinon seule la "
-                "fenetre temporelle s'applique."
-            ),
-            "next_step": "Rappelle avec confirm=true pour lancer le profilage.",
-        }
-
-    soumission = _soumettre_sbatch(s, plan, name, note="profilage nsys")
-    if not soumission["ok"]:
-        return soumission
-    job_id = soumission["job_id"]
-    return {
-        "ok": True, "submitted": True, "job_id": job_id, "resolved": resume,
-        "warnings": plan.warnings,
-        "next_step": "Quand le job est termine, lis profile_report('{}').".format(job_id),
-    }
+@outil(annotations=MUTATING, description="Soumet le profilage exact prepare par job_profile_prepare. Exige confirm=true ; rend immediatement un job_id.")
+def job_profile_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return submit_prepared("profile", plan_id, confirm)
 
 @outil(
     annotations=READ_ONLY,
     description=(
-        "Resume le rapport de profilage d'un job traite par profile_job : "
+        "Resume le rapport de profilage d'un job traite par job_profile_prepare : "
         "repartition entre calcul et transferts memoire, et noyaux les plus "
         "couteux. Condense une sortie nsys de plusieurs centaines de lignes en "
         "quelques constats."
@@ -630,7 +557,7 @@ def profile_report(job_id: str, top: int = 5) -> dict[str, Any]:
     if "###PROFIL_STATS" not in contenu:
         return _error(
             "aucune section statistique dans la sortie du job {} : soit il n'a "
-            "pas ete lance par profile_job, soit il n'est pas termine.".format(job_id),
+            "pas ete lance par job_profile_prepare, soit il n'est pas termine.".format(job_id),
             job_id=job_id,
         )
 

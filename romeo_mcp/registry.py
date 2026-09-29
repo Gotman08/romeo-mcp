@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS prepared_submissions (
     state TEXT NOT NULL,
     result TEXT
 );
+CREATE TABLE IF NOT EXISTS report_snapshots (
+    report_id TEXT PRIMARY KEY,
+    payload TEXT NOT NULL,
+    sha256 TEXT NOT NULL
+);
 """
 
 
@@ -66,6 +71,7 @@ class Registry:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(self.path), check_same_thread=False)
+        os.chmod(self.path, 0o600)
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(_SCHEMA)
@@ -180,6 +186,26 @@ class Registry:
             self._conn.execute(
                 "UPDATE prepared_submissions SET state = ?, result = ? WHERE plan_id = ?",
                 (state, json.dumps(result, ensure_ascii=False), plan_id))
+
+    def save_report(self, report: dict) -> dict:
+        """Enregistre un releve immuable ; chaque nouvelle collecte a son identifiant."""
+        report_id = uuid.uuid4().hex
+        payload = json.dumps(report, ensure_ascii=False, sort_keys=True)
+        digest = hashlib.sha256(payload.encode('utf-8')).hexdigest()
+        with self._lock, self._conn:
+            self._conn.execute('INSERT INTO report_snapshots VALUES (?, ?, ?)', (report_id, payload, digest))
+        return {'report_id': report_id, 'report_sha256': digest, 'created_at': report['created_at'],
+                'job_id': report['job_id'], 'storage': str(self.path)}
+
+    def get_report(self, report_id: str) -> dict | None:
+        with self._lock:
+            row = self._conn.execute('SELECT payload, sha256 FROM report_snapshots WHERE report_id = ?',
+                                     (report_id,)).fetchone()
+        if row is None:
+            return None
+        if hashlib.sha256(row['payload'].encode('utf-8')).hexdigest() != row['sha256']:
+            raise ValueError('Releve altere : nouvelle collecte necessaire.')
+        return {'report_id': report_id, 'report_sha256': row['sha256'], 'report': json.loads(row['payload'])}
 
 
 _REGISTRY: Registry | None = None

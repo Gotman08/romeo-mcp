@@ -14,31 +14,77 @@ from mcp import ClientSession, StdioServerParameters, stdio_client  # noqa: E402
 #: C'est le seul garde-fou contre une perte silencieuse lors d'un deplacement
 #: de code entre modules.
 OUTILS_ATTENDUS = {
-    # contexte cluster
-    "romeo_status", "romeo_modules", "romeo_software", "romeo_quota",
-    # jobs
-    "job_prepare", "job_submit", "job_array_prepare", "job_array_submit", "submit_resilient_job",
-    "job_pipeline_prepare", "job_pipeline_submit",
-    "job_status",
-    "job_log_tail", "job_log_search", "job_efficiency", "diagnose_job", "cancel_job", "list_jobs",
-    "wait_for_job",
-    # execution et interactif
-    "build_on_node", "build_wheel", "romeo_pip_install",
-    "launch_interactive_service", "allocate_debug_node", "spawn_remote_workspace",
-    # observation
-    "job_live_metrics", "job_stack_trace", "job_system_health",
-    "job_energy_footprint", "profile_job", "profile_report",
-    "cluster_gpu_health_run",
-    # fichiers et stockage
-    "list_dir", "read_remote_file", "write_remote_file", "upload_to_romeo",
-    "download_from_romeo", "storage_usage_audit", "audit_orphan_files",
-    "stage_dataset", "inject_io_staging",
-    # ordonnancement
-    "romeo_fairshare_forecast", "suggest_submission_slot",
-    # divers
-    "run_login_command", "sbatch_lint", "secret_env_prepare", "romeo_selfcheck",
-    "search_docs", "read_doc",
-    "tool_profile_get", "tool_profile_set", "export_job_report",
+    'audit_orphan_files',
+    'cancel_job',
+    'cluster_allocation_connection_info',
+    'cluster_allocation_prepare',
+    'cluster_allocation_start',
+    'cluster_gpu_health_run',
+    'compute_command_prepare',
+    'compute_command_run',
+    'dataset_download',
+    'dataset_prepare',
+    'diagnose_job',
+    'download_from_romeo',
+    'file_create',
+    'file_replace',
+    'inject_io_staging',
+    'job_array_prepare',
+    'job_array_submit',
+    'job_efficiency',
+    'job_energy_footprint',
+    'job_live_metrics',
+    'job_log_search',
+    'job_log_tail',
+    'job_pipeline_prepare',
+    'job_pipeline_submit',
+    'job_prepare',
+    'job_profile_prepare',
+    'job_profile_submit',
+    'job_report_collect',
+    'job_report_export',
+    'job_report_from_record',
+    'job_report_get',
+    'job_resilient_prepare',
+    'job_resilient_submit',
+    'job_stack_trace',
+    'job_status',
+    'job_submit',
+    'job_system_health',
+    'list_dir',
+    'list_jobs',
+    'login_command_run',
+    'plan_get',
+    'profile_report',
+    'python_env_create',
+    'python_env_prepare',
+    'python_packages_install',
+    'python_packages_prepare',
+    'python_wheel_build',
+    'python_wheel_prepare',
+    'read_doc',
+    'read_remote_file',
+    'romeo_fairshare_forecast',
+    'romeo_modules',
+    'romeo_quota',
+    'romeo_selfcheck',
+    'romeo_software',
+    'romeo_status',
+    'sbatch_check_paths',
+    'sbatch_validate',
+    'search_docs',
+    'secret_env_prepare',
+    'service_connection_info',
+    'service_prepare',
+    'service_start',
+    'service_status',
+    'service_stop',
+    'storage_usage_audit',
+    'suggest_submission_slot',
+    'tool_profile_get',
+    'tool_profile_set',
+    'upload_to_romeo',
+    'wait_for_job',
 }
 
 
@@ -52,7 +98,7 @@ def payload_of(result):
 
 
 async def main() -> int:
-    params = StdioServerParameters(command=sys.executable, args=["-m", "romeo_mcp"])
+    params = StdioServerParameters(command=sys.executable, args=["-m", "romeo_mcp", "serve", "--profile", "expert"])
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as sess:
             init = await sess.initialize()
@@ -145,7 +191,7 @@ async def main() -> int:
             assert "--gpus-per-node=2" in payload.get("script", "")
 
             # Refus : le garde-fou doit remonter proprement, pas planter.
-            refused = await sess.call_tool("run_login_command", {"command": "make -j 8"})
+            refused = await sess.call_tool("login_command_run", {"command": "make -j 8"})
             payload = payload_of(refused)
             print("refus via protocole : ok={} refused={}".format(
                 payload.get("ok"), payload.get("refused")))

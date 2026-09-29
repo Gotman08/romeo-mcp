@@ -88,18 +88,18 @@ def main() -> int:
         check("chaque tache a recu ses parametres", trouves == len(params), contenu[:200])
 
     print("\n== 4. Service interactif (simulation) ==")
-    svc = srv.launch_interactive_service(service="jupyter", port=2345, local_port=8888,
-                                         minutes=60, gpus_per_node=1)
+    svc = srv.service_prepare(config={"service": "jupyter", "env_path": "/scratch_p/user/venv", "port": 2345},
+                                         time_limit="1h", gpus_per_node=1)
     check("simulation par defaut", svc.get("submitted") is False)
-    check("commande de service generee", "jupyter lab" in svc.get("commande_service", ""))
-    check("port repercute", "2345" in svc.get("commande_service", ""))
-    mauvais = srv.launch_interactive_service(service="tensorboard")
+    check("commande de service generee", "jupyter lab" in svc.get("script", ""))
+    check("port repercute", "2345" in svc.get("script", ""))
+    mauvais = srv.service_prepare(config={"service": "tensorboard", "env_path": "/scratch_p/user/venv"})
     check("tensorboard exige un logdir", not mauvais.get("ok"))
-    inconnu = srv.launch_interactive_service(service="grafana")
+    inconnu = srv.service_prepare(config={"service": "grafana", "env_path": "/scratch_p/user/venv"})
     check("service inconnu refuse", not inconnu.get("ok"))
 
     print("\n== 5. Noeud de mise au point (simulation) ==")
-    dbg = srv.allocate_debug_node(minutes=15, arch="armgpu", gpus_per_node=1)
+    dbg = srv.cluster_allocation_prepare(time_limit="15m", arch="armgpu", gpus_per_node=1)
     check("simulation par defaut", dbg.get("submitted") is False)
     check("arch armgpu retenue", dbg.get("resolved", {}).get("arch") == "armgpu")
 
