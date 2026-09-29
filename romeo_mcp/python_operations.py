@@ -32,11 +32,15 @@ def _wheelhouse(scratch, arch):
 
 
 def prepare_environment(env_path, arch, time_limit, spack_packages):
+    if not spack_packages or any(spec.strip() == 'python' for spec in spack_packages):
+        raise ValueError("Choisis une specification Python Spack non ambigue dans spack_packages "
+                         "(version, compilateur ou empreinte), apres romeo_software pour l'architecture "
+                         "voulue. Le nom 'python' seul correspond a plusieurs installations sur ROMEO.")
     s, context, env = _paths(env_path)
     quoted = shlex.quote(env)
     command = 'mkdir -- {0} || exit 1\npython3 -m venv {0}'.format(quoted)
     return prepare_spec('python_env', JobSpec(name='mcp-python-env', command=command, arch=arch,
-        time=time_limit, cpus_per_task=4, spack_packages=spack_packages or ['python']), details={'env_path': env},
+        time=time_limit, cpus_per_task=4, spack_packages=spack_packages), details={'env_path': env},
         connection=s, context=context)
 
 

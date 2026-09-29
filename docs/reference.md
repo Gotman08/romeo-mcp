@@ -72,7 +72,7 @@ Le profil `full` expose les outils métier. `expert` ajoute les exécuteurs gén
 
 | Outil | Rôle |
 |---|---|
-| `python_env_prepare` / `python_env_create` | Prépare puis crée un venv neuf, sans installer de paquet applicatif |
+| `python_env_prepare` / `python_env_create` | Prépare puis crée un venv neuf ; `spack_packages` doit choisir un Python non ambigu (version, compilateur ou empreinte) via `romeo_software`. Le nom `python` seul est refusé avant toute soumission. |
 | `python_wheel_prepare` / `python_wheel_build` | Prépare puis compile une roue binaire aarch64 dans un dépôt local |
 | `python_packages_prepare` / `python_packages_install` | Prépare puis installe dans un venv en réutilisant ces roues, sur la bonne architecture |
 | `romeo_fairshare_forecast` | Effet d'une charge envisagée sur la part d'usage du compte |

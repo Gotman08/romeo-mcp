@@ -46,7 +46,7 @@ def service_stop(service_id: str) -> dict[str, Any]:
     return services.stop_service(service_id)
 
 
-@outil(annotations=MUTATING, description="Prepare localement la creation d'un venv sur la bonne architecture. Le parent doit exister ; la creation refusera une cible existante. Aucune installation de paquet applicatif.")
+@outil(annotations=MUTATING, description="Prepare localement la creation d'un venv sur la bonne architecture. Fournis spack_packages avec une specification Python non ambigue (version, compilateur ou empreinte), choisie via romeo_software ; le nom python seul est refuse. Le parent doit exister ; la creation refusera une cible existante. Aucune installation de paquet applicatif.")
 def python_env_prepare(env_path: str, arch: str = "armgpu", time_limit: str = "15m",
                        spack_packages: list[str] | None = None) -> dict[str, Any]:
     return python_operations.prepare_environment(env_path, arch, time_limit, spack_packages)

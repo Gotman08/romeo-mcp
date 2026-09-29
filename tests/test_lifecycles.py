@@ -70,6 +70,17 @@ class Contracts(unittest.TestCase):
                 self.assertFalse(execution.service_prepare(config)['ok'])
 
 
+class PythonEnvironmentTests(unittest.TestCase):
+    def test_missing_or_ambiguous_python_is_rejected_before_ssh_or_plan_creation(self):
+        with patch.object(python_operations, '_paths') as paths, \
+             patch.object(python_operations, 'prepare_spec') as prepare:
+            for packages in (None, [], ['python'], [' python ']):
+                with self.subTest(packages=packages), self.assertRaisesRegex(ValueError, 'non ambigue'):
+                    python_operations.prepare_environment('/scratch_p/user/env', 'x64cpu', '1m', packages)
+            paths.assert_not_called()
+            prepare.assert_not_called()
+
+
 @unittest.skipUnless(io.BASH, 'Bash requis')
 class PlansAndServices(unittest.TestCase):
     setUp = io.JobIOTests.setUp
@@ -84,7 +95,7 @@ class PlansAndServices(unittest.TestCase):
         env = self.session.scratch + '/venv'
         preparations = [
             (lambda: execution.service_prepare({'service': 'jupyter', 'env_path': env}, arch='x64cpu'), execution.service_start),
-            (lambda: execution.python_env_prepare(env, arch='x64cpu'), execution.python_env_create),
+            (lambda: execution.python_env_prepare(env, arch='x64cpu', spack_packages=['python@3.13.5']), execution.python_env_create),
             (lambda: execution.python_packages_prepare(env, ['example-package==1.0'], arch='x64cpu'), execution.python_packages_install),
             (lambda: execution.python_wheel_prepare('example-package==1.0', arch='x64cpu'), execution.python_wheel_build),
             (lambda: execution.cluster_allocation_prepare(arch='x64cpu', gpus_per_node=0), execution.cluster_allocation_start),
@@ -125,7 +136,7 @@ class PlansAndServices(unittest.TestCase):
         context = ('/home/user', '/scratch_p/user', [], 'hors ligne')
         for module, prepare in (
             (services, lambda: execution.service_prepare({'service': 'jupyter', 'env_path': '/scratch_p/user/env'})),
-            (python_operations, lambda: execution.python_env_prepare('/scratch_p/user/env')),
+            (python_operations, lambda: execution.python_env_prepare('/scratch_p/user/env', spack_packages=['python@3.13.5'])),
             (python_operations, lambda: execution.python_packages_prepare('/scratch_p/user/env', ['example'])),
             (python_operations, lambda: execution.python_wheel_prepare('example')),
         ):

@@ -4,6 +4,10 @@
 
 ## Non publié — intentions et cycles de vie explicites
 
+- La préparation d'un environnement Python refuse une sélection Spack absente
+  ou le nom ambigu `python` avant de créer un plan. Le test réel sur ROMEO a
+  montré que ce défaut provoquait un échec Slurm au chargement de Spack.
+
 - Services unifiés : préparation, démarrage sans attente, état, connexion et arrêt.
 - Fichiers : création exclusive et remplacement atomique avec empreinte attendue facultative.
 - Validation locale séparée de la vérification distante des chemins.
