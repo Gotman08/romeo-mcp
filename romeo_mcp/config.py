@@ -40,8 +40,8 @@ def setting(name: str, default: str = "") -> str:
 
 def save(values: dict[str, str]) -> Path:
     for key, value in values.items():
-        if key == "ROMEO_TOOL_PROFILE" and value not in {"essential", "full"}:
-            raise ValueError("Profil d'outils inconnu : choisir essential ou full.")
+        if key == "ROMEO_TOOL_PROFILE" and value not in {"essential", "full", "expert"}:
+            raise ValueError("Profil d'outils inconnu : choisir essential, full ou expert.")
         if key not in FIELDS or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", value):
             raise ValueError("Hote, compte et QOS doivent etre des identifiants simples, sans espace ni commande.")
         if key == "ROMEO_ACCOUNT" and value.upper() in {"VOTRE_PROJET", "YOUR_PROJECT", "R000000"}:

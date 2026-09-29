@@ -62,7 +62,7 @@ async def main(resume=""):
                     return payload
 
                 profile = await call("tool_profile_get", {})
-                assert profile["profile"] == "essential" and profile["count"] == 20
+                assert profile["profile"] == "essential" and profile["count"] == 22
                 spec = {"name": name, "command": "python3 calculation.py", "arch": "x64cpu",
                         "nodes": 1, "cpus_per_task": 1, "mem_gb": 1, "time_limit": "1m",
                         "workdir": remote, "data_files": [remote + "/input.txt"]}
@@ -95,8 +95,8 @@ async def main(resume=""):
                     raise AssertionError("Attente depassee ; le job reste soumis, consulter son etat avant de relancer")
                 output = await call("job_log_tail", {"job_id": jid, "stream": "out"})
                 assert "REPRO_SCIENCE_OK" in json.dumps(output), "Resultat scientifique absent"
-                result = await call("export_job_report", {"job_id": jid, "output_dir": str(local),
-                                                           "data_files": [remote + "/input.txt"]})
+                snapshot = await call("job_report_collect", {"job_id": jid, "data_files": [remote + "/input.txt"]})
+                result = await call("job_report_export", {"report_id": snapshot["report_id"], "output_dir": str(local)})
                 report = json.loads(Path(result["files"]["report.json"]).read_text(encoding="utf-8"))
                 assert report["submission"]["code"]["commit"] == commit
                 assert report["runtime"]["git"]["commit"] == commit
@@ -108,7 +108,8 @@ async def main(resume=""):
                            for r in report["resource_usage"])
                 assert not report["missing_information"], report["missing_information"]
                 assert hashlib.sha256(report["script"]["content"].encode()).hexdigest() == report["script"]["exported_sha256"]
-                offline = await call("export_job_report", {"job_id": jid, "output_dir": str(local), "live": False})
+                snapshot = await call("job_report_from_record", {"job_id": jid})
+                offline = await call("job_report_export", {"report_id": snapshot["report_id"], "output_dir": str(local)})
                 assert offline["ok"] and offline["missing_information"]
                 print("OK : protocole essentiel, calcul, commit, environnement, SHA-256, Slurm, exports live et hors ligne", flush=True)
     finally:

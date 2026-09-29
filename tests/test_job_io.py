@@ -17,7 +17,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import offline  # noqa: E402 - configuration fictive avant tout import du serveur
 from commun import RACINE  # noqa: E402
-from romeo_mcp import noyau, outils_calcul as jobs, reproducibility as repro  # noqa: E402
+from romeo_mcp import plans, execution_backend, workload_preparation, noyau, outils_calcul as jobs, reproducibility as repro  # noqa: E402
 from romeo_mcp.cluster import ARCHS  # noqa: E402
 from romeo_mcp.registry import Registry  # noqa: E402
 from romeo_mcp.ssh import Result, SSHError, RomeoSession, clamp  # noqa: E402
@@ -107,13 +107,14 @@ class JobIOTests(unittest.TestCase):
         self.enterContext(patch.object(RomeoSession, "run", side_effect=AssertionError("aucun SSH reel dans cette suite")))
         self.store = Registry(self.root / "registry.db")
         self.addCleanup(self.store.close)
-        for module in (jobs, noyau):
+        for module in (jobs, noyau, plans, execution_backend):
             self.enterContext(patch.object(module, "session", return_value=self.session))
             self.enterContext(patch.object(module, "registry", return_value=self.store))
         self.enterContext(patch.object(repro, "observe_files", return_value={"git": {"status": "unavailable"}}))
         # La capture d'environnement est couverte dans test_accompagnement.
         self.enterContext(patch.object(repro, "runtime_fragment", return_value=[]))
-        self.enterContext(patch.object(jobs, "_controle_du_script_genere", return_value=[]))
+        self.enterContext(patch.object(plans, "_controle_du_script_genere", return_value=[]))
+        self.enterContext(patch.object(workload_preparation, "session", return_value=self.session))
         self.workdir = self.session.scratch + "/campagne d'essais"
 
     def submit_array(self, parameters, confirm=False, **kwargs):
@@ -192,11 +193,13 @@ class JobIOTests(unittest.TestCase):
             self.assertEqual(self.session.local_path(path).read_bytes(), snapshot.read_bytes())
 
     def test_resilient_chain_reuses_its_script_and_dependencies(self):
-        result = jobs.submit_resilient_job(
+        result = jobs.job_resilient_prepare(
             name="chain", command="echo resumed", segment_time="10m", max_total_time="20m",
             workdir=self.workdir, checkpoint_dir=self.session.scratch + "/checkpoints",
-            arch="x64cpu", gpus_per_node=0, confirm=True,
+            arch="x64cpu", gpus_per_node=0,
         )
+        self.assertTrue(result["ok"], result)
+        result = jobs.job_resilient_submit(result["plan_id"], confirm=True)
         self.assertTrue(result["ok"], result)
         self.assertEqual(len(self.session.pending), 2)
         self.assertEqual(self.session.pending[0][0], self.session.pending[1][0])

@@ -499,7 +499,7 @@ def session(longue: bool = False) -> RomeoSession:
     `longue=True` rend une **seconde** session, reservee aux commandes qui
     tiennent le transport plusieurs minutes : compilation sur noeud, profilage,
     installation de paquets. Le verrou du transport est detenu pendant toute la
-    duree d'une commande ; sans cette separation, un `build_on_node` de quinze
+    duree d'une commande ; sans cette separation, un `compute_command_prepare` de quinze
     minutes bloque en tete de file tout autre appel, et un modele qui veut
     seulement relire une file d'attente attend la fin de la compilation.
 

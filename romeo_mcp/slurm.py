@@ -338,7 +338,7 @@ def plan_job(spec: JobSpec, scratch: str) -> Plan:
     if arch == "armgpu":
         warnings.append(
             "cible aarch64 : tout binaire ou paquet Python compile depuis le "
-            "noeud de login (x86_64) echouera. Utilise build_on_node."
+            "noeud de login (x86_64) echouera. Utilise compute_command_prepare."
         )
     if partition == "instant" and seconds > 1800:
         warnings.append(

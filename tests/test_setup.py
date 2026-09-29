@@ -99,10 +99,10 @@ assert cluster.USER_MAX_CPUS == cluster.USER_MAX_GPUS == cluster.USER_MAX_JOBS =
 calls = [
     (jobs, lambda: jobs.job_prepare(name="example", command="hostname")),
     (jobs, lambda: jobs.job_array_prepare(name="example", command="hostname", parameters=["one"])),
-    (jobs, lambda: jobs.submit_resilient_job(name="example", command="hostname")),
+    (jobs, lambda: jobs.job_resilient_prepare(name="example", command="hostname")),
     (jobs, lambda: jobs.job_pipeline_prepare(name="example", stages=[])),
     (jobs, lambda: jobs.romeo_fairshare_forecast()),
-    (build, lambda: build.build_on_node(commands=["true"])),
+    (build, lambda: build.compute_command_prepare(commands=["true"])),
     (measure, lambda: measure.cluster_gpu_health_run()),
 ]
 for module, call in calls:

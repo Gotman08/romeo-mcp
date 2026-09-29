@@ -17,7 +17,7 @@ from mcp import ClientSession, StdioServerParameters, stdio_client
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import offline  # noqa: F401,E402
 import test_job_io as io  # noqa: E402
-from romeo_mcp import noyau, outils_calcul as jobs, outils_donnees as data, outils_mesure as measure  # noqa: E402
+from romeo_mcp import plans, workload_preparation, noyau, outils_calcul as jobs, outils_donnees as data, outils_mesure as measure  # noqa: E402
 from romeo_mcp import server as assembled  # noqa: F401,E402
 from romeo_mcp.registry import Registry  # noqa: E402
 from romeo_mcp.ssh import Result, SSHTimeout  # noqa: E402
@@ -45,6 +45,14 @@ class ToolContractTests(unittest.TestCase):
                         self.assertIn("confirm=true", payload["error"])
                         missing = await client.call_tool("job_log_search", {"job_id": "123"})
                         self.assertTrue(missing.is_error)
+                        service = await client.call_tool("service_prepare", {"config": {
+                            "service": "jupyter", "env_path": "/scratch_p/student/venv"}, "arch": "x64cpu"})
+                        service_plan = json.loads(service.content[0].text)
+                        self.assertTrue(service_plan["ok"], service_plan)
+                        self.assertFalse(service_plan["submitted"])
+                        invalid = await client.call_tool("service_prepare", {"config": {
+                            "service": "tensorboard", "env_path": "/scratch_p/student/venv"}})
+                        self.assertTrue(invalid.is_error)
         asyncio.run(exercise())
 
     def test_catalog_exposes_separate_actions_and_correct_effects(self):
@@ -55,7 +63,7 @@ class ToolContractTests(unittest.TestCase):
             self.assertNotIn(legacy, tools)
         for readonly in ("tool_profile_get", "job_log_tail", "job_log_search", "storage_usage_audit"):
             self.assertTrue(tools[readonly].annotations.read_only_hint)
-        for mutating in ("tool_profile_set", "secret_env_prepare", "cluster_gpu_health_run", "stage_dataset",
+        for mutating in ("tool_profile_set", "secret_env_prepare", "cluster_gpu_health_run", "dataset_prepare",
                          "job_prepare", "job_submit", "job_array_prepare", "job_array_submit",
                          "job_pipeline_prepare", "job_pipeline_submit"):
             self.assertFalse(tools[mutating].annotations.read_only_hint)
@@ -82,18 +90,18 @@ class ToolContractTests(unittest.TestCase):
 
     def test_huggingface_uses_the_selected_environment_without_installing(self):
         session = SimpleNamespace(home="/home/user", scratch="/scratch_p/student", path_aliases=[])
-        with patch.object(data, "session", return_value=session), patch.object(data, "_soumettre_sbatch") as submit:
-            missing = data.stage_dataset("example/dataset", "/scratch_p/student/dataset")
+        with patch.object(workload_preparation, "session", return_value=session), patch.object(plans, "_soumettre_sbatch") as submit:
+            missing = data.dataset_prepare("example/dataset", "/scratch_p/student/dataset")
             self.assertFalse(missing["ok"])
-            self.assertIn("romeo_pip_install", missing["error"])
-            response = data.stage_dataset("example/dataset", "/scratch_p/student/dataset",
+            self.assertIn("python_packages_install", missing["error"])
+            response = data.dataset_prepare("example/dataset", "/scratch_p/student/dataset",
                                           env_path="/scratch_p/student/env with spaces")
             self.assertTrue(response["ok"], response)
             self.assertNotIn("pip install", response["script"])
             self.assertNotIn("--user", response["script"])
             self.assertIn("'/scratch_p/student/env with spaces/bin/python'", response["script"])
             self.assertIn("snapshot_download", response["script"])
-            self.assertFalse(data.stage_dataset("example/data", "/scratch_p/student/data", env_path="/etc/env")["ok"])
+            self.assertFalse(data.dataset_prepare("example/data", "/scratch_p/student/data", env_path="/etc/env")["ok"])
             submit.assert_not_called()
 
 
@@ -115,7 +123,7 @@ class PreparedSubmissionTests(unittest.TestCase):
         self.assertEqual(self.session.pending, [])
         other = Registry(self.store.path)
         self.addCleanup(other.close)
-        with patch.object(jobs, "registry", return_value=other), patch.object(jobs, "plan_job", side_effect=AssertionError("pas de regeneration")):
+        with patch.object(plans, "registry", return_value=other), patch.object(jobs, "plan_job", side_effect=AssertionError("pas de regeneration")):
             submitted = jobs.job_submit(preview["plan_id"], confirm=True)
             self.assertTrue(submitted["ok"], submitted)
             replay = jobs.job_submit(preview["plan_id"], confirm=True)
@@ -127,7 +135,7 @@ class PreparedSubmissionTests(unittest.TestCase):
 
     def test_confirmation_unknown_id_and_wrong_kind_never_connect(self):
         preview = self.prepare()
-        with patch.object(jobs, "session", side_effect=AssertionError("pas de SSH")):
+        with patch.object(plans, "session", side_effect=AssertionError("pas de SSH")):
             self.assertFalse(jobs.job_submit(preview["plan_id"])["ok"])
             self.assertFalse(jobs.job_submit("unknown", confirm=True)["ok"])
             self.assertFalse(jobs.job_array_submit(preview["plan_id"], confirm=True)["ok"])
@@ -176,7 +184,7 @@ class PreparedSubmissionTests(unittest.TestCase):
         preview = jobs.job_pipeline_prepare(name="lint", stages=[
             {"name": "start", "command": "true"},
             {"name": "end", "command": "true", "depends_on": ["start"]}])
-        with patch.object(jobs, "_controle_du_script_genere", side_effect=[[], ["invalid second script"]]):
+        with patch.object(plans, "_controle_du_script_genere", side_effect=[[], ["invalid second script"]]):
             result = jobs.job_pipeline_submit(preview["plan_id"], confirm=True)
         self.assertFalse(result["ok"], result)
         self.assertEqual(self.session.pending, [])

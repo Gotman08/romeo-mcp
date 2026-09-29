@@ -131,11 +131,16 @@ class ProfileTests(unittest.TestCase):
                     self.assertTrue(content["client_notified"], content)
                     full = (await client.list_tools()).tools
                     self.assertGreater(len(full), len(essential) + 20)
-                    self.assertIn("build_on_node", {t.name for t in full})
+                    self.assertIn("python_wheel_prepare", {t.name for t in full})
+                    self.assertNotIn("compute_command_prepare", {t.name for t in full})
                     self.assertGreater(len(json.dumps([t.model_dump() for t in full])), len(json.dumps([t.model_dump() for t in essential])))
                     rejected = await client.call_tool("tool_profile_set", {"profile": "invalid"})
                     self.assertTrue(rejected.is_error)
                     self.assertEqual(len((await client.list_tools()).tools), len(full))
+                    await client.call_tool("tool_profile_set", {"profile": "expert"})
+                    expert = {t.name for t in (await client.list_tools()).tools}
+                    self.assertEqual(expert - {t.name for t in full},
+                                     {"compute_command_prepare", "compute_command_run", "login_command_run"})
                     await client.call_tool("tool_profile_set", {"profile": "essential"})
                     self.assertEqual({t.name for t in (await client.list_tools()).tools}, ESSENTIAL_TOOLS)
                     self.assertTrue(any("list_changed" in m for m in received))

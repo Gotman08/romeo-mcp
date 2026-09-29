@@ -21,7 +21,6 @@ from .verification import SONDE as SONDE_VERIFICATION, analyser_releve
 from . import docsearch
 from .ssh import SSHError, SSHTimeout, session
 from .noyau import (
-    MAX_BUILD_SECONDS,
     MAX_WAIT_SECONDS,
     READ_ONLY,
     _docs_dir,
@@ -201,7 +200,7 @@ _SPACK_CACHE: dict[str, list[str]] = {}
         "logiciels. ATTENTION : le catalogue differe selon l'architecture. Des "
         "outils absents du PATH du noeud de login (conda via `anaconda3`, "
         "`apptainer`, plusieurs versions de `cuda`) s'y trouvent. Les paquets "
-        "trouves se passent ensuite a job_prepare ou build_on_node via "
+        "trouves se passent ensuite a job_prepare ou compute_command_prepare via "
         "`spack_packages`."
     ),
 )
@@ -275,7 +274,7 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
         "packages": shown,
         "usage": (
             "Passe ces noms a job_prepare(spack_packages=[...]) ou "
-            "build_on_node(spack_packages=[...]) : le script generera "
+            "compute_command_prepare(spack_packages=[...]) : le script generera "
             "`{}` puis `spack load`.".format(node["env_loader"])
         ),
     }
@@ -501,7 +500,7 @@ def limits_resource() -> str:
             ),
             "",
             "Cherche-les avec `romeo_software`, puis passe-les en "
-            "`spack_packages` a `job_prepare` ou `build_on_node`.",
+            "`spack_packages` a `job_prepare` ou `compute_command_prepare`.",
             "",
             "## Limites de temps",
             "",
@@ -514,7 +513,7 @@ def limits_resource() -> str:
             "",
             "- Commande sur le noeud de login : 20 s maximum, calculs refuses.",
             "- `wait_for_job` : {} s maximum.".format(MAX_WAIT_SECONDS),
-            "- `build_on_node` : {} s maximum.".format(MAX_BUILD_SECONDS),
+            "- `compute_command_run` : soumission asynchrone ; la duree vient du plan.",
         ]
     )
 

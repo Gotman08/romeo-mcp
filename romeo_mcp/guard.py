@@ -22,25 +22,25 @@ from collections.abc import Sequence
 
 #: Binaires qui n'ont rien a faire sur un noeud de login.
 HEAVY_COMMANDS = {
-    "make": "build_on_node",
-    "cmake": "build_on_node",
-    "ninja": "build_on_node",
-    "gcc": "build_on_node",
-    "g++": "build_on_node",
-    "cc": "build_on_node",
-    "c++": "build_on_node",
-    "gfortran": "build_on_node",
-    "nvcc": "build_on_node",
-    "nvc": "build_on_node",
-    "nvfortran": "build_on_node",
-    "cargo": "build_on_node",
-    "rustc": "build_on_node",
-    "go": "build_on_node",
+    "make": "compute_command_prepare",
+    "cmake": "compute_command_prepare",
+    "ninja": "compute_command_prepare",
+    "gcc": "compute_command_prepare",
+    "g++": "compute_command_prepare",
+    "cc": "compute_command_prepare",
+    "c++": "compute_command_prepare",
+    "gfortran": "compute_command_prepare",
+    "nvcc": "compute_command_prepare",
+    "nvc": "compute_command_prepare",
+    "nvfortran": "compute_command_prepare",
+    "cargo": "compute_command_prepare",
+    "rustc": "compute_command_prepare",
+    "go": "compute_command_prepare",
     "mpirun": "job_prepare",
     "mpiexec": "job_prepare",
     # `srun` n'est volontairement PAS bloque : la documentation ROMEO le
     # presente comme la voie normale vers un noeud de calcul (`srun --pty bash`),
-    # et c'est d'ailleurs ce que `build_on_node` execute depuis le login.
+    # et c'est d'ailleurs ce que `compute_command_prepare` execute depuis le login.
     "julia": "job_prepare",
     "matlab": "job_prepare",
     "Rscript": "job_prepare",
@@ -157,7 +157,7 @@ def check_login_command(command: str, allow_heavy: bool = False) -> None:
             raise GuardError(
                 "`pip install` sur le noeud de login produit des roues x86_64, "
                 "inutilisables sur les noeuds GPU aarch64. Si la cible est "
-                "aarch64, utilise `build_on_node(arch='armgpu', ...)`. Si tu "
+                "aarch64, utilise `compute_command_prepare(arch='armgpu', ...)`. Si tu "
                 "vises bien le x86_64, la documentation ROMEO autorise la "
                 "procedure officielle (romeo_load_x64cpu_env, spack load, "
                 "python -m venv, puis pip) depuis le login : relance alors avec "

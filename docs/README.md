@@ -23,7 +23,7 @@ et leur date de collecte.
 ## Les guides
 
 - [Configuration](configuration.md) : accès personnels, priorités des réglages,
-  profils `essential` et `full`, clients stdio, `doctor --live`, déplacement et WSL.
+  profils `essential`, `full` et `expert`, clients stdio, `doctor --live`, déplacement et WSL.
 - [Référence technique](reference.md) : outils MCP, MPI et GPU, logiciels,
   stockage, diagnostics, mesures et limites de conception.
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,

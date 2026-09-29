@@ -56,7 +56,7 @@ def main() -> int:
     # --- refus attendus ---------------------------------------------------
     print("\n== refus attendus ==")
     for bad in ["make -j 8", "pip install numpy", "python entrainement.py"]:
-        r = srv.run_login_command(bad)
+        r = srv.login_command_run(bad)
         ok = r.get("refused") is True
         print("  {:<28} refuse={} -> {}".format(bad, ok, str(r.get("error"))[:80]))
         if not ok:
@@ -74,10 +74,10 @@ def main() -> int:
           "->", str(too_long.get("error"))[:90])
 
     # --- commande legere autorisee ---------------------------------------
-    ok_cmd = srv.run_login_command("hostname; uname -m")
-    print("\n== run_login_command (autorise) ==\n ", ok_cmd.get("output"))
+    ok_cmd = srv.login_command_run("hostname; uname -m")
+    print("\n== login_command_run (autorise) ==\n ", ok_cmd.get("output"))
     if not ok_cmd.get("ok"):
-        failures.append("run_login_command")
+        failures.append("login_command_run")
 
     # --- soumission reelle d'un job minuscule -----------------------------
     prepared = srv.job_prepare(
@@ -120,20 +120,23 @@ def main() -> int:
         print("  {:<40} {}".format(entry["name"], entry["size"]))
 
     # --- la preuve par l'architecture -------------------------------------
-    print("\n== build_on_node(armgpu) : le test decisif ==")
-    build = srv.build_on_node(
+    print("\n== compute_command_prepare(armgpu) : le test decisif ==")
+    build = srv.compute_command_prepare(
         commands=['echo "architecture du noeud de calcul : $(uname -m)"'],
         arch="armgpu",
-        minutes=2,
-        cpus=4,
+        time_limit="2m",
+        cpus_per_task=4,
     )
     if build.get("ok"):
-        print(build.get("output"))
-        if "aarch64" not in str(build.get("output", "")):
+        build = srv.compute_command_run(build["plan_id"], confirm=True)
+    if build.get("ok"):
+        final = srv.wait_for_job(build["job_id"])
+        output = srv.job_log_tail(build["job_id"], stream="out")
+        if "aarch64" not in str(output):
             failures.append("le noeud armgpu n'a pas repondu aarch64")
     else:
         print("  ERREUR:", build.get("error"))
-        failures.append("build_on_node")
+        failures.append("compute_command_run")
 
     return _finish(failures)
 

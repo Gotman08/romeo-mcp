@@ -4,6 +4,7 @@ Tout ce qui touche au contenu depose sur le cluster plutot qu'aux calculs.
 """
 
 from __future__ import annotations
+from . import workload_preparation
 
 import posixpath
 import re
@@ -11,21 +12,12 @@ import shlex
 from typing import Any
 from pathlib import Path
 from . import files
-from .cluster import DEFAULT_ACCOUNT, ClusterError
-from .guard import GuardError, allowed_roots, check_path
-from .slurm import JobSpec, plan_job
+from .validation import validate_script
+from .file_operations import check_script_paths, create_file, replace_file
+from .plans import submit_prepared
+from .guard import GuardError, check_path
 from .ssh import SSHError, SSHTimeout, session
-from .noyau import (
-    MAX_CHEMINS_VERIFIES,
-    MAX_VARIABLES_SIGNALEES,
-    MUTATING,
-    READ_ONLY,
-    _duree_job,
-    _error,
-    _sh,
-    _soumettre_sbatch,
-    outil,
-)
+from .noyau import MUTATING, DESTRUCTIVE, READ_ONLY, _error, _sh, outil
 
 
 # =============================================================================
@@ -132,19 +124,19 @@ def read_remote_file(
         "content": content,
     }
 
-@outil(
-    annotations=MUTATING,
-    description="Ecrit ou remplace un fichier texte distant (script, configuration).",
-)
-def write_remote_file(path: str, content: str) -> dict[str, Any]:
-    """Depose un fichier sur ROMEO."""
-    s = session()
-    try:
-        target = check_path(path, s.home, s.scratch, s.path_aliases)
-        s.write_file(target, content)
-    except (GuardError, SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
-    return {"ok": True, "path": target, "bytes": len(content.encode("utf-8"))}
+@outil(annotations=MUTATING, description=(
+    "Cree un fichier texte sur ROMEO. Refuse toute cible existante, y compris un lien symbolique. "
+    "Le repertoire parent doit exister ; publication atomique du contenu, permissions 600."))
+def file_create(path: str, content: str) -> dict[str, Any]:
+    return create_file(session(), path, content)
+
+
+@outil(annotations=DESTRUCTIVE, description=(
+    "Remplace explicitement le contenu d'un fichier regulier existant sur ROMEO, sans suivre les liens symboliques. "
+    "expected_sha256 facultatif refuse un contenu modifie depuis sa lecture. Publication atomique ; permissions conservees. "
+    "Le verrou coordonne les ecritures de ces outils ; les autres programmes doivent respecter ce verrou."))
+def file_replace(path: str, content: str, expected_sha256: str | None = None) -> dict[str, Any]:
+    return replace_file(session(), path, content, expected_sha256)
 
 @outil(
     annotations=MUTATING,
@@ -347,14 +339,14 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
 @outil(
     annotations=MUTATING,
     description=(
-        "Telecharge un jeu de donnees depuis un noeud de calcul plutot que "
+        "Prepare un plan local de telechargement (24 h), sans soumission ni ecriture sur ROMEO. Telecharge un jeu de donnees depuis un noeud de calcul plutot que "
         "depuis le noeud de login, dont la bande passante est partagee. "
         "Accepte une URL directe, un dataset Hugging Face ou un depot git. "
-        "Hugging Face exige env_path avec huggingface_hub deja installe via romeo_pip_install ; "
+        "Hugging Face exige env_path avec huggingface_hub deja installe via python_packages_install ; "
         "ce telechargement n'installe aucun paquet."
     ),
 )
-def stage_dataset(
+def dataset_prepare(
     source: str,
     destination: str,
     kind: str = "auto",
@@ -362,317 +354,33 @@ def stage_dataset(
     time_limit: str | None = None,
     arch: str = "x64cpu",
     env_path: str | None = None,
-    confirm: bool = False,
 ) -> dict[str, Any]:
-    """Rapatrie des donnees via un job, pour epargner le noeud de login."""
-    s = session()
-    if not source.strip():
-        return _error("source vide")
-    try:
-        cible = check_path(destination, s.home, s.scratch, s.path_aliases)
-    except GuardError as exc:
-        return _error(str(exc))
-
-    nature = kind.strip().lower()
-    if nature == "auto":
-        if source.endswith(".git") or "github.com" in source or "romeogit" in source:
-            nature = "git"
-        elif source.startswith(("http://", "https://")):
-            nature = "url"
-        else:
-            nature = "huggingface"
-
-    if nature == "url":
-        commande = "curl -fL --retry 3 -o {} {}".format(
-            shlex.quote(posixpath.join(cible, posixpath.basename(source))),
-            shlex.quote(source),
-        )
-        paquets = ["curl"]
-    elif nature == "git":
-        commande = "git clone --depth 1 {} {}".format(
-            shlex.quote(source), shlex.quote(cible)
-        )
-        paquets = []
-    elif nature == "huggingface":
-        if not env_path:
-            return _error("Hugging Face requiert env_path, un venv existant contenant huggingface_hub. "
-                          "Installe ce paquet explicitement avec romeo_pip_install sur la meme architecture.")
-        try:
-            environnement = check_path(env_path, s.home, s.scratch, s.path_aliases)
-        except GuardError as exc:
-            return _error(str(exc))
-        python = shlex.quote(posixpath.join(environnement, "bin", "python"))
-        # L'API Python publique evite de dependre du chemin interne de la CLI.
-        # Le job de telechargement ne lance jamais d'installateur.
-        code = ("import sys; from huggingface_hub import snapshot_download; "
-                "snapshot_download(repo_id=sys.argv[1], local_dir=sys.argv[2], repo_type='dataset')")
-        commande = (
-            "{python} -c 'import huggingface_hub' || {{ "
-            "echo 'huggingface_hub absent : utilise romeo_pip_install dans ce venv.' >&2; exit 1; }}; "
-            "{python} -c {code} {source} {destination}"
-        ).format(python=python, code=shlex.quote(code), source=shlex.quote(source),
-                 destination=shlex.quote(cible))
-        paquets = []
-    else:
-        return _error(
-            "type inconnu : {!r}. Valeurs : auto, url, git, huggingface.".format(kind)
-        )
-
-    spec = JobSpec(
-        name="mcp-staging",
-        command="mkdir -p {} && {}".format(shlex.quote(cible), commande),
-        time=_duree_job(minutes, time_limit, 24 * 60),
-        cpus_per_task=4,
-        arch=arch,
-        spack_packages=paquets,
-        workdir=cible,
+    return workload_preparation.dataset_prepare(
+        source=source, destination=destination, kind=kind,
+        minutes=minutes, time_limit=time_limit, arch=arch,
+        env_path=env_path,
     )
-    try:
-        spec.workdir = cible
-        plan = plan_job(spec, s.scratch)
-    except (ClusterError, SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
 
-    if not confirm:
-        return {
-            "ok": True, "submitted": False, "mode": "simulation",
-            "kind": nature, "destination": cible, "script": plan.script,
-            "next_step": "Rappelle avec confirm=true pour lancer le telechargement.",
-        }
 
-    soumission = _soumettre_sbatch(
-        s, plan, spec.name, note="staging {}".format(nature)
-    )
-    if not soumission["ok"]:
-        return soumission
-    job_id = soumission["job_id"]
-    return {
-        "ok": True, "submitted": True, "job_id": job_id,
-        "kind": nature, "destination": cible,
-        "next_step": "Suis le telechargement avec job_status('{}').".format(job_id),
-    }
+@outil(annotations=MUTATING, description="Soumet le telechargement exact prepare par dataset_prepare. Exige confirm=true ; rend immediatement un job_id.")
+def dataset_download(plan_id: str, confirm: bool = False) -> dict[str, Any]:
+    return submit_prepared("dataset", plan_id, confirm)
 
 # =============================================================================
 # Verification statique d'un script de soumission
 # =============================================================================
-_MOTIFS_SECRET = re.compile(
-    r"(?i)\b(api[_-]?key|token|password|passwd|secret|aws_secret)\b\s*=\s*['\"]?\S{8,}"
-)
+@outil(annotations=READ_ONLY, description=(
+    "Analyse uniquement le texte du script Slurm : syntaxe des directives, ressources, variables et secrets. "
+    "Aucun acces SSH ni lecture de fichier. Utilise sbatch_check_paths pour verifier les chemins distants."))
+def sbatch_validate(script: str) -> dict[str, Any]:
+    return validate_script(script)
 
-@outil(
-    annotations=READ_ONLY,
-    description=(
-        "Verifie un script de soumission AVANT de l'envoyer : fins de ligne "
-        "Windows qui corrompent l'interpreteur, directives #SBATCH placees trop "
-        "tard, `--mem` manquant que ROMEO exige, chemins inexistants, variables "
-        "non definies, secrets ecrits en clair. Accepte le texte du script ou "
-        "le chemin d'un script deja depose sur le cluster."
-    ),
-)
-def sbatch_lint(script: str = "", path: str = "") -> dict[str, Any]:
-    """Analyse statique d'un fichier de soumission."""
-    s = session()
-    if not script.strip() and not path.strip():
-        return _error("fournis `script` (le texte) ou `path` (un fichier distant).")
 
-    origine = "texte fourni"
-    if path.strip():
-        try:
-            cible = check_path(path, s.home, s.scratch, s.path_aliases)
-            lecture = _sh(
-                s, "cat {} 2>&1".format(shlex.quote(cible)), timeout=45,
-                max_chars=200_000,
-            )
-        except (GuardError, SSHError, SSHTimeout) as exc:
-            return _error(str(exc))
-        if not lecture.ok:
-            return _error(lecture.stdout.strip()[:200] or "fichier illisible")
-        script = lecture.stdout
-        origine = cible
-
-    constats = []
-
-    def signaler(gravite, message, ligne=None, remede=""):
-        constats.append(
-            {"gravite": gravite, "message": message, "ligne": ligne, "remede": remede}
-        )
-
-    # Les fins de ligne Windows font echouer le shebang de facon opaque :
-    # « bad interpreter: /bin/bash^M ».
-    if "\r\n" in script or "\r" in script:
-        signaler(
-            "haute",
-            "Le script contient des retours chariot Windows (CRLF). "
-            "L'interpreteur lit alors `/bin/bash\\r` et refuse de demarrer.",
-            remede="Convertis avec `dos2unix` ou `sed -i 's/\\r$//' <fichier>`.",
-        )
-
-    lignes = script.replace("\r\n", "\n").split("\n")
-    if not lignes or not lignes[0].startswith("#!"):
-        signaler("haute", "Aucune ligne shebang en tete du script.",
-                 ligne=1, remede="Commence par `#!/usr/bin/env bash`.")
-
-    # SLURM cesse de lire l'en-tete a la premiere ligne executable.
-    premiere_commande = None
-    for index, ligne in enumerate(lignes, start=1):
-        depouillee = ligne.strip()
-        if not depouillee or depouillee.startswith("#"):
-            continue
-        premiere_commande = index
-        break
-    for index, ligne in enumerate(lignes, start=1):
-        if ligne.strip().startswith("#SBATCH") and premiere_commande and index > premiere_commande:
-            signaler(
-                "haute",
-                "Directive #SBATCH placee apres la premiere commande : SLURM "
-                "l'ignore silencieusement.",
-                ligne=index,
-                remede="Remonte-la dans l'en-tete, avant toute ligne executable.",
-            )
-
-    entete = "\n".join(lignes[: premiere_commande or len(lignes)])
-    if "--mem" not in entete:
-        signaler(
-            "haute",
-            "Aucune directive `--mem` : ROMEO refuse la soumission avec "
-            "« Memory resource is missing ».",
-            remede="Ajoute `#SBATCH --mem=<N>G`.",
-        )
-    if "--account" not in entete:
-        signaler("moyenne", "Aucun `--account` : la soumission peut etre refusee.",
-                 remede="Ajoute `#SBATCH --account={}`.".format(DEFAULT_ACCOUNT or "VOTRE_PROJET"))
-    if "--time" not in entete:
-        signaler("moyenne", "Aucun `--time` : la limite par defaut de la "
-                 "partition s'applique, souvent trop courte.")
-
-    if _MOTIFS_SECRET.search(script):
-        signaler(
-            "haute",
-            "Une valeur ressemblant a un secret est ecrite en clair dans le "
-            "script. Elle serait lisible par quiconque accede au fichier.",
-            remede="Depose-la dans un fichier a droits 600 et passe "
-                   "`secret_env_file` a job_prepare.",
-        )
-
-    if re.search(r"\bmodule\s+load\b", script) and "romeo_load_" not in script:
-        signaler(
-            "basse",
-            "Le script utilise `module load` sans charger l'environnement de "
-            "l'architecture. Sur ROMEO 2025, la voie officielle est "
-            "`romeo_load_<arch>_env` puis `spack load`.",
-        )
-
-    # Chemins absolus mentionnes : on verifie leur existence reelle. Les racines
-    # sont **derivees** de la session plutot que figees dans un motif : une liste
-    # ecrite en dur rate l'emplacement reel du scratch (chemin physique GPFS) et
-    # laisse alors passer sans controle les chemins qui comptent le plus.
-    try:
-        racines_data = [
-            r for r in allowed_roots(s.home, s.scratch, s.path_aliases)
-            if r not in ("/tmp", "/apps")
-        ]
-    except (SSHError, SSHTimeout):
-        # Hors ligne : on retombe sur les racines documentees de ROMEO. Le
-        # controle d'existence ne tournera pas de toute facon.
-        racines_data = ["/home", "/scratch_p", "/gpfs/scratch", "/project",
-                        "/gpfs/projet"]
-    candidats = {
-        m.group(0) for m in re.finditer(r"(?<![\w$])/[\w./-]+", script)
-        if "$" not in m.group(0)
-    }
-    tous_chemins = sorted(
-        c for c in candidats
-        if any(c == r or c.startswith(r.rstrip("/") + "/") for r in racines_data)
-    )
-    chemins = tous_chemins[:MAX_CHEMINS_VERIFIES]
-    manquants = []
-    if chemins:
-        try:
-            verif = _sh(
-                s,
-                "; ".join(
-                    'test -e {p} || echo "ABSENT {p}"'.format(p=shlex.quote(c))
-                    for c in chemins
-                ),
-                timeout=60,
-            )
-            manquants = [
-                l.split(None, 1)[1] for l in verif.stdout.splitlines()
-                if l.startswith("ABSENT ")
-            ]
-        except (SSHError, SSHTimeout):
-            pass
-    for absent in manquants:
-        signaler("moyenne", "Chemin inexistant sur le cluster : {}".format(absent),
-                 remede="Verifie l'orthographe, ou cree-le avant la soumission.")
-    if len(tous_chemins) > len(chemins):
-        signaler(
-            "basse",
-            "{} chemins absolus supplementaires n'ont pas ete verifies "
-            "({} sur {} controles).".format(
-                len(tous_chemins) - len(chemins), len(chemins), len(tous_chemins)),
-            remede="Decoupe le script, ou verifie ces chemins avec `list_dir`.",
-        )
-
-    # Variables utilisees mais jamais definies dans le script ni connues de SLURM.
-    connues = {
-        "HOME", "USER", "PATH", "PWD", "TMPDIR", "SHELL", "LD_LIBRARY_PATH",
-        "OMP_NUM_THREADS", "CUDA_VISIBLE_DEVICES",
-    }
-    # `readonly`, `local`, `declare` et `typeset` declarent tout autant
-    # qu'`export`. Ne reconnaitre qu'`export` transforme un script rigoureux en
-    # pluie de faux signalements : plus l'auteur est discipline, plus le
-    # controle est bruyant, et le plafond ci-dessous evince alors les vrais.
-    definies = set(re.findall(
-        r"^\s*(?:export\s+|readonly\s+|local\s+|typeset\s+"
-        r"|declare\s+(?:-\w+\s+)*)?([A-Za-z_]\w*)=", script, re.M))
-    definies |= set(re.findall(r"^\s*for\s+([A-Za-z_]\w*)\s+in\b", script, re.M))
-    definies |= set(re.findall(r"^\s*read\s+(?:-\w+\s+)*([A-Za-z_]\w*)", script, re.M))
-    utilisees = set(re.findall(r"\$\{?([A-Za-z_]\w*)", script))
-    # `${VAR:-defaut}`, `${VAR:?message}` et leurs variantes disent
-    # explicitement que la variable vient de l'exterieur et que le cas est
-    # traite. C'est l'inverse d'un oubli : le signaler serait a contresens.
-    traitees = set(re.findall(r"\$\{([A-Za-z_]\w*)\s*:?[-=?+]", script))
-    toutes_inconnues = sorted(
-        v for v in utilisees - definies - connues - traitees
-        if not v.startswith("SLURM") and not v.startswith("_ROMEO")
-    )
-    inconnues = toutes_inconnues[:MAX_VARIABLES_SIGNALEES]
-    for variable in inconnues:
-        signaler(
-            "basse",
-            "Variable `${}` utilisee sans etre definie dans le script.".format(variable),
-            remede="Definis-la, ou passe-la par `secret_env_file` si elle est "
-                   "sensible.",
-        )
-    # Tronquer un affichage est acceptable, tronquer un *controle* en silence
-    # ne l'est pas : « aucun probleme detecte » deviendrait un mensonge.
-    if len(toutes_inconnues) > len(inconnues):
-        signaler(
-            "basse",
-            "{} autres variables potentiellement non definies ne sont pas "
-            "listees ({} sur {} affichees).".format(
-                len(toutes_inconnues) - len(inconnues),
-                len(inconnues), len(toutes_inconnues)),
-            remede="Corrige celles ci-dessus puis relance `sbatch_lint`.",
-        )
-
-    graves = [c for c in constats if c["gravite"] == "haute"]
-    return {
-        "ok": True,
-        "origine": origine,
-        "lignes": len(lignes),
-        "constats": constats,
-        "bloquants": len(graves),
-        "verdict": (
-            "{} probleme(s) bloquant(s) : corrige-les avant de soumettre.".format(
-                len(graves))
-            if graves
-            else "Aucun probleme bloquant detecte."
-            if constats
-            else "Script conforme."
-        ),
-    }
+@outil(annotations=READ_ONLY, description=(
+    "Verifie sur ROMEO, par SSH, les chemins absolus litteraux du texte fourni. "
+    "Ne valide pas la syntaxe du script. Les chemins dynamiques ne sont pas resolus ; aucun fichier n'est cree."))
+def sbatch_check_paths(script: str) -> dict[str, Any]:
+    return check_script_paths(session(), script)
 
 # =============================================================================
 # Audit du scratch
