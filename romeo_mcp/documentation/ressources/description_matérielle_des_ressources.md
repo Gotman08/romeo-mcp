@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/description_matér
 scraped_at: "2026-09-26 02:36:13"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Description  matérielle des ressources ROMEO
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Description  matérielle des ressources ROMEO · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Description matérielle des ressources ROMEO
 
@@ -78,3 +78,7 @@ Vous pouvez utiliser ces photos des ressources ROMEO comme illustration si vous 
 ---
 
 ← [Ressources de calcul](../ressources.md) | → [Se connecter aux ressources et gestion des clés ssh](connexion_ssh.md)
+
+## Dans cette section
+
+[↑ Haut de page](#description-matérielle-des-ressources-romeo) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)

@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/utilise
 scraped_at: "2026-09-26 02:37:05"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser OpenMPI
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser OpenMPI · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Utiliser OpenMPI
 
@@ -174,3 +174,7 @@ Vous trouverez alors dans le dossier où vous étiez a la soumission deux fichie
 ---
 
 ← [Utiliser Python](utiliser_python.md) | → [Utiliser des GPU](utiliser_des_gpu.md)
+
+## Dans cette section
+
+[↑ Haut de page](#utiliser-openmpi) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

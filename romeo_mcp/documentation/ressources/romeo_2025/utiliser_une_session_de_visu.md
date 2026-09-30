@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/utilise
 scraped_at: "2026-09-26 02:37:07"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser une session de visualisation
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser une session de visualisation · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Utiliser une session de visualisation
 
@@ -70,3 +70,7 @@ Vous pouvez faire la commande **vncserver -list**, elle va alors vous donner la 
 ---
 
 ← [Pour aller plus loin](plus_loin.md) | → [Commandes utiles](commandes_utiles.md)
+
+## Dans cette section
+
+[↑ Haut de page](#utiliser-une-session-de-visualisation) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

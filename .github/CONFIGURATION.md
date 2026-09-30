@@ -5,6 +5,15 @@
 Ce dossier contient la configuration des vérifications exécutées sur GitHub
 lorsqu’une modification est poussée ou proposée dans une pull request.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Contenu](#contenu)
+- [Où lire les résultats ?](#où-lire-les-résultats-)
+- [Contribuer](#contribuer)
+
+</details>
+
 ## Contenu
 
 | Section | Rôle |
@@ -31,3 +40,7 @@ fonctionnement pour les utilisateurs et les étapes pour les mainteneurs.
 Avant de pousser, suivre les [vérifications locales](../CONTRIBUTING.md#avant-un-commit).
 Un problème de sécurité se signale selon [SECURITY.md](../SECURITY.md), avec
 des informations permettant sa reproduction sans publier de données privées.
+
+---
+
+[↑ Haut de page](#configuration-github) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)

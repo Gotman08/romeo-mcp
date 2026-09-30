@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/Logicie
 scraped_at: "2026-09-26 02:36:28"
 ---
 
-[Sommaire](../../../SOMMAIRE.md) › [Accueil](../../../index.md) › [Ressources de calcul](../../../ressources.md) › [Romeo 2025](../../romeo_2025.md) › [Logiciels](../Logiciels.md) › Architecture x86_64
+[Sommaire](../../../SOMMAIRE.md) › [Accueil](../../../index.md) › [Ressources de calcul](../../../ressources.md) › [Romeo 2025](../../romeo_2025.md) › [Logiciels](../Logiciels.md) › Architecture x86_64 · [Corpus ROMEO](../../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Architecture x86\_64
 
@@ -71,3 +71,7 @@ rmdir $GAUSS_SCRDIR
 ---
 
 ← [Architecture Aarch64](<Architecture Aarch64.md>) | → [Cluster Juliet](../../juliet.md)
+
+## Dans cette section
+
+[↑ Haut de page](#architecture-x86_64) · [Sommaire officiel](../../../SOMMAIRE.md) · [Guide du corpus](../../../README.md)

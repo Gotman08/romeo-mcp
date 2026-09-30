@@ -6,6 +6,8 @@ Ces pages présentent des générations antérieures des équipements ROMEO.
 Elles apportent un contexte historique et permettent de dater une référence
 matérielle ou une illustration.
 
+**Sur cette page :** [Pages conservées](#pages-conservées) · [Lire les informations avec leur date](#lire-les-informations-avec-leur-date)
+
 ## Pages conservées
 
 | Génération | Page |
@@ -26,3 +28,7 @@ les pages opérationnelles archivées. Le [sommaire](../SOMMAIRE.md) relie
 cette rubrique aux autres sections officielles.
 
 *Guide de navigation du projet MCP ; les présentations liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#historique-des-équipements) · [Corpus ROMEO](../README.md) · [Sommaire officiel](../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

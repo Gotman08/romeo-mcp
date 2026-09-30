@@ -4,7 +4,18 @@
 
 Ces scripts accompagnent l’installation et la maintenance du dépôt. Ils se
 lancent depuis la **racine du projet**, avec le Python du venv activé. Pour
-soumettre un calcul, utiliser les [outils MCP](../docs/reference.md).
+soumettre un calcul, utiliser les [outils MCP](../docs/Tools.md).
+
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Choisir le bon script](#choisir-le-bon-script)
+- [Enregistrer le MCP dans un client](#enregistrer-le-mcp-dans-un-client)
+- [Vérifier avant de publier](#vérifier-avant-de-publier)
+- [Renouveler la documentation ROMEO](#renouveler-la-documentation-romeo)
+- [Continuer](#continuer)
+
+</details>
 
 ## Choisir le bon script
 
@@ -92,3 +103,7 @@ le projet reste identifiée séparément dans le [README du corpus](../romeo_mcp
 [Installer et démarrer](../README.md#prise-en-main) ·
 [Contribuer](../CONTRIBUTING.md) ·
 [Comprendre le code](../romeo_mcp/README.md)
+
+---
+
+[↑ Haut de page](#utilitaires-du-projet) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)

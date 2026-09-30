@@ -6,6 +6,15 @@ Les images de ce dossier accompagnent la présentation du MCP sur GitHub.
 Elles sont versionnées avec le dépôt afin que les liens relatifs restent
 valides après déplacement du projet.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Schéma de fonctionnement](#schéma-de-fonctionnement)
+- [Bannière ROMEO](#bannière-romeo)
+- [Réutilisation et mise à jour](#réutilisation-et-mise-à-jour)
+
+</details>
+
 ## Schéma de fonctionnement
 
 ![Du client IA aux nœuds de calcul](architecture.svg)
@@ -31,3 +40,7 @@ depuis les pages et les [mentions des contenus tiers](../../THIRD_PARTY_NOTICES.
 Les captures d’écran de la documentation officielle se trouvent dans un
 [dossier distinct du corpus](../../romeo_mcp/documentation/images/README.md),
 où leurs empreintes sont suivies par le manifeste documentaire.
+
+---
+
+[↑ Haut de page](#visuels-du-projet) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

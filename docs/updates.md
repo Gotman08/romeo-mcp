@@ -6,6 +6,19 @@
 [dépôt officiel](https://github.com/Gotman08/romeo-mcp/releases). La détection est
 automatique ; **l’installation demande votre accord**.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Les trois commandes](#les-trois-commandes)
+- [Ce qui se passe après votre accord](#ce-qui-se-passe-après-votre-accord)
+- [Revenir à la version précédente](#revenir-à-la-version-précédente)
+- [Détection automatique et réseau](#détection-automatique-et-réseau)
+- [Où sont conservées les versions ?](#où-sont-conservées-les-versions-)
+- [Activer le système sur une ancienne installation](#activer-le-système-sur-une-ancienne-installation)
+- [Publier une nouvelle version](#publier-une-nouvelle-version)
+
+</details>
+
 ## Les trois commandes
 
 Utiliser le Python de l’installation enregistrée dans votre client. Si le venv
@@ -148,3 +161,7 @@ brouillon, charge la wheel, les sources et `SHA256SUMS`, puis publie la release.
 Un simple push sur `main` ne déclenche aucune installation chez les utilisateurs.
 Une release publiée est conservée telle quelle : une correction reçoit une
 nouvelle version et un nouveau tag.
+
+---
+
+[↑ Haut de page](#mettre-à-jour-romeo-mcp) · [Accueil](../README.md) · [Documentation](README.md) · [Catalogue Tools](Tools.md)

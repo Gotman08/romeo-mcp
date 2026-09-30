@@ -6,7 +6,9 @@
 
 Un serveur MCP local pour préparer, soumettre, suivre et comprendre vos calculs Slurm.
 
-[Prise en main](#prise-en-main) · [Fonctionnement](#comment-ça-fonctionne) · [Référence](docs/reference.md) · [Documentation ROMEO](romeo_mcp/documentation/SOMMAIRE.md)
+[Démarrer](#prise-en-main) · [Tous les guides](docs/README.md) · [Tools](docs/Tools.md) · [Documentation ROMEO](romeo_mcp/documentation/README.md)
+
+[Configuration](docs/configuration.md) · [Dépannage](#en-cas-de-problème) · [Mises à jour](docs/updates.md) · [Contribuer](CONTRIBUTING.md)
 
 [![Vérifications](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml)
 ![Python 3.11 et plus](https://img.shields.io/badge/Python-3.11%2B-3776AB)
@@ -19,6 +21,45 @@ Un serveur MCP local pour préparer, soumettre, suivre et comprendre vos calculs
 
 </div>
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Navigation rapide](#navigation-rapide)
+- [Pour qui ?](#pour-qui-)
+- [Comment ça fonctionne](#comment-ça-fonctionne)
+- [Prise en main](#prise-en-main)
+  - [1. Préparer les accès](#1-préparer-les-accès)
+  - [2. Installer le serveur](#2-installer-le-serveur)
+  - [3. Ajouter le MCP à votre assistant](#3-ajouter-le-mcp-à-votre-assistant)
+  - [4. Faire un premier essai](#4-faire-un-premier-essai)
+- [Des demandes utiles](#des-demandes-utiles)
+- [Un profil essentiel pour commencer](#un-profil-essentiel-pour-commencer)
+- [Une fiche de reproductibilité par job](#une-fiche-de-reproductibilité-par-job)
+- [Documentation locale et contexte de l’IA](#documentation-locale-et-contexte-de-lia)
+- [Quotas : quel chiffre regarder ?](#quotas--quel-chiffre-regarder-)
+- [En cas de problème](#en-cas-de-problème)
+- [Contribuer et vérifier](#contribuer-et-vérifier)
+
+</details>
+
+## Navigation rapide
+
+Choisissez votre besoin pour ouvrir le guide ou la fiche correspondante.
+L’[index de la documentation](docs/README.md) rassemble tous les parcours.
+
+| Je veux… | Guide | Accès direct |
+|---|---|---|
+| Installer et connecter le MCP | [Prise en main](#prise-en-main) | [Accès SSH](romeo_mcp/documentation/ressources/connexion_ssh.md) · [Configuration](docs/configuration.md) · [Clients IA](#3-ajouter-le-mcp-à-votre-assistant) |
+| Découvrir les outils | [Catalogue Tools](docs/Tools.md#outils-exposés) | [Fiches par catégorie](docs/tools/README.md) · [Profils d’outils](docs/configuration.md#profils-doutils) |
+| Préparer et suivre un calcul | [Premier essai](#4-faire-un-premier-essai) | [Préparer](docs/tools/job_prepare.md) · [Soumettre](docs/tools/job_submit.md) · [Suivre](docs/tools/job_status.md) |
+| Utiliser Python, MPI ou les GPU | [Calcul parallèle](docs/Tools.md#calcul-parallèle) | [Python](romeo_mcp/documentation/ressources/romeo_2025/utiliser_python.md) · [OpenMPI](romeo_mcp/documentation/ressources/romeo_2025/utiliser_openmpi.md) · [GPU](romeo_mcp/documentation/ressources/romeo_2025/utiliser_des_gpu.md) |
+| Gérer les fichiers et le stockage | [Fichiers et transferts](docs/Tools.md#fichiers-stockage-et-données) | [Envoyer](docs/tools/upload_to_romeo.md) · [Récupérer](docs/tools/download_from_romeo.md) · [Quotas](docs/tools/romeo_quota.md) |
+| Ouvrir un notebook ou un service | [Services interactifs](docs/Tools.md#services-interactifs) | [Préparer un service](docs/tools/service_prepare.md) · [Connexion](docs/tools/service_connection_info.md) · [JupyterLab](romeo_mcp/documentation/ressources/romeo_2025/7.1.utiliser_jupyterlab.md) |
+| Comprendre un échec ou mesurer un job | [Dépannage](#en-cas-de-problème) | [Diagnostic](docs/tools/diagnose_job.md) · [Journaux](docs/tools/job_log_tail.md) · [Efficacité](docs/tools/job_efficiency.md) |
+| Conserver les preuves d’une expérience | [Reproductibilité](docs/reproducibility.md) | [Collecter une fiche](docs/tools/job_report_collect.md) · [Exporter](docs/tools/job_report_export.md) · [Limites des mesures](docs/reproducibility.md#ce-qui-est-réellement-mesuré) |
+| Consulter une procédure ROMEO | [Parcours ROMEO 2025](romeo_mcp/documentation/ressources/romeo_2025/README.md) | [Sommaire officiel](romeo_mcp/documentation/SOMMAIRE.md) · [Chercher](docs/tools/search_docs.md) · [Lire une page](docs/tools/read_doc.md) |
+| Mettre à jour ou contribuer | [Mises à jour](docs/updates.md) | [Versions](CHANGELOG.md) · [Contribution](CONTRIBUTING.md) · [Tests](tests/README.md) · [Sécurité](SECURITY.md) |
+
 ## Pour qui ?
 
 Étudiants, enseignants et chercheurs disposant d’un accès **déjà autorisé** à ROMEO : simulation numérique, chimie, bio-informatique, statistiques, calcul MPI ou apprentissage automatique.
@@ -29,14 +70,14 @@ Décrivez votre besoin à votre assistant IA. Le MCP lui fournit les outils pour
 
 | Votre besoin | Ce que fournit le MCP |
 |---|---|
-| Préparer un calcul | Script Slurm, choix de partition, contrôles CPU, RAM et architecture |
-| Utiliser les GPU | Prise en compte de l’architecture ARM des nœuds GPU et des environnements Spack |
-| Comprendre un échec | État du job, extraits ciblés des journaux, diagnostic et efficacité |
-| Lancer plusieurs expériences | Tableaux de paramètres, étapes dépendantes et points de reprise |
-| Trouver la bonne commande | Documentation embarquée, recherche locale et lecture par section |
-| Reprendre une conversation | Registre local des jobs soumis par le MCP |
-| Commencer avec peu d’outils | Profil essentiel, avec accès au catalogue complet à la demande |
-| Conserver les preuves d’un calcul | Fiche JSON et Markdown : script filtré, code, environnement, ressources et empreintes |
+| [Préparer un calcul](docs/tools/job_prepare.md) | Script Slurm, choix de partition, contrôles CPU, RAM et architecture |
+| [Utiliser les GPU](romeo_mcp/documentation/ressources/romeo_2025/utiliser_des_gpu.md) | Prise en compte de l’architecture ARM des nœuds GPU et des environnements Spack |
+| [Comprendre un échec](docs/tools/diagnose_job.md) | État du job, extraits ciblés des journaux, diagnostic et efficacité |
+| [Lancer plusieurs expériences](docs/tools/job_array_prepare.md) | Tableaux de paramètres, étapes dépendantes et points de reprise |
+| [Trouver la bonne commande](docs/tools/search_docs.md) | Documentation embarquée, recherche locale et lecture par section |
+| [Reprendre une conversation](docs/tools/list_jobs.md) | Registre local des jobs soumis par le MCP |
+| [Commencer avec peu d’outils](docs/configuration.md#profils-doutils) | Profil essentiel, avec accès au catalogue complet à la demande |
+| [Conserver les preuves d’un calcul](docs/reproducibility.md) | Fiche JSON et Markdown : script filtré, code, environnement, ressources et empreintes |
 
 ## Comment ça fonctionne
 
@@ -61,7 +102,7 @@ Il vous faut :
 
 L’installation automatisée prévoit **Codex**, **Claude Code** et **Claude Desktop**. La disponibilité du MCP dépend aussi de la version et de la configuration de votre client.
 
-Consultez la documentation officielle embarquée pour la [création du compte](romeo_mcp/documentation/creation_compte.md) et la [connexion SSH](romeo_mcp/documentation/SOMMAIRE.md).
+Consultez la documentation officielle embarquée pour la [création du compte](romeo_mcp/documentation/creation_compte.md) et la [connexion SSH](romeo_mcp/documentation/ressources/connexion_ssh.md).
 
 Dans `~/.ssh/config` (Windows : `%USERPROFILE%\.ssh\config`), ajoutez une entrée en remplaçant les deux valeurs `VOTRE_…` :
 
@@ -156,7 +197,7 @@ Puis préparez un petit calcul :
 
 > Prépare en simulation un job `hello-romeo`, sur un seul nœud `x64cpu`, avec un cœur, 1 Go de RAM et une minute. La commande est `hostname`. Montre-moi le script et les avertissements avant toute soumission.
 
-L’appel correspondant à `job_prepare` est :
+L’appel correspondant à [`job_prepare`](docs/tools/job_prepare.md) est :
 
 ```json
 {
@@ -170,22 +211,22 @@ L’appel correspondant à `job_prepare` est :
 }
 ```
 
-La préparation retourne le script et un `plan_id`, sans soumettre le calcul. Elle peut consulter les chemins distants par SSH et conserve le plan localement pendant 24 heures. Après lecture, soumettez exactement ce plan avec `job_submit({"plan_id": "IDENTIFIANT_RECU", "confirm": true})`. Suivez ensuite le job reçu avec `job_status`, `job_log_tail` et `job_efficiency`.
+La préparation retourne le script et un `plan_id`, sans soumettre le calcul. Elle peut consulter les chemins distants par SSH et conserve le plan localement pendant 24 heures. Après lecture, soumettez exactement ce plan avec `job_submit({"plan_id": "IDENTIFIANT_RECU", "confirm": true})`. Suivez ensuite le job reçu avec [`job_status`](docs/tools/job_status.md), [`job_log_tail`](docs/tools/job_log_tail.md) et [`job_efficiency`](docs/tools/job_efficiency.md).
 
-Les tableaux et pipelines suivent le même parcours avec `job_array_prepare` / `job_array_submit` et `job_pipeline_prepare` / `job_pipeline_submit`. Les préparations ne prennent pas de paramètre `confirm`. Un aperçu hors ligne aux chemins illustratifs ne peut pas être soumis. D’autres actions, comme les transferts, l’annulation ou `cluster_gpu_health_run`, agissent directement.
+Les tableaux et pipelines suivent le même parcours avec [`job_array_prepare`](docs/tools/job_array_prepare.md) / [`job_array_submit`](docs/tools/job_array_submit.md) et [`job_pipeline_prepare`](docs/tools/job_pipeline_prepare.md) / [`job_pipeline_submit`](docs/tools/job_pipeline_submit.md). Les préparations ne prennent pas de paramètre `confirm`. Un aperçu hors ligne aux chemins illustratifs ne peut pas être soumis. D’autres actions, comme les transferts, l’annulation ou [`cluster_gpu_health_run`](docs/tools/cluster_gpu_health_run.md), agissent directement.
 
 ## Des demandes utiles
 
 | Situation | Exemple de demande |
 |---|---|
-| TP de calcul scientifique | « Prépare un tableau Slurm pour ces paramètres et explique les ressources choisies. » |
-| Code MPI | « Trouve le logiciel via Spack, puis prépare un lancement MPI sur deux nœuds. » |
-| Calcul GPU | « Vérifie la compatibilité ARM de mes dépendances avant de préparer ce job GPU. » |
-| Job en échec | « Analyse le job indiqué et lis seulement les extraits de logs utiles au diagnostic. » |
-| Optimisation | « Compare le temps et la mémoire réellement utilisés aux ressources réservées. » |
-| Reproductibilité | « Exporte la fiche de ce job avec les empreintes de ces fichiers d’entrée. » |
+| [TP de calcul scientifique](docs/tools/job_array_prepare.md) | « Prépare un tableau Slurm pour ces paramètres et explique les ressources choisies. » |
+| [Code MPI](romeo_mcp/documentation/ressources/romeo_2025/utiliser_openmpi.md) | « Trouve le logiciel via Spack, puis prépare un lancement MPI sur deux nœuds. » |
+| [Calcul GPU](romeo_mcp/documentation/ressources/romeo_2025/utiliser_des_gpu.md) | « Vérifie la compatibilité ARM de mes dépendances avant de préparer ce job GPU. » |
+| [Job en échec](docs/tools/diagnose_job.md) | « Analyse le job indiqué et lis seulement les extraits de logs utiles au diagnostic. » |
+| [Optimisation](docs/tools/job_efficiency.md) | « Compare le temps et la mémoire réellement utilisés aux ressources réservées. » |
+| [Reproductibilité](docs/reproducibility.md) | « Exporte la fiche de ce job avec les empreintes de ces fichiers d’entrée. » |
 
-La [référence technique](docs/reference.md) détaille les outils, MPI, PyTorch, Apptainer, les transferts, le profilage et les limites de chaque mesure.
+La page [Tools](docs/Tools.md) propose un catalogue cliquable : chaque outil possède une fiche avec son rôle, ses paramètres et un exemple. Elle détaille aussi MPI, PyTorch, Apptainer, les transferts, le profilage et les limites de chaque mesure.
 
 ## Un profil essentiel pour commencer
 
@@ -193,7 +234,7 @@ Le profil `essential` présente **22 outils** : documentation, état du cluster,
 
 Pour accéder aux tableaux de paramètres, aux pipelines, aux services interactifs ou au profilage, demandez à l’assistant :
 
-> Passe le profil d’outils ROMEO à `full` avec `tool_profile_set`.
+> Passe le profil d’outils ROMEO à `full` avec [`tool_profile_set`](docs/tools/tool_profile_set.md).
 
 Le client reçoit une notification de changement du catalogue. Le choix vaut pour le processus MCP actuel. Pour le conserver au prochain lancement :
 
@@ -205,9 +246,9 @@ Cette commande conserve votre projet et votre alias SSH. Sans choix explicite, l
 
 ## Une fiche de reproductibilité par job
 
-`job_report_export` crée un dossier privé avec `report.json`, `report.md` et `script.sbatch.txt`. Les nouveaux jobs conservent les ressources demandées et tentent de relever le commit Git, l’environnement chargé et les empreintes des fichiers choisis avant le calcul. `job_report_collect(job_id)` enregistre un relevé daté et rend `report_id`. `job_report_export(report_id)` exporte exactement ce relevé, sans SSH.
+[`job_report_export`](docs/tools/job_report_export.md) crée un dossier privé avec `report.json`, `report.md` et `script.sbatch.txt`. Les nouveaux jobs conservent les ressources demandées et tentent de relever le commit Git, l’environnement chargé et les empreintes des fichiers choisis avant le calcul. `job_report_collect(job_id)` enregistre un relevé daté et rend `report_id`. `job_report_export(report_id)` exporte exactement ce relevé, sans SSH.
 
-Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à `job_prepare`. Les fichiers choisis seulement à la collecte sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
+Pour choisir les entrées à relever au démarrage, ajoutez `data_files` à [`job_prepare`](docs/tools/job_prepare.md). Les fichiers choisis seulement à la collecte sont datés comme observations après coup. Les captures sont limitées à 20 fichiers et 64 Mio par relevé.
 
 Les exports restent **hors des dépôts Git**. Les secrets reconnaissables sont masqués ; le contenu des données, les variables d’environnement complètes et les adresses des dépôts Git ne sont pas exportés. Les informations absentes sont signalées. [Exemples, protection des données et limites](docs/reproducibility.md).
 
@@ -215,14 +256,14 @@ Les exports restent **hors des dépôts Git**. Les secrets reconnaissables sont 
 
 Le [corpus ROMEO](romeo_mcp/documentation/SOMMAIRE.md) accompagne le dépôt **et les paquets Python** : 42 pages officielles, 21 images, un sommaire et un manifeste de provenance.
 
-- `search_docs` classe les sections par pertinence lexicale (BM25), avec prise en compte des titres et des accents.
+- [`search_docs`](docs/tools/search_docs.md) classe les sections par pertinence lexicale (BM25), avec prise en compte des titres et des accents.
 - Les extraits comportent les sources, les lignes, l’empreinte du document et les arguments de lecture.
-- `read_doc` permet de lire une section complète. Si elle dépasse le budget, `next_call` poursuit la lecture sans supprimer du texte du corpus.
+- [`read_doc`](docs/tools/read_doc.md) permet de lire une section complète. Si elle dépasse le budget, `next_call` poursuit la lecture sans supprimer du texte du corpus.
 - Aucun service d’embeddings ni accès réseau n’est requis pour cette recherche.
 
-Un extrait seul peut manquer de prérequis : l’assistant doit poursuivre la lecture de la section ou des sections parentes. Le corpus est daté ; `romeo_status`, `romeo_quota` et `romeo_selfcheck` renseignent l’état actuel du cluster.
+Un extrait seul peut manquer de prérequis : l’assistant doit poursuivre la lecture de la section ou des sections parentes. Le corpus est daté ; [`romeo_status`](docs/tools/romeo_status.md), [`romeo_quota`](docs/tools/romeo_quota.md) et [`romeo_selfcheck`](docs/tools/romeo_selfcheck.md) renseignent l’état actuel du cluster.
 
-Après déplacement du dossier, recréez le venv et relancez l’installateur pour mettre à jour les chemins du client. La documentation reste dans le projet. [Fonctionnement et renouvellement du corpus](docs/reference.md#documentation-hors-ligne).
+Après déplacement du dossier, recréez le venv et relancez l’installateur pour mettre à jour les chemins du client. La documentation reste dans le projet. [Fonctionnement et renouvellement du corpus](docs/Tools.md#documentation-hors-ligne).
 
 ## Quotas : quel chiffre regarder ?
 
@@ -235,19 +276,19 @@ Après déplacement du dossier, recréez le venv et relancez l’installateur po
 | CPU / GPU / jobs Slurm | Ressources et nombre de jobs autorisés par les associations et QOS |
 | Fairshare | Priorité influencée par l’usage passé du groupe ; ce n’est pas du stockage disponible |
 
-`romeo_quota` lit les quotas effectifs ; `df` indique la capacité du système de fichiers entier. Les plafonds Slurm dépendent du projet. Aucun quota personnel n’est présumé par défaut dans cette version.
+[`romeo_quota`](docs/tools/romeo_quota.md) lit les quotas effectifs ; `df` indique la capacité du système de fichiers entier. Les plafonds Slurm dépendent du projet. Aucun quota personnel n’est présumé par défaut dans cette version.
 
 ## En cas de problème
 
 | Symptôme | Vérification |
 |---|---|
-| « Projet ROMEO absent » | Exécuter `configure --account …`, puis relancer le processus MCP |
-| SSH refusé ou bloqué | Tester `ssh romeo1` dans le même environnement utilisateur ; vérifier clé et agent SSH |
-| Le MCP n’apparaît pas | Relancer le client et vérifier le chemin du Python avec `install_mcp.py --list` |
-| `No module named romeo_mcp` | Réinstaller avec le Python du venv utilisé par le client |
-| Documentation introuvable | Exécuter `doctor` et retirer un ancien `ROMEO_DOCS_DIR` s’il n’est plus valable |
-| Un job attend longtemps | Lire le motif Slurm ; vérifier disponibilité, compte, QOS, dépendances et limites |
-| Binaire incompatible sur GPU | Recompiler pour `aarch64` sur un nœud adapté avec `compute_command_prepare` |
+| [« Projet ROMEO absent »](docs/configuration.md#votre-profil-romeo) | Exécuter `configure --account …`, puis relancer le processus MCP |
+| [SSH refusé ou bloqué](romeo_mcp/documentation/ressources/connexion_ssh.md) | Tester `ssh romeo1` dans le même environnement utilisateur ; vérifier clé et agent SSH |
+| [Le MCP n’apparaît pas](tools/README.md#enregistrer-le-mcp-dans-un-client) | Relancer le client et vérifier le chemin du Python avec `install_mcp.py --list` |
+| [`No module named romeo_mcp`](#2-installer-le-serveur) | Réinstaller avec le Python du venv utilisé par le client |
+| [Documentation introuvable](docs/configuration.md#diagnostic-en-lecture-seule) | Exécuter `doctor` et retirer un ancien `ROMEO_DOCS_DIR` s’il n’est plus valable |
+| [Un job attend longtemps](docs/tools/job_status.md) | Lire le motif Slurm ; vérifier disponibilité, compte, QOS, dépendances et limites |
+| [Binaire incompatible sur GPU](docs/tools/compute_command_prepare.md) | Recompiler pour `aarch64` sur un nœud adapté avec [`compute_command_prepare`](docs/tools/compute_command_prepare.md) |
 
 ## Contribuer et vérifier
 
@@ -261,3 +302,7 @@ Utilisez le Python du venv. Les suites par défaut sont hors ligne. Les tests `-
 La CI vérifie les suites hors ligne, la documentation, les métadonnées de commit et les fichiers publiés, puis construit le paquet. Les procédures de contribution et de signalement se trouvent dans [CONTRIBUTING.md](CONTRIBUTING.md) et [SECURITY.md](SECURITY.md).
 
 Code distribué sous [licence MIT](LICENSE). La documentation et les visuels officiels conservent leurs droits et leur attribution : [contenus tiers](THIRD_PARTY_NOTICES.md).
+
+---
+
+[↑ Haut de page](#romeo-mcp) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

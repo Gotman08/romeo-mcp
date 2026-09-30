@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/bonnes_pratiques_cybersecurit
 scraped_at: "2026-09-26 02:35:51"
 ---
 
-[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo
+[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo
 
@@ -53,3 +53,7 @@ Pour rappel, l'utilisation des services de Romeo est sujette au respect [des dif
 ---
 
 ← [Supercalculateur ROMEO 2013](historique/romeo2013.md) | → [Conditions Générales d’Utilisation des ressources de calcul de ROMEO](2.5.charte.md)
+
+## Dans cette section
+
+[↑ Haut de page](#responsabilités-et-bonnes-pratiques-en-sécurité-numérique-destinées-aux-utilisateurs-des-services-romeo) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)

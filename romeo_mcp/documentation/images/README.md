@@ -6,6 +6,8 @@ Ce dossier contient les 21 images téléchargées avec les pages officielles.
 Les fichiers restent locaux afin que les procédures illustrées soient lisibles
 sans charger leurs images depuis un autre site.
 
+**Sur cette page :** [Retrouver une famille d’illustrations](#retrouver-une-famille-dillustrations) · [Conservation et attribution](#conservation-et-attribution)
+
 ## Retrouver une famille d’illustrations
 
 | Famille | Fichiers | Exemple |
@@ -32,3 +34,7 @@ Les visuels de présentation du MCP sont documentés dans le
 [guide des visuels du projet](https://github.com/Gotman08/romeo-mcp/blob/main/docs/assets/README.md).
 
 *Guide de navigation du projet MCP ; les images sont celles du corpus ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#images-de-la-documentation-officielle) · [Corpus ROMEO](../README.md) · [Sommaire officiel](../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

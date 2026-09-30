@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/services/accompagnementScient
 scraped_at: "2026-09-26 02:37:12"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Accompagnement personnalisé pour les utilisateurs ROMEO
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Accompagnement personnalisé pour les utilisateurs ROMEO · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Accompagnement personnalisé pour les utilisateurs ROMEO
 
@@ -39,3 +39,7 @@ Déposez votre demande via un ticket dans la rubrique **"Besoin d'accompagnement
 ---
 
 ← [RomeoGit](romeogit.md) | → [Oratio](Oratio.md)
+
+## Dans cette section
+
+[↑ Haut de page](#accompagnement-personnalisé-pour-les-utilisateurs-romeo) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)
