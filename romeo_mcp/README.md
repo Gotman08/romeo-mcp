@@ -38,7 +38,7 @@ qui exécutent le calcul. La préparation par `job_prepare` conserve un plan loc
 | [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | `diagnose_job`, `job_live_metrics`, `job_profile_prepare`, `job_system_health` |
 | [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile_get` / `tool_profile_set`, `job_report_export` |
 
-La [référence utilisateur](../docs/reference.md) détaille les fonctions et leurs
+La page [Tools](../docs/Tools.md) donne accès à une fiche par outil, avec ses paramètres, un exemple et ses
 limites. Le profil `essential` annonce 22 outils ; `full` annonce les outils métier, `expert` ajoute les exécuteurs génériques au catalogue
 complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 

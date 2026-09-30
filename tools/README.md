@@ -4,7 +4,7 @@
 
 Ces scripts accompagnent l’installation et la maintenance du dépôt. Ils se
 lancent depuis la **racine du projet**, avec le Python du venv activé. Pour
-soumettre un calcul, utiliser les [outils MCP](../docs/reference.md).
+soumettre un calcul, utiliser les [outils MCP](../docs/Tools.md).
 
 ## Choisir le bon script
 

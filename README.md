@@ -6,7 +6,7 @@
 
 Un serveur MCP local pour préparer, soumettre, suivre et comprendre vos calculs Slurm.
 
-[Prise en main](#prise-en-main) · [Fonctionnement](#comment-ça-fonctionne) · [Référence](docs/reference.md) · [Documentation ROMEO](romeo_mcp/documentation/SOMMAIRE.md)
+[Prise en main](#prise-en-main) · [Fonctionnement](#comment-ça-fonctionne) · [Tools](docs/Tools.md) · [Documentation ROMEO](romeo_mcp/documentation/SOMMAIRE.md)
 
 [![Vérifications](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Gotman08/romeo-mcp/actions/workflows/ci.yml)
 ![Python 3.11 et plus](https://img.shields.io/badge/Python-3.11%2B-3776AB)
@@ -185,7 +185,7 @@ Les tableaux et pipelines suivent le même parcours avec `job_array_prepare` / `
 | Optimisation | « Compare le temps et la mémoire réellement utilisés aux ressources réservées. » |
 | Reproductibilité | « Exporte la fiche de ce job avec les empreintes de ces fichiers d’entrée. » |
 
-La [référence technique](docs/reference.md) détaille les outils, MPI, PyTorch, Apptainer, les transferts, le profilage et les limites de chaque mesure.
+La page [Tools](docs/Tools.md) propose un catalogue cliquable : chaque outil possède une fiche avec son rôle, ses paramètres et un exemple. Elle détaille aussi MPI, PyTorch, Apptainer, les transferts, le profilage et les limites de chaque mesure.
 
 ## Un profil essentiel pour commencer
 
@@ -222,7 +222,7 @@ Le [corpus ROMEO](romeo_mcp/documentation/SOMMAIRE.md) accompagne le dépôt **e
 
 Un extrait seul peut manquer de prérequis : l’assistant doit poursuivre la lecture de la section ou des sections parentes. Le corpus est daté ; `romeo_status`, `romeo_quota` et `romeo_selfcheck` renseignent l’état actuel du cluster.
 
-Après déplacement du dossier, recréez le venv et relancez l’installateur pour mettre à jour les chemins du client. La documentation reste dans le projet. [Fonctionnement et renouvellement du corpus](docs/reference.md#documentation-hors-ligne).
+Après déplacement du dossier, recréez le venv et relancez l’installateur pour mettre à jour les chemins du client. La documentation reste dans le projet. [Fonctionnement et renouvellement du corpus](docs/Tools.md#documentation-hors-ligne).
 
 ## Quotas : quel chiffre regarder ?
 

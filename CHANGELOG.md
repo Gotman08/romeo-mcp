@@ -10,7 +10,7 @@
 - Relevés de jobs immuables, consultables et exportables sans nouvelle collecte.
 - Plans consultables et communs aux installations, roues, téléchargements, profilages, chaînes reprenables et allocations.
 - Environnements Python structurés ; exécuteurs génériques limités au catalogue `expert`.
-- Migration incompatible des anciens outils composites : voir `docs/reference.md`.
+- Migration incompatible des anciens outils composites : voir `docs/Tools.md`.
 
 
 ## Non publié
@@ -26,7 +26,7 @@
 - `stage_dataset` n’installe plus implicitement `huggingface_hub` : un venv
   `env_path` préparé explicitement est requis pour les datasets Hugging Face.
 - Ces changements retirent les anciens noms du catalogue MCP. Voir le
-  [guide de migration](docs/reference.md#migration-des-anciens-noms).
+  [guide de migration](docs/Tools.md#migration-des-anciens-noms).
 
 - Isolation des fichiers de paramètres et des scripts Slurm par soumission,
   avec noms uniques dans le même dossier et empreintes conservées dans la

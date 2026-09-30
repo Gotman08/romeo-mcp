@@ -1,92 +1,149 @@
-# Référence technique
+# Tools
 
-[Accueil](../README.md) › [Documentation](README.md) › Référence technique
+[Accueil](../README.md) › [Documentation](README.md) › Tools
 
-[Outils](#outils-exposés) · [Jobs et journaux](#jobs-et-journaux) · [Calcul parallèle](#calcul-parallèle) ·
+Catalogue des **71 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
+Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son résultat, ses effets et ses limites.
+
+[Catalogue](#outils-exposés) · [Jobs et journaux](#jobs-et-journaux) · [Calcul parallèle](#calcul-parallèle) ·
 [Diagnostic](#diagnostic-des-échecs) · [Documentation locale](#documentation-hors-ligne) ·
 [Conception du serveur](#partis-pris-de-conception)
 
-Commandes à exécuter depuis la racine du dépôt. Les valeurs matérielles sont des relevés datés, à vérifier avec `romeo_selfcheck`.
+Les exemples JSON sont des arguments à transmettre au client MCP, après adaptation des chemins et identifiants. Les commandes shell de ce guide s’exécutent depuis la racine du dépôt.
 
 ## Outils exposés
 
-Le profil `full` expose les outils métier. `expert` ajoute les exécuteurs génériques. Le profil `essential` en annonce 22 ;
-`tool_profile_set` permet de changer de profil pendant la connexion. Voir les
-[profils d’outils](configuration.md#profils-doutils).
+| Profil | Outils annoncés | Usage |
+|---|---:|---|
+| `essential` | 22 | Documentation, contexte cluster, jobs simples, transferts et relevés courants. |
+| `full` | 68 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
+| `expert` | 71 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
-**Contexte cluster**
+Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
+Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
 
-| Outil | Rôle |
-|---|---|
-| `romeo_status` | Partitions, nœuds libres par architecture, file personnelle et fairshare, en un aller-retour SSH |
-| `romeo_software` | Catalogue Spack de l'architecture demandée (mis en cache) |
-| `romeo_modules` | Environment Modules, hérités de l'ancien calculateur |
-| `romeo_quota` | Quotas réels via `mmlsquota`, avec alerte sur les délais de grâce expirés |
-| `romeo_selfcheck` | **Confronte le modèle encodé au cluster réel** et rend les écarts (voir plus bas) |
+Les préparations enregistrent un plan local, valable 24 heures, puis l’action associée exige `plan_id` et `confirm=true`. Les autres actions ont leurs propres effets : consulter la fiche avant l’appel.
 
-**Jobs**
+### Profil et documentation
 
-| Outil | Rôle |
-|---|---|
-| `job_prepare` / `job_submit` | Prépare et conserve le script exact ; soumet ce plan avec son `plan_id` et `confirm=true` |
-| `job_array_prepare` / `job_array_submit` | Balayage paramétrique en tableau SLURM, une tâche par jeu de paramètres |
-| `job_pipeline_prepare` / `job_pipeline_submit` | **Enchaînement d'étapes dépendantes** : préparer, calculer, rassembler. Ordonné, validé en entier avant la première soumission, architecture héritée |
-| `job_status` | File d'attente, puis historique `sacct` ; démarrage estimé |
-| `job_log_tail` / `job_log_search` | Dernières lignes des logs / recherche bornée avec un `pattern` obligatoire |
-| `diagnose_job` | **Autopsie d'un échec en un appel** : état, journaux, causes reconnues, remèdes |
-| `job_resilient_prepare` / `job_resilient_submit` | Chaîne de segments reprenables, pour dépasser la limite d'une partition rapide |
-| `job_live_metrics` | **Télémétrie d'un job en cours** : occupation et VRAM des GPU, température, puissance |
-| `job_stack_trace` | Pile d'appels d'un job bloqué (interblocage MPI, noyau CUDA figé) |
-| `job_profile_prepare` / `job_profile_submit` / `profile_report` | Profilage Nsight Systems fenêtré, puis résumé des goulots |
-| `job_energy_footprint` | Énergie et empreinte carbone : **modèle**, voir plus bas |
-| `job_system_health` | Charge CPU face aux cœurs réservés, attente d'E/S, mémoire réelle |
-| `sbatch_validate` / `sbatch_check_paths` | Analyse locale du texte / vérification explicite des chemins par SSH |
-| `job_efficiency` | Efficacité CPU/mémoire/GPU et recommandations de redimensionnement |
-| `job_report_collect` / `job_report_export` | Collecte un relevé daté puis exporte exactement ce relevé |
-| `job_report_from_record` / `job_report_get` | Crée un relevé hors ligne / relit un relevé enregistré |
-| `plan_get` | Relit scripts, ressources, expiration et état de la tentative |
-| `cancel_job`, `list_jobs`, `wait_for_job` | Gestion courante ; l’attente est plafonnée à 600 s |
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`tool_profile_get`](tools/tool_profile_get.md) | Consulter le profil actif et les outils annoncés. | `essential`, `full`, `expert` |
+| [`tool_profile_set`](tools/tool_profile_set.md) | Changer le profil d’outils de la connexion. | `essential`, `full`, `expert` |
+| [`search_docs`](tools/search_docs.md) | Trouver les sections utiles dans la documentation ROMEO. | `essential`, `full`, `expert` |
+| [`read_doc`](tools/read_doc.md) | Lire une page ou une plage de lignes du corpus local. | `essential`, `full`, `expert` |
 
-**Construction et interactif**
+### Cluster et ordonnancement
 
-| Outil | Rôle |
-|---|---|
-| `service_prepare` / `service_start` | Prépare puis soumet le service ; rend immédiatement un identifiant |
-| `service_status` / `service_connection_info` | Consulte l'état puis fournit l'accès quand le service répond |
-| `service_stop` | Demande explicitement l'arrêt du service |
-| `cluster_allocation_prepare` / `cluster_allocation_start` | Prépare puis réserve un nœud, sans attendre son affectation |
-| `cluster_allocation_connection_info` | Fournit la commande de shell pour une allocation en cours |
-| `cluster_gpu_health_run` | Réserve des ressources GPU via `srun` et sonde bridage, ECC et fréquence ; mode NCCL désactivé |
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`romeo_status`](tools/romeo_status.md) | Consulter l’état du cluster et votre file de jobs. | `essential`, `full`, `expert` |
+| [`romeo_software`](tools/romeo_software.md) | Rechercher un logiciel dans le catalogue Spack. | `essential`, `full`, `expert` |
+| [`romeo_modules`](tools/romeo_modules.md) | Lister les anciens Environment Modules. | `full`, `expert` |
+| [`romeo_quota`](tools/romeo_quota.md) | Lire les quotas réels de stockage. | `essential`, `full`, `expert` |
+| [`romeo_selfcheck`](tools/romeo_selfcheck.md) | Comparer le modèle du MCP au cluster actuel. | `full`, `expert` |
+| [`cluster_gpu_health_run`](tools/cluster_gpu_health_run.md) | Réserver une courte allocation pour sonder les GPU. | `full`, `expert` |
+| [`romeo_fairshare_forecast`](tools/romeo_fairshare_forecast.md) | Estimer l’impact d’une charge sur le fairshare. | `full`, `expert` |
+| [`suggest_submission_slot`](tools/suggest_submission_slot.md) | Comparer les partitions pour un calcul envisagé. | `full`, `expert` |
 
-**Stockage**
+### Préparation et gestion des jobs
 
-| Outil | Rôle |
-|---|---|
-| `storage_usage_audit` | Repère ce qui occupe l'espace ; propose les commandes, n'efface rien |
-| `dataset_prepare` / `dataset_download` | Prépare puis télécharge depuis un nœud de calcul ; Hugging Face exige un venv `env_path` déjà préparé |
-| `audit_orphan_files` | Fichiers volumineux abandonnés, répertoires de jobs morts |
-| `secret_env_prepare` | Crée le dossier et le fichier distants, impose les droits 700/600, sans lire les secrets |
-| `inject_io_staging` | Greffe la mise en cache en mémoire vive dans un script sbatch existant |
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`plan_get`](tools/plan_get.md) | Relire un plan conservé localement. | `essential`, `full`, `expert` |
+| [`job_prepare`](tools/job_prepare.md) | Préparer le script exact d’un job Slurm. | `essential`, `full`, `expert` |
+| [`job_submit`](tools/job_submit.md) | Soumettre un job Slurm à partir du plan relu. | `essential`, `full`, `expert` |
+| [`job_array_prepare`](tools/job_array_prepare.md) | Préparer un tableau de calculs paramétrés. | `full`, `expert` |
+| [`job_array_submit`](tools/job_array_submit.md) | Soumettre un tableau Slurm à partir du plan relu. | `full`, `expert` |
+| [`job_pipeline_prepare`](tools/job_pipeline_prepare.md) | Préparer un enchaînement de jobs dépendants. | `full`, `expert` |
+| [`job_pipeline_submit`](tools/job_pipeline_submit.md) | Soumettre les étapes d’un pipeline à partir du plan relu. | `full`, `expert` |
+| [`job_resilient_prepare`](tools/job_resilient_prepare.md) | Préparer une chaîne de segments reprenables. | `full`, `expert` |
+| [`job_resilient_submit`](tools/job_resilient_submit.md) | Soumettre une chaîne de segments reprenables à partir du plan relu. | `full`, `expert` |
+| [`job_status`](tools/job_status.md) | Lire l’état d’un job Slurm. | `essential`, `full`, `expert` |
+| [`list_jobs`](tools/list_jobs.md) | Retrouver votre file et les jobs enregistrés. | `essential`, `full`, `expert` |
+| [`cancel_job`](tools/cancel_job.md) | Demander l’annulation d’un job. | `essential`, `full`, `expert` |
+| [`wait_for_job`](tools/wait_for_job.md) | Attendre brièvement la fin d’un job. | `full`, `expert` |
 
-**Environnements et ordonnancement**
+### Journaux, mesures et profilage
 
-| Outil | Rôle |
-|---|---|
-| `python_env_prepare` / `python_env_create` | Prépare puis crée un venv neuf, sans installer de paquet applicatif |
-| `python_wheel_prepare` / `python_wheel_build` | Prépare puis compile une roue binaire aarch64 dans un dépôt local |
-| `python_packages_prepare` / `python_packages_install` | Prépare puis installe dans un venv en réutilisant ces roues, sur la bonne architecture |
-| `romeo_fairshare_forecast` | Effet d'une charge envisagée sur la part d'usage du compte |
-| `suggest_submission_slot` | Quelle partition démarrerait le plus vite pour la taille visée |
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`job_log_tail`](tools/job_log_tail.md) | Lire la fin des journaux d’un job. | `essential`, `full`, `expert` |
+| [`job_log_search`](tools/job_log_search.md) | Rechercher un motif dans les journaux d’un job. | `essential`, `full`, `expert` |
+| [`diagnose_job`](tools/diagnose_job.md) | Rassembler un diagnostic de job en échec. | `essential`, `full`, `expert` |
+| [`job_efficiency`](tools/job_efficiency.md) | Comparer les ressources réservées et utilisées. | `essential`, `full`, `expert` |
+| [`job_live_metrics`](tools/job_live_metrics.md) | Sonder les GPU et les processus d’un job actif. | `full`, `expert` |
+| [`job_stack_trace`](tools/job_stack_trace.md) | Prélever des traces de pile d’un job bloqué. | `full`, `expert` |
+| [`job_system_health`](tools/job_system_health.md) | Examiner la charge CPU, la mémoire et les attentes d’E/S. | `full`, `expert` |
+| [`job_profile_prepare`](tools/job_profile_prepare.md) | Préparer une capture Nsight Systems bornée. | `full`, `expert` |
+| [`job_profile_submit`](tools/job_profile_submit.md) | Soumettre un job de profilage GPU à partir du plan relu. | `full`, `expert` |
+| [`profile_report`](tools/profile_report.md) | Résumer le rapport d’un job de profilage. | `full`, `expert` |
+| [`job_energy_footprint`](tools/job_energy_footprint.md) | Estimer l’énergie et l’empreinte carbone d’un job. | `full`, `expert` |
 
-**Fichiers** : `list_dir`, `read_remote_file`, `file_create`, `file_replace`,
-`upload_to_romeo`, `download_from_romeo`.
+### Services et allocations
 
-**Documentation hors ligne** : `search_docs` (classement lexical par sections,
-sources et lignes), `read_doc` (page ou plage de lignes, pagination sans perte).
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`service_prepare`](tools/service_prepare.md) | Préparer un service dans un environnement existant. | `full`, `expert` |
+| [`service_start`](tools/service_start.md) | Soumettre un service interactif à partir du plan relu. | `full`, `expert` |
+| [`service_status`](tools/service_status.md) | Consulter l’état d’un service. | `full`, `expert` |
+| [`service_connection_info`](tools/service_connection_info.md) | Obtenir l’URL et la commande SSH d’un service prêt. | `full`, `expert` |
+| [`service_stop`](tools/service_stop.md) | Demander l’arrêt d’un service. | `full`, `expert` |
+| [`cluster_allocation_prepare`](tools/cluster_allocation_prepare.md) | Préparer une allocation pour la mise au point. | `full`, `expert` |
+| [`cluster_allocation_start`](tools/cluster_allocation_start.md) | Soumettre une allocation de mise au point à partir du plan relu. | `full`, `expert` |
+| [`cluster_allocation_connection_info`](tools/cluster_allocation_connection_info.md) | Obtenir une commande de shell pour une allocation active. | `full`, `expert` |
 
-**Catalogue expert** : `compute_command_prepare` puis `compute_command_run` exécutent des commandes arbitraires via un job. `login_command_run` est une échappatoire, encadrée, avec un `allow_heavy` explicite
-pour les cas que la documentation ROMEO autorise (par exemple un `pip install`
-en environnement virtuel à destination du x86_64).
+### Environnements et paquets Python
+
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`python_env_prepare`](tools/python_env_prepare.md) | Préparer la création d’un environnement Python neuf. | `full`, `expert` |
+| [`python_env_create`](tools/python_env_create.md) | Soumettre la création d’un venv à partir du plan relu. | `full`, `expert` |
+| [`python_packages_prepare`](tools/python_packages_prepare.md) | Préparer l’installation de paquets dans un venv. | `full`, `expert` |
+| [`python_packages_install`](tools/python_packages_install.md) | Soumettre l’installation de paquets à partir du plan relu. | `full`, `expert` |
+| [`python_wheel_prepare`](tools/python_wheel_prepare.md) | Préparer la construction d’une roue Python. | `full`, `expert` |
+| [`python_wheel_build`](tools/python_wheel_build.md) | Soumettre la construction d’une roue Python à partir du plan relu. | `full`, `expert` |
+
+### Fichiers, stockage et données
+
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`list_dir`](tools/list_dir.md) | Lister un répertoire distant. | `essential`, `full`, `expert` |
+| [`read_remote_file`](tools/read_remote_file.md) | Lire une tranche de texte sur ROMEO. | `full`, `expert` |
+| [`file_create`](tools/file_create.md) | Créer un fichier texte sans écraser une cible. | `full`, `expert` |
+| [`file_replace`](tools/file_replace.md) | Remplacer explicitement un fichier texte existant. | `full`, `expert` |
+| [`upload_to_romeo`](tools/upload_to_romeo.md) | Envoyer un fichier ou un dossier vers ROMEO. | `essential`, `full`, `expert` |
+| [`download_from_romeo`](tools/download_from_romeo.md) | Rapatrier un fichier ou un dossier depuis ROMEO. | `essential`, `full`, `expert` |
+| [`storage_usage_audit`](tools/storage_usage_audit.md) | Repérer les principaux consommateurs de stockage. | `full`, `expert` |
+| [`audit_orphan_files`](tools/audit_orphan_files.md) | Repérer des fichiers anciens sans job actif associé. | `full`, `expert` |
+| [`secret_env_prepare`](tools/secret_env_prepare.md) | Préparer un fichier privé pour les secrets d’un job. | `full`, `expert` |
+| [`dataset_prepare`](tools/dataset_prepare.md) | Préparer un téléchargement depuis un nœud de calcul. | `full`, `expert` |
+| [`dataset_download`](tools/dataset_download.md) | Soumettre un téléchargement de données à partir du plan relu. | `full`, `expert` |
+
+### Scripts Slurm
+
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`sbatch_validate`](tools/sbatch_validate.md) | Analyser le texte d’un script Slurm sans connexion. | `full`, `expert` |
+| [`sbatch_check_paths`](tools/sbatch_check_paths.md) | Vérifier les chemins littéraux d’un script sur ROMEO. | `full`, `expert` |
+| [`inject_io_staging`](tools/inject_io_staging.md) | Ajouter du staging en RAM à un script existant. | `full`, `expert` |
+
+### Reproductibilité
+
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`job_report_collect`](tools/job_report_collect.md) | Conserver un relevé daté de reproductibilité. | `essential`, `full`, `expert` |
+| [`job_report_from_record`](tools/job_report_from_record.md) | Créer un relevé à partir du registre local. | `full`, `expert` |
+| [`job_report_get`](tools/job_report_get.md) | Relire un relevé de reproductibilité enregistré. | `full`, `expert` |
+| [`job_report_export`](tools/job_report_export.md) | Exporter un relevé en JSON et Markdown. | `essential`, `full`, `expert` |
+
+### Commandes du profil expert
+
+| Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
+|---|---|---|
+| [`compute_command_prepare`](tools/compute_command_prepare.md) | Préparer des commandes arbitraires sur un nœud de calcul. | `expert` |
+| [`compute_command_run`](tools/compute_command_run.md) | Soumettre des commandes shell arbitraires à partir du plan relu. | `expert` |
+| [`login_command_run`](tools/login_command_run.md) | Exécuter une commande courte sur le login. | `expert` |
 
 ## Jobs et journaux
 
