@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/utilise
 scraped_at: "2026-09-26 02:37:06"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser Python
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Utiliser Python · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Utiliser Python
 
@@ -121,3 +121,7 @@ source mes_environnements_python/mon_env_python/bin/activate
 ---
 
 ← [Installer un logiciel](installer_un_logiciel.md) | → [Utiliser OpenMPI](utiliser_openmpi.md)
+
+## Dans cette section
+
+[↑ Haut de page](#utiliser-python) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

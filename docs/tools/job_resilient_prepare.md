@@ -8,11 +8,13 @@ _Préparer une chaîne de segments reprenables._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Découpe un calcul long en segments reliés par des dépendances. Un signal SIGUSR1 est envoyé avant la fin d’un segment pour permettre une sauvegarde ; le suivant reprend depuis le checkpoint.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -32,7 +34,7 @@ Découpe un calcul long en segments reliés par des dépendances. Un signal SIGU
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_resilient_prepare` depuis votre client MCP :
 
@@ -50,18 +52,22 @@ Arguments JSON à transmettre à `job_resilient_prepare` depuis votre client MCP
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le nombre de segments, leur durée, le dossier de reprise, le script, les avertissements et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Votre programme doit savoir sauvegarder et reprendre ses checkpoints. Un segment dure au moins 10 minutes ; le préavis doit être plus court que le segment. La chaîne est limitée à 20 segments.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`plan_get`](plan_get.md) · [`job_resilient_submit`](job_resilient_submit.md) · [`diagnose_job`](diagnose_job.md)
 
 [Code de l’outil](../../romeo_mcp/outils_calcul.py#L701) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_resilient_prepare) · [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

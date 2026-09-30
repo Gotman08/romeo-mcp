@@ -5,6 +5,8 @@
 Le corpus contient une [présentation de Juliet](../juliet.md) et une page
 de renvoi vers sa documentation MesoNET.
 
+**Sur cette page :** [Pages disponibles](#pages-disponibles) · [Continuer](#continuer)
+
 ## Pages disponibles
 
 | Page | Contenu de la copie |
@@ -23,3 +25,7 @@ Pour les outils Slurm documentés par ce MCP, suivre le
 [sommaire complet](../../SOMMAIRE.md) permet de revenir aux autres ressources.
 
 *Guide de navigation du projet MCP ; les pages liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#cluster-juliet) · [Corpus ROMEO](../../README.md) · [Sommaire officiel](../../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

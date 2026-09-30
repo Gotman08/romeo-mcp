@@ -5,9 +5,68 @@
 Catalogue des **71 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
 Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son résultat, ses effets et ses limites.
 
-[Catalogue](#outils-exposés) · [Jobs et journaux](#jobs-et-journaux) · [Calcul parallèle](#calcul-parallèle) ·
-[Diagnostic](#diagnostic-des-échecs) · [Documentation locale](#documentation-hors-ligne) ·
-[Conception du serveur](#partis-pris-de-conception)
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Trouver le bon outil](#trouver-le-bon-outil)
+- [Outils exposés](#outils-exposés)
+  - [Profil et documentation](#profil-et-documentation)
+  - [Cluster et ordonnancement](#cluster-et-ordonnancement)
+  - [Préparation et gestion des jobs](#préparation-et-gestion-des-jobs)
+  - [Journaux, mesures et profilage](#journaux-mesures-et-profilage)
+  - [Services et allocations](#services-et-allocations)
+  - [Environnements et paquets Python](#environnements-et-paquets-python)
+  - [Fichiers, stockage et données](#fichiers-stockage-et-données)
+  - [Scripts Slurm](#scripts-slurm)
+  - [Reproductibilité](#reproductibilité)
+  - [Commandes du profil expert](#commandes-du-profil-expert)
+- [Jobs et journaux](#jobs-et-journaux)
+  - [Préparer puis soumettre le plan exact](#préparer-puis-soumettre-le-plan-exact)
+  - [Migration des anciens noms](#migration-des-anciens-noms)
+  - [Cycles de vie et migration des outils composites](#cycles-de-vie-et-migration-des-outils-composites)
+  - [Services interactifs](#services-interactifs)
+  - [Fichiers et validation](#fichiers-et-validation)
+  - [Plusieurs tableaux dans le même dossier](#plusieurs-tableaux-dans-le-même-dossier)
+  - [Lire les journaux](#lire-les-journaux)
+- [Calcul parallèle](#calcul-parallèle)
+  - [Options réservées à PyTorch](#options-réservées-à-pytorch)
+  - [Caches Python (redirect_caches, désactivé par défaut)](#caches-python-redirect_caches-désactivé-par-défaut)
+- [Diagnostic des échecs](#diagnostic-des-échecs)
+- [Télémétrie en direct](#télémétrie-en-direct)
+- [Calculs longs sur partition courte](#calculs-longs-sur-partition-courte)
+- [Entrées-sorties en mémoire vive](#entrées-sorties-en-mémoire-vive)
+- [Roues aarch64 précompilées](#roues-aarch64-précompilées)
+- [Profilage et santé du parc](#profilage-et-santé-du-parc)
+- [Énergie : un modèle, pas une mesure](#énergie--un-modèle-pas-une-mesure)
+- [Hygiène des jobs](#hygiène-des-jobs)
+- [Diagnostic système](#diagnostic-système)
+- [Transferts vérifiés](#transferts-vérifiés)
+- [Ressources](#ressources)
+- [Prompts](#prompts)
+- [Documentation hors ligne](#documentation-hors-ligne)
+  - [Recherche et contexte pour le modèle](#recherche-et-contexte-pour-le-modèle)
+  - [Collecte et vérification](#collecte-et-vérification)
+- [Le modèle encodé a une date de péremption](#le-modèle-encodé-a-une-date-de-péremption)
+- [Les racines sont découvertes, pas supposées](#les-racines-sont-découvertes-pas-supposées)
+- [Partis pris de conception](#partis-pris-de-conception)
+  - [Organisation des responsabilités](#organisation-des-responsabilités)
+
+</details>
+
+## Trouver le bon outil
+
+| Besoin | Catégorie | Guide |
+|---|---|---|
+| Profil et documentation | [4 fiches](#profil-et-documentation) | [Configuration des profils](configuration.md#profils-doutils) |
+| Cluster et ordonnancement | [8 fiches](#cluster-et-ordonnancement) | [État et limites du cluster](#le-modèle-encodé-a-une-date-de-péremption) |
+| Préparation et gestion des jobs | [13 fiches](#préparation-et-gestion-des-jobs) | [Préparer puis soumettre](#préparer-puis-soumettre-le-plan-exact) |
+| Journaux, mesures et profilage | [11 fiches](#journaux-mesures-et-profilage) | [Lire les journaux](#lire-les-journaux) |
+| Services et allocations | [8 fiches](#services-et-allocations) | [Services interactifs](#services-interactifs) |
+| Environnements et paquets Python | [6 fiches](#environnements-et-paquets-python) | [Calcul parallèle](#calcul-parallèle) |
+| Fichiers, stockage et données | [11 fiches](#fichiers-stockage-et-données) | [Transferts vérifiés](#transferts-vérifiés) |
+| Scripts Slurm | [3 fiches](#scripts-slurm) | [Jobs et journaux](#jobs-et-journaux) |
+| Reproductibilité | [4 fiches](#reproductibilité) | [Fiches et limites](reproducibility.md) |
+| Commandes du profil expert | [3 fiches](#commandes-du-profil-expert) | [Profils et autorisations](configuration.md#profils-doutils) |
 
 Les exemples JSON sont des arguments à transmettre au client MCP, après adaptation des chemins et identifiants. Les commandes shell de ce guide s’exécutent depuis la racine du dépôt.
 
@@ -149,7 +208,7 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 
 ### Préparer puis soumettre le plan exact
 
-`job_prepare` rend le script, les ressources, les avertissements, un `plan_id`,
+[`job_prepare`](tools/job_prepare.md) rend le script, les ressources, les avertissements, un `plan_id`,
 son empreinte `plan_sha256` et sa date d’expiration `expires_at` (timestamp Unix).
 Le plan est conservé dans le registre local privé `jobs.db` pendant au moins
 24 heures ; il est soumettable seulement durant ces 24 heures. Aucun fichier
@@ -163,13 +222,13 @@ Un aperçu dont les chemins sont illustratifs rend `submittable=false` et
 `plan_id=null` ; reconnectez-vous ou configurez les racines, puis préparez à nouveau.
 
 Le même contrat s’applique aux tableaux et pipelines. Les paramètres et leur
-chemin sont figés dès `job_array_prepare`. `job_pipeline_prepare` valide tous
+chemin sont figés dès [`job_array_prepare`](tools/job_array_prepare.md). [`job_pipeline_prepare`](tools/job_pipeline_prepare.md) valide tous
 les scripts et les dépendances avant la première soumission. Seuls les identifiants
 Slurm nécessaires aux clauses `--dependency` sont obtenus à l’exécution.
 
 Un appel répété après succès rend les mêmes identifiants avec
 `already_submitted=true`. Une tentative en cours, interrompue ou partiellement
-échouée ne peut pas être rejouée automatiquement : consulter `list_jobs` avant
+échouée ne peut pas être rejouée automatiquement : consulter [`list_jobs`](tools/list_jobs.md) avant
 de préparer un autre plan. Les étapes déjà soumises d’un pipeline restent actives
 et figurent dans `submitted_stages`. Ces protections persistent après redémarrage.
 
@@ -182,15 +241,15 @@ et adapter les listes d’outils autorisés dans le client.
 |---|---|
 | `tool_profile()` / `tool_profile(profile=...)` | `tool_profile_get()` / `tool_profile_set(profile=...)` |
 | `job_output(..., lines=...)` / `job_output(..., grep=...)` | `job_log_tail(..., lines=...)` / `job_log_search(..., pattern=...)` |
-| `submit_job` | `job_prepare` puis `job_submit` avec `plan_id` |
-| `submit_array_job` | `job_array_prepare` puis `job_array_submit` avec `plan_id` |
-| `submit_pipeline` | `job_pipeline_prepare` puis `job_pipeline_submit` avec `plan_id` |
-| `secret_env_setup` | `secret_env_prepare` (écrit sur ROMEO) |
-| `run_cluster_sanity_check` | `cluster_gpu_health_run` (réserve des GPU) |
-| `storage_cleanup_helper` | `storage_usage_audit` (lecture seule) |
+| `submit_job` | [`job_prepare`](tools/job_prepare.md) puis [`job_submit`](tools/job_submit.md) avec `plan_id` |
+| `submit_array_job` | [`job_array_prepare`](tools/job_array_prepare.md) puis [`job_array_submit`](tools/job_array_submit.md) avec `plan_id` |
+| `submit_pipeline` | [`job_pipeline_prepare`](tools/job_pipeline_prepare.md) puis [`job_pipeline_submit`](tools/job_pipeline_submit.md) avec `plan_id` |
+| `secret_env_setup` | [`secret_env_prepare`](tools/secret_env_prepare.md) (écrit sur ROMEO) |
+| `run_cluster_sanity_check` | [`cluster_gpu_health_run`](tools/cluster_gpu_health_run.md) (réserve des GPU) |
+| `storage_cleanup_helper` | [`storage_usage_audit`](tools/storage_usage_audit.md) (lecture seule) |
 
 Pour Hugging Face, créer un venv sur l’architecture de téléchargement, installer
-`huggingface_hub` avec `python_packages_prepare` puis `python_packages_install`, attendre le succès du job, puis transmettre ce
+`huggingface_hub` avec [`python_packages_prepare`](tools/python_packages_prepare.md) puis [`python_packages_install`](tools/python_packages_install.md), attendre le succès du job, puis transmettre ce
 chemin à `dataset_prepare(..., kind="huggingface", env_path=...)` sur la même
 architecture, puis appeler `dataset_download(plan_id, confirm=true)`. Le job télécharge un dépôt de type `dataset` et échoue clairement
 si le paquet manque ; il ne lance jamais d’installation.
@@ -204,22 +263,22 @@ L'action exige seulement `plan_id` et `confirm=true`, sans régénérer le scrip
 
 | Ancien outil | Parcours explicite |
 |---|---|
-| `launch_interactive_service`, `spawn_remote_workspace` | `service_prepare` → `service_start` → `service_status` → `service_connection_info` ; arrêt par `service_stop` |
-| `submit_resilient_job` | `job_resilient_prepare` → `job_resilient_submit` |
-| `profile_job` | `job_profile_prepare` → `job_profile_submit` |
-| `stage_dataset` | `dataset_prepare` → `dataset_download` |
-| `build_wheel` | `python_wheel_prepare` → `python_wheel_build` |
-| `romeo_pip_install` | `python_packages_prepare` → `python_packages_install` |
-| `allocate_debug_node` | `cluster_allocation_prepare` → `cluster_allocation_start` |
-| `build_on_node` | Outils Python précis ; commandes arbitraires via `compute_command_prepare` → `compute_command_run` dans `expert` |
-| `run_login_command` | `login_command_run`, dans `expert` |
-| `write_remote_file` | `file_create` ou `file_replace` |
+| `launch_interactive_service`, `spawn_remote_workspace` | [`service_prepare`](tools/service_prepare.md) → [`service_start`](tools/service_start.md) → [`service_status`](tools/service_status.md) → [`service_connection_info`](tools/service_connection_info.md) ; arrêt par [`service_stop`](tools/service_stop.md) |
+| `submit_resilient_job` | [`job_resilient_prepare`](tools/job_resilient_prepare.md) → [`job_resilient_submit`](tools/job_resilient_submit.md) |
+| `profile_job` | [`job_profile_prepare`](tools/job_profile_prepare.md) → [`job_profile_submit`](tools/job_profile_submit.md) |
+| `stage_dataset` | [`dataset_prepare`](tools/dataset_prepare.md) → [`dataset_download`](tools/dataset_download.md) |
+| `build_wheel` | [`python_wheel_prepare`](tools/python_wheel_prepare.md) → [`python_wheel_build`](tools/python_wheel_build.md) |
+| `romeo_pip_install` | [`python_packages_prepare`](tools/python_packages_prepare.md) → [`python_packages_install`](tools/python_packages_install.md) |
+| `allocate_debug_node` | [`cluster_allocation_prepare`](tools/cluster_allocation_prepare.md) → [`cluster_allocation_start`](tools/cluster_allocation_start.md) |
+| `build_on_node` | Outils Python précis ; commandes arbitraires via [`compute_command_prepare`](tools/compute_command_prepare.md) → [`compute_command_run`](tools/compute_command_run.md) dans `expert` |
+| `run_login_command` | [`login_command_run`](tools/login_command_run.md), dans `expert` |
+| `write_remote_file` | [`file_create`](tools/file_create.md) ou [`file_replace`](tools/file_replace.md) |
 | `sbatch_lint` | `sbatch_validate(script)` ou `sbatch_check_paths(script)` |
 | `export_job_report` | `job_report_collect(job_id)` → `job_report_export(report_id)` |
 
 ### Services interactifs
 
-Exemple de configuration pour `service_prepare` :
+Exemple de configuration pour [`service_prepare`](tools/service_prepare.md) :
 
 ```json
 {"config": {"service": "jupyter", "env_path": "/scratch_p/VOTRE_IDENTIFIANT/venv", "port": 8888}, "arch": "armgpu", "gpus_per_node": 1, "time_limit": "2h"}
@@ -230,8 +289,8 @@ configuration est spécifique : TensorBoard exige `logdir`, vLLM exige `model`
 et un GPU, Jupyter et MLflow n'acceptent pas ces champs. Les champs sans objet
 sont refusés. La préparation ne crée aucun environnement et n'installe rien.
 
-`service_start` rend `service_id` et `job_id` après `sbatch`, sans attendre de nœud.
-`service_status` effectue une lecture Slurm et, si le job tourne, une sonde HTTP
+[`service_start`](tools/service_start.md) rend `service_id` et `job_id` après `sbatch`, sans attendre de nœud.
+[`service_status`](tools/service_status.md) effectue une lecture Slurm et, si le job tourne, une sonde HTTP
 bornée à trois secondes. États : `waiting`, `starting`, `ready`, `failed`,
 `stopped`, `unknown`. Une panne de transport ne prouve pas un échec du service.
 Le même `service_id` reste utilisable après redémarrage du MCP.
@@ -240,12 +299,12 @@ Le même `service_id` reste utilisable après redémarrage du MCP.
 et l'URL seulement quand le service répond. Il n'ouvre aucun tunnel. Jupyter
 et vLLM génèrent un jeton dans un fichier privé au démarrage ; TensorBoard et
 MLflow restent sans authentification et l'avertissement figure dans leur plan.
-`service_stop` demande l'annulation Slurm ; consulter ensuite l'état pour
+[`service_stop`](tools/service_stop.md) demande l'annulation Slurm ; consulter ensuite l'état pour
 confirmer l'arrêt. La fin normale du job ferme également le service.
 
 ### Fichiers et validation
 
-`file_create` refuse une cible existante. `file_replace` exige un fichier
+[`file_create`](tools/file_create.md) refuse une cible existante. [`file_replace`](tools/file_replace.md) exige un fichier
 régulier existant et refuse un lien symbolique. Son `expected_sha256` facultatif
 empêche d'écraser un contenu qui ne correspond plus à l'empreinte attendue.
 La réponse donne la nouvelle empreinte. Les deux outils publient atomiquement
@@ -253,16 +312,16 @@ le contenu, exigent un parent existant et acceptent jusqu'à 64 Kio de texte.
 Le verrou `.romeo-mcp-files.lock` coordonne ces outils entre processus ; une
 écriture concurrente par un autre programme doit respecter le même verrou.
 
-`sbatch_validate` ne reçoit que du texte et n'ouvre aucune connexion.
-`sbatch_check_paths` vérifie par SSH jusqu'à 20 chemins littéraux dans les
+[`sbatch_validate`](tools/sbatch_validate.md) ne reçoit que du texte et n'ouvre aucune connexion.
+[`sbatch_check_paths`](tools/sbatch_check_paths.md) vérifie par SSH jusqu'à 20 chemins littéraux dans les
 racines autorisées et indique ceux laissés de côté. C'est une analyse lexicale,
 sans expansion des variables, des motifs ou du shell. Un chemin de sortie
 absent n'est pas nécessairement une erreur de script. Pour analyser un fichier
-distant, le lire explicitement avec `read_remote_file` puis valider son texte.
+distant, le lire explicitement avec [`read_remote_file`](tools/read_remote_file.md) puis valider son texte.
 
 ### Plusieurs tableaux dans le même dossier
 
-`job_array_prepare` puis `job_array_submit` permettent de soumettre plusieurs tableaux avec le même nom
+[`job_array_prepare`](tools/job_array_prepare.md) puis [`job_array_submit`](tools/job_array_submit.md) permettent de soumettre plusieurs tableaux avec le même nom
 et le même `workdir`, même lorsque les précédents attendent encore dans Slurm.
 La préparation réserve les noms ; la soumission crée un fichier `parametres-UUID.txt` et un script `NOM-UUID.sbatch`
 dans ce dossier. Le script lit les paramètres par leur chemin absolu, et le
@@ -280,7 +339,7 @@ restent à choisir pour éviter les collisions entre vos expériences.
 
 ### Lire les journaux
 
-`job_log_tail` lit au plus 500 lignes par fichier. `job_log_search` exige un
+[`job_log_tail`](tools/job_log_tail.md) lit au plus 500 lignes par fichier. [`job_log_search`](tools/job_log_search.md) exige un
 motif `pattern` compatible `grep -E` ; un motif invalide produit une erreur.
 La recherche porte sur les derniers `max_bytes_per_file` octets de chaque
 fichier (1 Mio par défaut, 16 Mio au maximum) et rend au plus `max_matches`
@@ -293,13 +352,13 @@ plafond de fichiers atteint et `truncated` une sortie abrégée.
 
 `job_log_tail.has_stderr_content` indique si au moins un fichier stderr existe
 et contient des octets. Un fichier vide ou absent donne `false` ; des espaces
-ou sauts de ligne seuls donnent `true`. Ce booléen existe aussi dans `job_log_search` et est indépendant de `pattern`,
+ou sauts de ligne seuls donnent `true`. Ce booléen existe aussi dans [`job_log_search`](tools/job_log_search.md) et est indépendant de `pattern`,
 du nombre de lignes et du flux demandé, y compris `stream="out"`.
 
 L'affichage ajoute un en-tête seulement aux extraits qui contiennent du texte
 non blanc. En mode `auto`, stderr est choisi si un tel extrait subsiste après
 filtrage ; sinon stdout est affiché. La présence de stderr ne constitue pas
-un verdict d'échec du job : son état et son code de sortie sont dans `job_status`.
+un verdict d'échec du job : son état et son code de sortie sont dans [`job_status`](tools/job_status.md).
 
 ## Calcul parallèle
 
@@ -346,7 +405,7 @@ disponible via Spack.
 
 ## Diagnostic des échecs
 
-`diagnose_job` remplace la séquence habituelle `sacct` → lecture du `.err` →
+[`diagnose_job`](tools/diagnose_job.md) remplace la séquence habituelle `sacct` → lecture du `.err` →
 recherche du code d'erreur. Il combine état, journaux et mesures, puis reconnaît
 onze modes d'échec avec, pour chacun, l'extrait de journal qui l'atteste et des
 remèdes exprimés dans le vocabulaire des outils du serveur :
@@ -367,7 +426,7 @@ dans le répertoire du job.
 
 ## Télémétrie en direct
 
-`job_live_metrics` inspecte le matériel d'un job **en cours** sans lire un seul
+[`job_live_metrics`](tools/job_live_metrics.md) inspecte le matériel d'un job **en cours** sans lire un seul
 journal ni attendre la fin, grâce à `srun --overlap` qui superpose une étape à
 l'allocation existante : la mesure n'attend donc pas en file et ne consomme pas
 d'allocation propre.
@@ -377,7 +436,7 @@ job tourne signale un calcul qui attend ses données ; VRAM au-delà de 90 %
 annonce la saturation avant qu'elle ne provoque l'échec ; au-delà de 85 °C, le
 ralentissement thermique devient plausible.
 
-`job_stack_trace` prélève la pile des processus via `pstack`, avec repli sur
+[`job_stack_trace`](tools/job_stack_trace.md) prélève la pile des processus via `pstack`, avec repli sur
 `gdb` puis `eu-stack`, tous trois présents sur les nœuds. Il ne s'attache pas
 de façon interactive : il capture et rend la main, sans interrompre le calcul.
 La pile est ensuite interprétée : arrêt dans MPI, collective NCCL bloquée,
@@ -385,7 +444,7 @@ attente sur verrou, ou attente d'entrée-sortie.
 
 ## Calculs longs sur partition courte
 
-`job_resilient_prepare` découpe un calcul en segments enchaînés par
+[`job_resilient_prepare`](tools/job_resilient_prepare.md) découpe un calcul en segments enchaînés par
 `--dependency=afterany`, ce qui permet d'occuper une partition rapide bien
 au-delà de sa limite de temps :
 
@@ -412,21 +471,21 @@ taille décompressée.
 ## Roues aarch64 précompilées
 
 Compiler `deepspeed`, `flash-attn` ou `bitsandbytes` prend de longues minutes,
-et recommencer à chaque environnement est du gâchis. `python_wheel_prepare` puis `python_wheel_build` compilent une
+et recommencer à chaque environnement est du gâchis. [`python_wheel_prepare`](tools/python_wheel_prepare.md) puis [`python_wheel_build`](tools/python_wheel_build.md) compilent une
 fois sur un nœud de la bonne architecture et dépose la roue dans
-`/scratch_p/$USER/.wheels/aarch64/` ; `python_packages_prepare` puis `python_packages_install` l'y retrouvent via
+`/scratch_p/$USER/.wheels/aarch64/` ; [`python_packages_prepare`](tools/python_packages_prepare.md) puis [`python_packages_install`](tools/python_packages_install.md) l'y retrouvent via
 `--find-links`, toujours depuis un nœud de calcul.
 
 ## Profilage et santé du parc
 
-`job_profile_prepare` prépare le script ; `job_profile_submit` lance le job. Le script encapsule le calcul dans **Nsight Systems**, disponible via Spack
+[`job_profile_prepare`](tools/job_profile_prepare.md) prépare le script ; [`job_profile_submit`](tools/job_profile_submit.md) lance le job. Le script encapsule le calcul dans **Nsight Systems**, disponible via Spack
 (`nvidia-nsight-systems@2024.6.1`). La capture est **fenêtrée** (un délai de
 mise en régime puis quelques dizaines de secondes), sans quoi la trace atteint
-plusieurs gigaoctets. `profile_report` condense ensuite la sortie `nsys stats`
+plusieurs gigaoctets. [`profile_report`](tools/profile_report.md) condense ensuite la sortie `nsys stats`
 en quelques constats : part des transferts mémoire face au calcul, noyau
 dominant, présence de GEMM suggérant d'activer bf16.
 
-`cluster_gpu_health_run` repère les **nœuds dégradés**, qui ne plantent pas
+[`cluster_gpu_health_run`](tools/cluster_gpu_health_run.md) repère les **nœuds dégradés**, qui ne plantent pas
 mais divisent le débit d'un job réparti sans erreur visible : raisons de bridage
 décodées depuis le champ de bits de `nvidia-smi`, erreurs mémoire non corrigées,
 fréquence anormalement basse sous charge. Il rend une clause `--exclude=` prête
@@ -440,7 +499,7 @@ benchmark NCCL n’est implémenté. `check_type="gpu"` est le seul mode disponi
 
 ROMEO n'active **aucun greffon de comptabilité énergétique SLURM** :
 `AcctGatherEnergyType = (null)`, et `ConsumedEnergyRaw` vaut zéro sur tous les
-jobs. `job_energy_footprint` ne peut donc rien mesurer : il modélise, et le dit.
+jobs. [`job_energy_footprint`](tools/job_energy_footprint.md) ne peut donc rien mesurer : il modélise, et le dit.
 
 - Sur un job **en cours**, la puissance GPU réelle est relevée par la sonde
   superposée : l'incertitude se réduit fortement.
@@ -473,13 +532,13 @@ piège unique déroule : le répertoire temporaire et la mise en cache mémoire
 cohabitent sans se neutraliser.
 
 **Secrets** (`secret_env_file`). Les valeurs ne transitent **jamais** par le
-serveur : `secret_env_prepare` crée un fichier en droits 600 que tu remplis
+serveur : [`secret_env_prepare`](tools/secret_env_prepare.md) crée un fichier en droits 600 que tu remplis
 toi-même sur le cluster, et le script le source au démarrage. Ni le `.sbatch`,
 ni le registre SQLite, ni la conversation ne contiennent la valeur.
 
 ## Diagnostic système
 
-`diagnose_job` décode le couple `(State, ExitCode)` en plus des journaux. SLURM
+[`diagnose_job`](tools/diagnose_job.md) décode le couple `(State, ExitCode)` en plus des journaux. SLURM
 note le code sous la forme `code:signal`, si bien qu'un même signal apparaît
 sous deux formes selon qui le rapporte ; les deux sont traitées :
 
@@ -494,14 +553,14 @@ sous deux formes selon qui le rapporte ; les deux sont traitées :
 Un binaire tué par SIGKILL n'a pas toujours le temps d'écrire quoi que ce soit :
 le code de sortie explique alors l'échec à lui seul.
 
-`sbatch_validate` vérifie un script **avant** l'envoi : fins de ligne Windows qui
+[`sbatch_validate`](tools/sbatch_validate.md) vérifie un script **avant** l'envoi : fins de ligne Windows qui
 font échouer le shebang de façon opaque, `#SBATCH` placés après la première
 commande et donc ignorés, `--mem` manquant, chemins inexistants (vérifiés
 réellement sur le cluster), variables non définies, secrets en clair.
 
 ## Transferts vérifiés
 
-`upload_to_romeo` et `download_from_romeo` calculent une empreinte SHA-256 des
+[`upload_to_romeo`](tools/upload_to_romeo.md) et [`download_from_romeo`](tools/download_from_romeo.md) calculent une empreinte SHA-256 des
 deux côtés et comparent. Un transfert tronqué produit sinon un binaire qui
 échoue plus tard de façon opaque.
 
@@ -615,7 +674,7 @@ Un relevé est vrai le jour où on le fait, et rien ne signalait qu'il avait ces
 de l'être. C'est la faiblesse structurelle d'un serveur « correct par
 construction » : **sa correction se périme en silence**.
 
-`romeo_selfcheck` interroge SLURM et compare, sur une vingtaine de points :
+[`romeo_selfcheck`](tools/romeo_selfcheck.md) interroge SLURM et compare, sur une vingtaine de points :
 partitions et limites de temps, nombre de nœuds par partition et par
 architecture, cœurs / mémoire / GPU d'un nœud, identifiant GRES, compte, QOS,
 plafonds de l'association, et présence des outils déclarés absents.
@@ -647,9 +706,9 @@ reste **portée par utilisateur** : `/gpfs/scratch/<moi>` est accepté,
 
 ## Partis pris de conception
 
-**La préparation et la soumission sont distinctes.** `job_prepare` rend et
+**La préparation et la soumission sont distinctes.** [`job_prepare`](tools/job_prepare.md) rend et
 conserve le script sbatch exact, les ressources et les avertissements, sans
-soumettre. `job_submit` exige l’identifiant de ce plan et `confirm=true`.
+soumettre. [`job_submit`](tools/job_submit.md) exige l’identifiant de ce plan et `confirm=true`.
 Le client peut ainsi distinguer les écritures locales de la soumission sur ROMEO.
 
 **Une session SSH persistante.** Le multiplexage `ControlMaster` d'OpenSSH est
@@ -673,7 +732,7 @@ serveur produit `--account`, `--partition`, `--constraint`, `--gpus-per-node`,
 
 **La simulation doit tenir sans le cluster.** Vérifier un dimensionnement est
 le mode le plus utile du serveur, et c'était paradoxalement le plus contraint :
-`job_prepare` ouvrait une session SSH pour la seule raison de connaître le
+[`job_prepare`](tools/job_prepare.md) ouvrait une session SSH pour la seule raison de connaître le
 scratch. Une simulation doit pouvoir tourner depuis un portable, et la suite de
 tests doit pouvoir l'exercer sans cluster. `ROMEO_SCRATCH` fige les racines ;
 à défaut, une simulation hors ligne rend le script en annonçant que ses chemins
@@ -708,3 +767,7 @@ déversés.
 
 Les opérations existantes de diagnostic et les transferts avec vérification
 d'intégrité conservent leur intention unique.
+
+---
+
+[↑ Haut de page](#tools) · [Accueil](../README.md) · [Documentation](README.md)

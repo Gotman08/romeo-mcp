@@ -8,11 +8,13 @@ _Lire la fin des journaux d’un job._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Restitue des extraits bornés de stdout et stderr. Le mode auto privilégie stderr lorsqu’un extrait non blanc est disponible, puis se replie sur stdout.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -24,7 +26,7 @@ Restitue des extraits bornés de stdout et stderr. Le mode auto privilégie stde
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_log_tail` depuis votre client MCP :
 
@@ -38,18 +40,22 @@ Arguments JSON à transmettre à `job_log_tail` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les extraits affichés, les limites appliquées, truncated, files_limited et has_stderr_content.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 lines vaut de 1 à 500, max_files de 1 à 40 par flux et max_chars de 1 à 40000. La présence de contenu stderr n’est pas un verdict d’échec.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`job_log_search`](job_log_search.md) · [`job_status`](job_status.md) · [`diagnose_job`](diagnose_job.md)
 
 [Code de l’outil](../../romeo_mcp/outils_calcul.py#L264) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_log_tail) · [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

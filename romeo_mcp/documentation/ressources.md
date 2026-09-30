@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources"
 scraped_at: "2026-09-26 02:35:58"
 ---
 
-[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Ressources de calcul
+[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Ressources de calcul · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Ressources de calcul
 
@@ -20,3 +20,5 @@ scraped_at: "2026-09-26 02:35:58"
 ---
 
 ← [Accèder au portail ROMEO](creation_compte.md) | → [Description  matérielle des ressources ROMEO](ressources/description_matérielle_des_ressources.md)
+
+[↑ Haut de page](#ressources-de-calcul) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)

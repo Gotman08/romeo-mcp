@@ -6,6 +6,15 @@ Cette section rassemble les pages officielles consacrées aux équipements et
 à leurs accès. Pour utiliser les outils Slurm de ce MCP, commencer par le
 parcours **ROMEO 2025**, puis consulter les procédures nécessaires au calcul.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Se repérer](#se-repérer)
+- [Garder le contexte de la ressource](#garder-le-contexte-de-la-ressource)
+- [Poursuivre](#poursuivre)
+
+</details>
+
 ## Se repérer
 
 | Sujet | Lecture |
@@ -21,8 +30,8 @@ parcours **ROMEO 2025**, puis consulter les procédures nécessaires au calcul.
 
 Les sous-sections correspondent à des équipements différents. Conserver le
 nom de la ressource et la date de la page lors de la préparation d’une commande.
-Pour ROMEO 2025, les outils `romeo_status`, `romeo_software`, `romeo_quota` et
-`romeo_selfcheck` complètent les pages datées avec des observations distantes.
+Pour ROMEO 2025, les outils [`romeo_status`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/romeo_status.md), [`romeo_software`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/romeo_software.md), [`romeo_quota`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/romeo_quota.md) et
+[`romeo_selfcheck`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/romeo_selfcheck.md) complètent les pages datées avec des observations distantes.
 
 ## Poursuivre
 
@@ -31,3 +40,7 @@ Pour ROMEO 2025, les outils `romeo_status`, `romeo_software`, `romeo_quota` et
 [Sommaire complet](../SOMMAIRE.md)
 
 *Guide de navigation du projet MCP. Les pages liées conservent leur attribution ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#ressources-de-calcul) · [Corpus ROMEO](../README.md) · [Sommaire officiel](../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

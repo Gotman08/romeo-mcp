@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/services/Oratio/api_oratio"
 scraped_at: "2026-09-26 02:37:10"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › API Oratio
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › API Oratio · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # API Oratio
 
@@ -1205,3 +1205,7 @@ Pour toute question ou problème technique :
 ---
 
 ← [Interface Web Oratio](gui_oratio.md) | → [Modèles disponibles](models.md)
+
+## Dans cette section
+
+[↑ Haut de page](#api-oratio) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

@@ -5,6 +5,16 @@
 [ci.yml](ci.yml) définit le workflow `Verifications`. Il démarre lors d’un
 push, d’une pull request ou d’un lancement manuel via GitHub Actions.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Environnements couverts](#environnements-couverts)
+- [Étapes du workflow](#étapes-du-workflow)
+- [Publication des releases](#publication-des-releases)
+- [Lire un échec](#lire-un-échec)
+
+</details>
+
 ## Environnements couverts
 
 | Système | Versions Python |
@@ -56,3 +66,7 @@ ouvrir le commit concerné, puis la combinaison système/Python en échec.
 Reproduire la commande localement avec la même version de Python. Les
 [utilitaires](../../tools/README.md) et le [guide des tests](../../tests/README.md)
 donnent les commandes ciblées.
+
+---
+
+[↑ Haut de page](#vérifications-automatiques) · [Accueil](../../README.md) · [Documentation](../../docs/README.md) · [Catalogue Tools](../../docs/Tools.md)

@@ -5,6 +5,15 @@
 Ces hooks facultatifs exécutent le contrôle de confidentialité avant qu’un
 commit ou un push soit finalisé sur votre poste.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Activer les hooks](#activer-les-hooks)
+- [Contrôles exécutés](#contrôles-exécutés)
+- [En cas de signalement](#en-cas-de-signalement)
+
+</details>
+
 ## Activer les hooks
 
 Depuis un clone Git du projet :
@@ -37,3 +46,7 @@ Un secret déjà diffusé exige également la procédure décrite dans
 [SECURITY.md](../SECURITY.md). Pour comprendre les motifs détectés et leurs
 limites, consulter les [utilitaires de confidentialité](../tools/README.md#vérifier-avant-de-publier).
 La [CI](../.github/workflows/README.md) répète le contrôle sur GitHub.
+
+---
+
+[↑ Haut de page](#contrôles-git-locaux) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)

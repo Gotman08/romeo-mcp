@@ -8,11 +8,13 @@ _Prélever des traces de pile d’un job bloqué._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Sonde quelques processus du job avec pstack, puis gdb ou eu-stack en repli. Les traces peuvent révéler une attente MPI, CUDA, sur un verrou ou sur une entrée-sortie.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -22,7 +24,7 @@ Sonde quelques processus du job avec pstack, puis gdb ou eu-stack en repli. Les 
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_stack_trace` depuis votre client MCP :
 
@@ -35,18 +37,22 @@ Arguments JSON à transmettre à `job_stack_trace` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les traces recueillies et les indices de blocage reconnus.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Le job doit être en cours et les outils de débogage doivent être disponibles. Une trace ponctuelle fournit un indice ; elle ne démontre pas à elle seule un interblocage.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_system_health`](job_system_health.md) · [`diagnose_job`](diagnose_job.md)
 
 [Code de l’outil](../../romeo_mcp/outils_mesure.py#L284) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_stack_trace) · [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

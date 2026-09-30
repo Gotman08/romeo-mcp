@@ -8,11 +8,13 @@ _Relire un relevé de reproductibilité enregistré._
 
 **Effet :** Lecture ou traitement local, sans connexion SSH ni modification de ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Restitue exactement le relevé désigné par report_id, avec sa date et son empreinte. Aucune nouvelle collecte n’est déclenchée.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -20,7 +22,7 @@ Restitue exactement le relevé désigné par report_id, avec sa date et son empr
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_report_get` depuis votre client MCP :
 
@@ -32,18 +34,22 @@ Arguments JSON à transmettre à `job_report_get` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le relevé conservé, son horodatage et son empreinte.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Le relevé décrit les observations à sa date de collecte. Pour observer un nouvel état, créer un nouveau relevé avec job_report_collect.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`job_report_collect`](job_report_collect.md) · [`job_report_export`](job_report_export.md)
 
 [Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L53) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_report_get) · [Reproductibilité](../Tools.md#reproductibilité) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

@@ -8,11 +8,13 @@ _Analyser le texte d’un script Slurm sans connexion._
 
 **Effet :** Lecture ou traitement local, sans connexion SSH ni modification de ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Examine les directives, les ressources, les variables et les secrets reconnaissables dans le texte fourni. Ne lit aucun fichier et n’ouvre aucune connexion SSH.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -20,7 +22,7 @@ Examine les directives, les ressources, les variables et les secrets reconnaissa
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `sbatch_validate` depuis votre client MCP :
 
@@ -32,18 +34,22 @@ Arguments JSON à transmettre à `sbatch_validate` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les diagnostics textuels, avertissements et erreurs détectés.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Une validation textuelle ne vérifie pas l’existence des fichiers ni la disponibilité des ressources. Utiliser sbatch_check_paths pour les chemins distants.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`sbatch_check_paths`](sbatch_check_paths.md) · [`job_prepare`](job_prepare.md) · [`read_remote_file`](read_remote_file.md)
 
 [Code de l’outil](../../romeo_mcp/outils_donnees.py#L375) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#sbatch_validate) · [Scripts Slurm](../Tools.md#scripts-slurm) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

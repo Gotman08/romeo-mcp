@@ -10,6 +10,17 @@ le fonctionnement du serveur ou contribuer à son code.
 Pour utiliser le MCP sans modifier Python, commencer par la
 [prise en main](../README.md#prise-en-main).
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Trajet d’un appel](#trajet-dun-appel)
+- [Sections fonctionnelles](#sections-fonctionnelles)
+- [Modules de support](#modules-de-support)
+- [Où vivent les données ?](#où-vivent-les-données-)
+- [Modifier le serveur](#modifier-le-serveur)
+
+</details>
+
 ## Trajet d’un appel
 
 ![Client IA, MCP local, SSH et nœuds de calcul](../docs/assets/architecture.svg)
@@ -24,19 +35,19 @@ Pour utiliser le MCP sans modifier Python, commencer par la
    dans le registre personnel. L’outil rend une réponse structurée au client.
 
 La connexion SSH effectue les opérations distantes ; Slurm attribue les nœuds
-qui exécutent le calcul. La préparation par `job_prepare` conserve un plan local ;
-`job_submit` en soumet le script exact avec `plan_id` et `confirm: true`.
+qui exécutent le calcul. La préparation par [`job_prepare`](../docs/tools/job_prepare.md) conserve un plan local ;
+[`job_submit`](../docs/tools/job_submit.md) en soumet le script exact avec `plan_id` et `confirm: true`.
 
 ## Sections fonctionnelles
 
 | Module | Responsabilité | Exemples d’outils |
 |---|---|---|
-| [outils_contexte.py](outils_contexte.py) | Se situer sur le cluster et lire la documentation | `romeo_status`, `romeo_quota`, `romeo_software`, `search_docs`, `read_doc`, `romeo_selfcheck` |
-| [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | `job_prepare` / `job_submit`, `job_array_prepare` / `job_array_submit`, `job_pipeline_prepare` / `job_pipeline_submit`, `job_status`, `job_log_tail`, `job_efficiency` |
-| [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | `list_dir`, `upload_to_romeo`, `download_from_romeo`, `dataset_prepare`, `sbatch_validate` |
-| [outils_execution.py](outils_execution.py) | Construire des environnements et lancer des services | `compute_command_prepare`, `python_wheel_prepare`, `python_packages_prepare`, `service_prepare` |
-| [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | `diagnose_job`, `job_live_metrics`, `job_profile_prepare`, `job_system_health` |
-| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | `tool_profile_get` / `tool_profile_set`, `job_report_export` |
+| [outils_contexte.py](outils_contexte.py) | Se situer sur le cluster et lire la documentation | [`romeo_status`](../docs/tools/romeo_status.md), [`romeo_quota`](../docs/tools/romeo_quota.md), [`romeo_software`](../docs/tools/romeo_software.md), [`search_docs`](../docs/tools/search_docs.md), [`read_doc`](../docs/tools/read_doc.md), [`romeo_selfcheck`](../docs/tools/romeo_selfcheck.md) |
+| [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | [`job_prepare`](../docs/tools/job_prepare.md) / [`job_submit`](../docs/tools/job_submit.md), [`job_array_prepare`](../docs/tools/job_array_prepare.md) / [`job_array_submit`](../docs/tools/job_array_submit.md), [`job_pipeline_prepare`](../docs/tools/job_pipeline_prepare.md) / [`job_pipeline_submit`](../docs/tools/job_pipeline_submit.md), [`job_status`](../docs/tools/job_status.md), [`job_log_tail`](../docs/tools/job_log_tail.md), [`job_efficiency`](../docs/tools/job_efficiency.md) |
+| [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | [`list_dir`](../docs/tools/list_dir.md), [`upload_to_romeo`](../docs/tools/upload_to_romeo.md), [`download_from_romeo`](../docs/tools/download_from_romeo.md), [`dataset_prepare`](../docs/tools/dataset_prepare.md), [`sbatch_validate`](../docs/tools/sbatch_validate.md) |
+| [outils_execution.py](outils_execution.py) | Construire des environnements et lancer des services | [`compute_command_prepare`](../docs/tools/compute_command_prepare.md), [`python_wheel_prepare`](../docs/tools/python_wheel_prepare.md), [`python_packages_prepare`](../docs/tools/python_packages_prepare.md), [`service_prepare`](../docs/tools/service_prepare.md) |
+| [outils_mesure.py](outils_mesure.py) | Diagnostiquer et observer les calculs | [`diagnose_job`](../docs/tools/diagnose_job.md), [`job_live_metrics`](../docs/tools/job_live_metrics.md), [`job_profile_prepare`](../docs/tools/job_profile_prepare.md), [`job_system_health`](../docs/tools/job_system_health.md) |
+| [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | [`tool_profile_get`](../docs/tools/tool_profile_get.md) / [`tool_profile_set`](../docs/tools/tool_profile_set.md), [`job_report_export`](../docs/tools/job_report_export.md) |
 
 La page [Tools](../docs/Tools.md) donne accès à une fiche par outil, avec ses paramètres, un exemple et ses
 limites. Le profil `essential` annonce 22 outils ; `full` annonce les outils métier, `expert` ajoute les exécuteurs génériques au catalogue
@@ -61,7 +72,7 @@ complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 | Recherche documentaire locale | [docsearch.py](docsearch.py), [corpus et sommaire](documentation/README.md) |
 
 Les caractéristiques encodées du cluster sont des hypothèses datées.
-`romeo_selfcheck` permet de les confronter à l’état observé avant de modifier
+[`romeo_selfcheck`](../docs/tools/romeo_selfcheck.md) permet de les confronter à l’état observé avant de modifier
 les règles de dimensionnement.
 
 ## Où vivent les données ?
@@ -87,3 +98,7 @@ l’inventaire de [smoke_protocol.py](../tests/smoke_protocol.py).
 
 Continuer avec le [guide des tests](../tests/README.md) et les
 [règles de contribution](../CONTRIBUTING.md).
+
+---
+
+[↑ Haut de page](#code-du-serveur-mcp) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)

@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025"
 scraped_at: "2026-09-26 02:36:22"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Romeo 2025
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Romeo 2025 · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Romeo 2025
 
@@ -29,3 +29,5 @@ scraped_at: "2026-09-26 02:36:22"
 ---
 
 ← [Se connecter aux ressources et gestion des clés ssh](connexion_ssh.md) | → [Se connecter à ROMEO 2025](romeo_2025/se_connecter.md)
+
+[↑ Haut de page](#romeo-2025) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)

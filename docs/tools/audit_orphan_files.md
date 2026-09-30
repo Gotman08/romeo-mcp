@@ -8,11 +8,13 @@ _Repérer des fichiers anciens sans job actif associé._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Recherche des fichiers volumineux ou temporaires dans le scratch et croise les observations avec les jobs actifs.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -23,7 +25,7 @@ Recherche des fichiers volumineux ou temporaires dans le scratch et croise les o
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `audit_orphan_files` depuis votre client MCP :
 
@@ -37,18 +39,22 @@ Arguments JSON à transmettre à `audit_orphan_files` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Des candidats à examiner selon l’âge, la taille et leur association éventuelle à un job.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Un fichier sans job actif peut rester utile à une expérience. Cet inventaire ne supprime rien et ne prouve pas qu’un fichier est jetable.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`romeo_quota`](romeo_quota.md) · [`list_jobs`](list_jobs.md)
 
 [Code de l’outil](../../romeo_mcp/outils_donnees.py#L397) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#audit_orphan_files) · [Fichiers, stockage et données](../Tools.md#fichiers-stockage-et-données) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

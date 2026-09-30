@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/juliet"
 scraped_at: "2026-09-26 02:36:17"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Cluster Juliet
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Cluster Juliet · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Cluster Juliet
 
@@ -19,3 +19,5 @@ Une description du cluster Juliet est disponible sur le site MesoNET
 ---
 
 ← [Architecture x86_64](<romeo_2025/Logiciels/Architecture x86_64.md>) | → [Documentation Juliet sur le site MesoNET](juliet/Bientot.md)
+
+[↑ Haut de page](#cluster-juliet) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)

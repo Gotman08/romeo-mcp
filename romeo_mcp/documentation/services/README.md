@@ -7,6 +7,8 @@ assistance aux utilisateurs, accompagnement scientifique, hébergement de code
 et service Oratio. La [présentation des services](../services.md) en donne
 le point d’entrée d’origine.
 
+**Sur cette page :** [Choisir une lecture](#choisir-une-lecture) · [Préparer une demande d’assistance](#préparer-une-demande-dassistance)
+
 ## Choisir une lecture
 
 | Besoin | Page |
@@ -32,3 +34,7 @@ sont celles de la source officielle, à vérifier depuis le lien de chaque page.
 [Sommaire complet](../SOMMAIRE.md)
 
 *Guide de navigation du projet MCP ; les pages liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#services-romeo) · [Corpus ROMEO](../README.md) · [Sommaire officiel](../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

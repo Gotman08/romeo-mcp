@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/services/Oratio"
 scraped_at: "2026-09-26 02:37:08"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Oratio
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Oratio · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Oratio
 
@@ -64,3 +64,5 @@ flowchart LR
 ---
 
 ← [Accompagnement personnalisé pour les utilisateurs ROMEO](accompagnementScientifiqueCode.md) | → [Interface Web Oratio](Oratio/gui_oratio.md)
+
+[↑ Haut de page](#oratio) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)

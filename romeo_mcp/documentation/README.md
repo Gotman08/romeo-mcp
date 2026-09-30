@@ -10,6 +10,23 @@ le dépôt et les distributions Python pour permettre la consultation locale.
 rédigés pour le projet MCP.** Les pages officielles liées conservent leurs
 sources, leur date de collecte et les droits de leurs auteurs.
 
+Les fils d’Ariane et les liens de retour ajoutés aux pages servent à naviguer
+dans cette copie. Les procédures restent accessibles localement ; les liens
+vers les [guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md)
+et le [catalogue Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
+ouvrent GitHub.
+
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Par où commencer ?](#par-où-commencer-)
+- [Sections](#sections)
+- [Provenance et intégrité](#provenance-et-intégrité)
+- [Lecture locale et recherche par l’IA](#lecture-locale-et-recherche-par-lia)
+- [Droits et maintenance](#droits-et-maintenance)
+
+</details>
+
 ## Par où commencer ?
 
 | Besoin | Lecture |
@@ -55,8 +72,8 @@ sur GitHub ou dans un lecteur Markdown. Les liens vers des services externes
 nécessitent une connexion réseau. Certaines pages de la source sont des
 ébauches ; leur état est indiqué dans les README concernés.
 
-`search_docs` recherche dans les pages officielles et retourne des extraits
-avec leurs sources, lignes et arguments de lecture. `read_doc` permet ensuite
+[`search_docs`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/search_docs.md) recherche dans les pages officielles et retourne des extraits
+avec leurs sources, lignes et arguments de lecture. [`read_doc`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/read_doc.md) permet ensuite
 de lire une section et de poursuivre avec `next_call` si nécessaire. Les
 README de navigation sont exclus de cet index pour préserver la recherche
 dans les 42 pages officielles.
@@ -72,3 +89,7 @@ titulaires de droits. Consulter les
 [mentions des contenus tiers](https://github.com/Gotman08/romeo-mcp/blob/main/THIRD_PARTY_NOTICES.md).
 Le renouvellement du corpus est décrit dans le
 [guide des utilitaires](https://github.com/Gotman08/romeo-mcp/blob/main/tools/README.md#renouveler-la-documentation-romeo).
+
+---
+
+[↑ Haut de page](#documentation-officielle-romeo-embarquée) · [Corpus ROMEO](README.md) · [Sommaire officiel](SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

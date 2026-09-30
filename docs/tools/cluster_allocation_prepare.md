@@ -8,11 +8,13 @@ _Préparer une allocation pour la mise au point._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Prépare un job de réservation afin de travailler sur un nœud de calcul de l’architecture choisie. Aucun nœud n’est réservé avant cluster_allocation_start.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -23,7 +25,7 @@ Prépare un job de réservation afin de travailler sur un nœud de calcul de l�
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `cluster_allocation_prepare` depuis votre client MCP :
 
@@ -38,18 +40,22 @@ Arguments JSON à transmettre à `cluster_allocation_prepare` depuis votre clien
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le script de réservation, les ressources et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 La durée doit être comprise entre 5 minutes et 1 heure. Les commandes de mise au point se lancent ensuite dans l’allocation active.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`cluster_allocation_start`](cluster_allocation_start.md) · [`cluster_allocation_connection_info`](cluster_allocation_connection_info.md)
 
 [Code de l’outil](../../romeo_mcp/outils_execution.py#L86) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#cluster_allocation_prepare) · [Services et allocations](../Tools.md#services-et-allocations) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

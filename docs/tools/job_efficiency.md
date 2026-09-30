@@ -8,11 +8,13 @@ _Comparer les ressources réservées et utilisées._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Recalcule depuis sacct les indicateurs CPU et mémoire d’un job terminé, ainsi que les ressources GPU allouées. Les recommandations aident à dimensionner le calcul suivant.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -20,7 +22,7 @@ Recalcule depuis sacct les indicateurs CPU et mémoire d’un job terminé, ains
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_efficiency` depuis votre client MCP :
 
@@ -32,18 +34,22 @@ Arguments JSON à transmettre à `job_efficiency` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les métriques disponibles et des recommandations de ressources. Cet outil remplit le rôle de seff lorsque celui-ci est absent.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Les données dépendent de la comptabilité Slurm. Le nombre de GPU alloués ne mesure pas leur occupation ; pour un job actif, utiliser job_live_metrics.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_system_health`](job_system_health.md) · [`job_prepare`](job_prepare.md)
 
 [Code de l’outil](../../romeo_mcp/outils_calcul.py#L443) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_efficiency) · [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

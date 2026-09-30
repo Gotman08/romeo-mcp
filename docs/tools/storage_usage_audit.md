@@ -8,11 +8,13 @@ _Repérer les principaux consommateurs de stockage._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Examine les gros dossiers, les anciens journaux, les checkpoints et les environnements virtuels. Aide à comprendre un dépassement signalé par romeo_quota.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -21,7 +23,7 @@ Examine les gros dossiers, les anciens journaux, les checkpoints et les environn
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `storage_usage_audit` depuis votre client MCP :
 
@@ -33,18 +35,22 @@ Arguments JSON à transmettre à `storage_usage_audit` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Un inventaire borné et des propositions de commandes de nettoyage.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 L’outil ne supprime rien. Vérifier l’utilité des fichiers avant d’exécuter une commande proposée.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`romeo_quota`](romeo_quota.md) · [`audit_orphan_files`](audit_orphan_files.md)
 
 [Code de l’outil](../../romeo_mcp/outils_donnees.py#L257) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#storage_usage_audit) · [Fichiers, stockage et données](../Tools.md#fichiers-stockage-et-données) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

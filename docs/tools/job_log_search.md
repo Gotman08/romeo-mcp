@@ -8,11 +8,13 @@ _Rechercher un motif dans les journaux d’un job._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Cherche une expression compatible grep -E dans une fenêtre bornée à la fin de chaque fichier de journal. Le paramètre pattern est obligatoire.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -26,7 +28,7 @@ Cherche une expression compatible grep -E dans une fenêtre bornée à la fin de
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_log_search` depuis votre client MCP :
 
@@ -41,18 +43,22 @@ Arguments JSON à transmettre à `job_log_search` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les correspondances, les limites de lecture et de sortie, truncated et files_limited.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 La recherche n’est pas exhaustive : au plus 1 Mio par fichier par défaut et 16 Mio au maximum. max_matches est limité à 500 par fichier, max_files à 40 par flux et max_chars à 40000.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`job_log_tail`](job_log_tail.md) · [`diagnose_job`](diagnose_job.md)
 
 [Code de l’outil](../../romeo_mcp/outils_calcul.py#L280) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_log_search) · [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

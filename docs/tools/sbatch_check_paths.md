@@ -8,11 +8,13 @@ _Vérifier les chemins littéraux d’un script sur ROMEO._
 
 **Effet :** Lecture distante par SSH, sans soumission de nouveau job ni modification de fichiers.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Analyse le texte fourni et consulte par SSH les chemins absolus littéraux qui se trouvent dans les racines autorisées.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -20,7 +22,7 @@ Analyse le texte fourni et consulte par SSH les chemins absolus littéraux qui s
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `sbatch_check_paths` depuis votre client MCP :
 
@@ -32,18 +34,22 @@ Arguments JSON à transmettre à `sbatch_check_paths` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les chemins vérifiés, leur état et ceux qui ont été laissés de côté.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Au plus 20 chemins sont vérifiés. Les variables, motifs et constructions shell ne sont pas développés ; un chemin de sortie absent peut être normal.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`sbatch_validate`](sbatch_validate.md) · [`read_remote_file`](read_remote_file.md) · [`list_dir`](list_dir.md)
 
 [Code de l’outil](../../romeo_mcp/outils_donnees.py#L382) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#sbatch_check_paths) · [Scripts Slurm](../Tools.md#scripts-slurm) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

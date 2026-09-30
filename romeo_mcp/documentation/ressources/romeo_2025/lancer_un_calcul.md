@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/lancer_
 scraped_at: "2026-09-26 02:36:36"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Lancer un calcul sur le supercalculateur
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Lancer un calcul sur le supercalculateur · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Lancer un calcul sur le supercalculateur
 
@@ -210,3 +210,7 @@ Avec la seconde commande je me suis retrouvé connecté au serveur 23.
 ---
 
 ← [Espaces de stockage](espaces_de_stockage.md) | → [Ecrire un fichier de soumission](ecrire_un_fichier_de_soumission.md)
+
+## Dans cette section
+
+[↑ Haut de page](#lancer-un-calcul-sur-le-supercalculateur) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

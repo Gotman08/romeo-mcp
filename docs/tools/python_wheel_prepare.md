@@ -8,11 +8,13 @@ _Préparer la construction d’une roue Python._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Génère un job pip wheel pour une spécification de paquet ou une URL git+https. La roue sera placée dans le dépôt local associé à l’architecture cible.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -26,7 +28,7 @@ Génère un job pip wheel pour une spécification de paquet ou une URL git+https
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `python_wheel_prepare` depuis votre client MCP :
 
@@ -41,18 +43,22 @@ Arguments JSON à transmettre à `python_wheel_prepare` depuis votre client MCP 
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le script de construction, la source, le dépôt de roues, les ressources et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 La construction utilise --no-deps : préparer les dépendances séparément. no_build_isolation suppose que l’environnement de construction contient déjà les dépendances requises.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`python_wheel_build`](python_wheel_build.md) · [`python_packages_prepare`](python_packages_prepare.md) · [`romeo_software`](romeo_software.md)
 
 [Code de l’outil](../../romeo_mcp/outils_execution.py#L72) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#python_wheel_prepare) · [Environnements et paquets Python](../Tools.md#environnements-et-paquets-python) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

@@ -8,11 +8,13 @@ _Trouver les sections utiles dans la documentation ROMEO._
 
 **Effet :** Lecture ou traitement local, sans connexion SSH ni modification de ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Recherche une question ou des mots clés dans le corpus local livré avec le MCP. Les résultats sont classés par pertinence lexicale et conservent les titres, les sources et les lignes des sections.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -27,7 +29,7 @@ Recherche une question ou des mots clés dans le corpus local livré avec le MCP
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `search_docs` depuis votre client MCP :
 
@@ -40,18 +42,22 @@ Arguments JSON à transmettre à `search_docs` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Des extraits avec read_args pour read_doc, la révision du corpus et, si nécessaire, next_call pour les résultats suivants.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Le corpus est une copie datée. Suivre next_call pour parcourir tous les résultats ; une recherche documentaire ne donne pas les quotas ou la disponibilité actuels du cluster.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`read_doc`](read_doc.md) · [`romeo_software`](romeo_software.md)
 
 [Code de l’outil](../../romeo_mcp/outils_contexte.py#L444) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#search_docs) · [Profil et documentation](../Tools.md#profil-et-documentation) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/juliet/Bientot"
 scraped_at: "2026-09-26 02:36:18"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Cluster Juliet](../juliet.md) › Documentation Juliet sur le site MesoNET
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Cluster Juliet](../juliet.md) › Documentation Juliet sur le site MesoNET · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Documentation Juliet sur le site MesoNET
 
@@ -13,3 +13,7 @@ scraped_at: "2026-09-26 02:36:18"
 ---
 
 ← [Cluster Juliet](../juliet.md) | → [Serveur QLM](../qlm.md)
+
+## Dans cette section
+
+[↑ Haut de page](#documentation-juliet-sur-le-site-mesonet) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

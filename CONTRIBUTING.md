@@ -1,8 +1,20 @@
 # Contribuer
 
+[Accueil](README.md) › [Documentation](docs/README.md) › Contribuer
+
 Les corrections de documentation, exemples scientifiques et améliorations
 des diagnostics sont bienvenues. Une issue utile indique le comportement
 attendu, les versions et une reproduction courte avec des données fictives.
+
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Installation de développement](#installation-de-développement)
+- [Avant un commit](#avant-un-commit)
+- [Périmètre d’une contribution](#périmètre-dune-contribution)
+- [Renouveler le corpus ROMEO](#renouveler-le-corpus-romeo)
+
+</details>
 
 ## Installation de développement
 
@@ -61,6 +73,13 @@ Mettre la navigation à jour lorsqu’un dossier ou un parcours change, en parta
 de l’[index documentaire](docs/README.md).
 Les guides du projet restent identifiés séparément des pages officielles ROMEO.
 
+Employer des liens relatifs entre les guides du dépôt, avec la casse exacte
+des fichiers. Lorsqu’un titre change, adapter son entrée de sommaire et les
+liens qui pointent vers son ancre. Chaque nouvelle fiche d’outil doit être
+accessible depuis [Tools](docs/Tools.md) et proposer un retour au catalogue.
+Les liens vers les guides MCP dans le corpus embarqué utilisent GitHub afin
+de fonctionner aussi depuis une installation Python du corpus.
+
 Décrivez le problème, la modification et les vérifications effectuées. Une
 preuve hors ligne ne démontre pas qu’un calcul réel a réussi. Indiquez
 séparément les essais sur le cluster, sans publier de compte, chemin personnel
@@ -78,3 +97,13 @@ contenu, les liens et la provenance avant de remplacer le corpus embarqué.
 Relancez `tools/verify_corpus.py` et les tests documentaires, puis commitez
 ensemble les pages, les images et le manifeste. Gardez les sources officielles
 et leurs mentions ; ne leur attribuez pas la licence du code.
+
+Conserver les guides de navigation du projet et revoir les liens de retour
+après une collecte. Toute modification d’un fichier du corpus demande de
+mettre à jour son empreinte SHA-256 dans `manifest.json` ; les ajouts de
+navigation sont décrits dans `local_navigation`, avec la provenance de la
+collecte officielle conservée.
+
+---
+
+[↑ Haut de page](#contribuer) · [Accueil](README.md) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

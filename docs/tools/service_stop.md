@@ -8,11 +8,13 @@ _Demander l’arrêt d’un service._
 
 **Effet :** Demande l’arrêt du job associé au service.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Envoie scancel pour le job associé au service_id conservé dans le registre.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -20,7 +22,7 @@ Envoie scancel pour le job associé au service_id conservé dans le registre.
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `service_stop` depuis votre client MCP :
 
@@ -32,18 +34,22 @@ Arguments JSON à transmettre à `service_stop` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le résultat de la demande d’arrêt et les identifiants associés.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 La demande d’arrêt ne constitue pas une confirmation de fin. Consulter ensuite service_status.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`service_status`](service_status.md) · [`service_start`](service_start.md)
 
 [Code de l’outil](../../romeo_mcp/outils_execution.py#L45) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#service_stop) · [Services et allocations](../Tools.md#services-et-allocations) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
