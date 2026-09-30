@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/install
 scraped_at: "2026-09-26 02:36:35"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Installer un logiciel
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Installer un logiciel · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Installer un logiciel
 
@@ -463,3 +463,7 @@ Pour plus d'informations, vous pouvez consulter la documentation officielle de S
 ---
 
 ← [Charger ses logiciels](charger_ses_logiciels.md) | → [Utiliser Python](utiliser_python.md)
+
+## Dans cette section
+
+[↑ Haut de page](#installer-un-logiciel) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

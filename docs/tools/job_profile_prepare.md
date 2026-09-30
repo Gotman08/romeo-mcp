@@ -8,11 +8,13 @@ _Préparer une capture Nsight Systems bornée._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Encapsule votre commande dans un script de profilage GPU. La capture commence après delay_seconds et dure duration_seconds pour limiter la taille des traces.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -31,7 +33,7 @@ Encapsule votre commande dans un script de profilage GPU. La capture commence ap
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_profile_prepare` depuis votre client MCP :
 
@@ -47,18 +49,22 @@ Arguments JSON à transmettre à `job_profile_prepare` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le script de profilage, les chemins de rapport prévus, les ressources et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 delay_seconds est borné de 0 à 3600 et duration_seconds de 5 à 600. warmup_steps et profile_steps sont transmis au programme via des variables ; votre code doit les exploiter pour un profilage par itérations.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`plan_get`](plan_get.md) · [`job_profile_submit`](job_profile_submit.md) · [`profile_report`](profile_report.md)
 
 [Code de l’outil](../../romeo_mcp/outils_mesure.py#L516) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_profile_prepare) · [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

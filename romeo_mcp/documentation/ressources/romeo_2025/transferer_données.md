@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/transfe
 scraped_at: "2026-09-26 02:37:03"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Transférer ses données
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Transférer ses données · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Transférer ses données
 
@@ -131,3 +131,7 @@ A venir
 ---
 
 ← [Se connecter à ROMEO 2025](se_connecter.md) | → [Espaces de stockage](espaces_de_stockage.md)
+
+## Dans cette section
+
+[↑ Haut de page](#transférer-ses-données) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

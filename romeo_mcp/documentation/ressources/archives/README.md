@@ -5,6 +5,8 @@
 Ces pages conservent la rubrique officielle consacrée à ROMEO 2018. Elles
 permettent de replacer une ancienne référence dans sa génération de matériel.
 
+**Sur cette page :** [Contenu](#contenu) · [Préparer un calcul actuel](#préparer-un-calcul-actuel)
+
 ## Contenu
 
 - [Présentation de ROMEO 2018](romeo_2018.md).
@@ -22,3 +24,7 @@ restent attachées à cette génération lors de la lecture et de la citation.
 [Retour aux ressources](../README.md) · [Sommaire officiel](../../SOMMAIRE.md)
 
 *Guide de navigation du projet MCP ; les archives liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#archives-des-ressources) · [Corpus ROMEO](../../README.md) · [Sommaire officiel](../../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

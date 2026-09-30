@@ -2,6 +2,16 @@
 
 [Accueil](README.md) · [Guide des mises à jour](docs/updates.md)
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Non publié — intentions et cycles de vie explicites](#non-publié--intentions-et-cycles-de-vie-explicites)
+- [Non publié](#non-publié)
+- [1.4.0](#140)
+- [1.3.0](#130)
+
+</details>
+
 ## Non publié — intentions et cycles de vie explicites
 
 - Services unifiés : préparation, démarrage sans attente, état, connexion et arrêt.
@@ -15,14 +25,18 @@
 
 ## Non publié
 
-- Séparation des actions MCP : `tool_profile_get` / `tool_profile_set`,
-  `job_log_tail` / `job_log_search`, préparation et soumission des jobs,
+- Navigation de la documentation : [accès par besoin depuis le README](README.md#navigation-rapide),
+  [index des guides](docs/README.md), sommaires, liens vers les fiches d’outils
+  et retours vers les pages parentes. Correction des ancres locales de la
+  charte et de la procédure SSH ; sources et dates de collecte conservées.
+- Séparation des actions MCP : [`tool_profile_get`](docs/tools/tool_profile_get.md) / [`tool_profile_set`](docs/tools/tool_profile_set.md),
+  [`job_log_tail`](docs/tools/job_log_tail.md) / [`job_log_search`](docs/tools/job_log_search.md), préparation et soumission des jobs,
   tableaux et pipelines. Les plans privés conservent les scripts exacts,
   expirent pour soumission après 24 h et empêchent une répétition après
   succès, appel concurrent ou échec partiel.
-- `secret_env_prepare` annonce ses écritures et changements de permissions ;
-  `cluster_gpu_health_run` annonce son allocation GPU. Le faux mode NCCL
-  est désactivé. `storage_usage_audit` remplace le nom suggérant un nettoyage.
+- [`secret_env_prepare`](docs/tools/secret_env_prepare.md) annonce ses écritures et changements de permissions ;
+  [`cluster_gpu_health_run`](docs/tools/cluster_gpu_health_run.md) annonce son allocation GPU. Le faux mode NCCL
+  est désactivé. [`storage_usage_audit`](docs/tools/storage_usage_audit.md) remplace le nom suggérant un nettoyage.
 - `stage_dataset` n’installe plus implicitement `huggingface_hub` : un venv
   `env_path` préparé explicitement est requis pour les datasets Hugging Face.
 - Ces changements retirent les anciens noms du catalogue MCP. Voir le
@@ -64,3 +78,7 @@ manuelle selon le [guide](docs/updates.md#activer-le-système-sur-une-ancienne-i
 - Diagnostic `doctor --live` en lecture seule.
 - Fiches de reproductibilité par job et documentation par section.
 - Corpus ROMEO embarqué, recherche locale avec pagination et contexte.
+
+---
+
+[↑ Haut de page](#historique-des-versions) · [Accueil](README.md) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

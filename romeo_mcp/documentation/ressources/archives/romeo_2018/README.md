@@ -5,6 +5,8 @@
 Cette sous-section accompagne la [présentation de ROMEO 2018](../romeo_2018.md).
 Elle est conservée pour préserver l’arborescence et le contexte de la source.
 
+**Sur cette page :** [État de la documentation](#état-de-la-documentation) · [Lectures associées](#lectures-associées)
+
 ## État de la documentation
 
 La page [Bientot.md](Bientot.md) est une ébauche intitulée « Documentation
@@ -19,3 +21,7 @@ d’exploitation détaillée dans cette page.
 - [Sommaire officiel complet](../../../SOMMAIRE.md).
 
 *Guide de navigation du projet MCP ; les pages liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#archive-romeo-2018) · [Corpus ROMEO](../../../README.md) · [Sommaire officiel](../../../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

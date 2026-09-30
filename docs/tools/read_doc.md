@@ -8,11 +8,13 @@ _Lire une page ou une plage de lignes du corpus local._
 
 **Effet :** Lecture ou traitement local, sans connexion SSH ni modification de ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Restitue le texte original d’une page de documentation. Utiliser les read_args fournis par search_docs pour lire la section correspondant à un extrait.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -25,7 +27,7 @@ Restitue le texte original d’une page de documentation. Utiliser les read_args
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `read_doc` depuis votre client MCP :
 
@@ -38,18 +40,22 @@ Arguments JSON à transmettre à `read_doc` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le texte demandé, son empreinte, les lignes lues, truncated et next_call si la lecture doit continuer.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Les lignes commencent à 1 et les bornes sont inclusives. Si truncated est vrai, suivre next_call pour obtenir la suite exacte ; expected_sha256 détecte un changement de page.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`search_docs`](search_docs.md) · [`romeo_quota`](romeo_quota.md)
 
 [Code de l’outil](../../romeo_mcp/outils_contexte.py#L464) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#read_doc) · [Profil et documentation](../Tools.md#profil-et-documentation) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

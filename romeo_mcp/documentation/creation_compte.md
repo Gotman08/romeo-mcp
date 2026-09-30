@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/creation_compte"
 scraped_at: "2026-09-26 02:35:53"
 ---
 
-[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Accèder au portail ROMEO
+[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Accèder au portail ROMEO · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Accèder au portail ROMEO
 
@@ -118,3 +118,7 @@ Une fois la clé ssh associée à une machine et un projet (validé), votre comp
 ---
 
 ← [Documentation Romeo](index.md) | → [Ressources de calcul](ressources.md)
+
+## Dans cette section
+
+[↑ Haut de page](#accèder-au-portail-romeo) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)

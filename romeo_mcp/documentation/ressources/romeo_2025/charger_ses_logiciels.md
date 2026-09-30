@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/charger
 scraped_at: "2026-09-26 02:36:31"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Charger ses logiciels
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Charger ses logiciels · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Charger ses logiciels
 
@@ -235,3 +235,7 @@ Si vous avez besoin d'un logiciel et qu'il n'est pas disponible, ou pas dans une
 ---
 
 ← [Ecrire un fichier de soumission](ecrire_un_fichier_de_soumission.md) | → [Installer un logiciel](installer_un_logiciel.md)
+
+## Dans cette section
+
+[↑ Haut de page](#charger-ses-logiciels) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

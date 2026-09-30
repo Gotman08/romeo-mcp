@@ -8,11 +8,13 @@ _Préparer un service dans un environnement existant._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Crée le plan de lancement de Jupyter, TensorBoard, vLLM ou MLflow. La configuration est propre au service choisi ; le venv et ses paquets doivent déjà exister sur la bonne architecture.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -38,7 +40,7 @@ Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour
 
 Jupyter et vLLM créent un jeton privé au démarrage. TensorBoard et MLflow n’ajoutent pas d’authentification ; lire les avertissements du plan.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `service_prepare` depuis votre client MCP :
 
@@ -57,18 +59,22 @@ Arguments JSON à transmettre à `service_prepare` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le script exact, la configuration, les ressources, les avertissements et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Aucune dépendance n’est installée pendant cette préparation. vLLM exige un GPU et un model ; TensorBoard exige logdir. Les champs étrangers au service sont refusés.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`service_start`](service_start.md) · [`python_env_prepare`](python_env_prepare.md) · [`python_packages_prepare`](python_packages_prepare.md)
 
 [Code de l’outil](../../romeo_mcp/outils_execution.py#L21) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#service_prepare) · [Services et allocations](../Tools.md#services-et-allocations) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

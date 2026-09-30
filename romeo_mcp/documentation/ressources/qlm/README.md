@@ -5,6 +5,8 @@
 Cette section conserve la documentation QLM présente dans la copie officielle.
 Son niveau de détail est celui de la source au moment de la collecte.
 
+**Sur cette page :** [Pages disponibles](#pages-disponibles) · [Continuer](#continuer)
+
 ## Pages disponibles
 
 | Page | État de la copie |
@@ -23,3 +25,7 @@ dans son en-tête pour vérifier si elle a été complétée.
 [Parcours Slurm ROMEO 2025](../romeo_2025/README.md)
 
 *Guide de navigation du projet MCP ; les pages liées proviennent de ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#serveur-qlm) · [Corpus ROMEO](../../README.md) · [Sommaire officiel](../../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

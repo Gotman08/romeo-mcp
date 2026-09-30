@@ -1,5 +1,16 @@
 # Contenus tiers
 
+[Accueil](README.md) › [Documentation](docs/README.md) › Contenus tiers
+
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Documentation officielle ROMEO / URCA](#documentation-officielle-romeo--urca)
+- [Visuel du README](#visuel-du-readme)
+- [Dépendances logicielles](#dépendances-logicielles)
+
+</details>
+
 ## Documentation officielle ROMEO / URCA
 
 Le corpus `romeo_mcp/documentation/` reproduit des pages de la documentation
@@ -38,3 +49,7 @@ topologie physique du calculateur.
 Les dépendances Python sont déclarées dans `pyproject.toml`. Elles sont
 installées séparément et conservent leurs licences respectives. Aucun client
 IA, système Slurm ou binaire SSH n’est redistribué avec ce projet.
+
+---
+
+[↑ Haut de page](#contenus-tiers) · [Accueil](README.md) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

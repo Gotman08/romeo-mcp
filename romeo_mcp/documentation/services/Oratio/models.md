@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/services/Oratio/models"
 scraped_at: "2026-09-26 02:37:11"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › Modèles disponibles
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › Modèles disponibles · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Modèles disponibles
 
@@ -42,3 +42,7 @@ Les données ne sont pas réutilisées à d'autres fins et ne sont pas communiqu
 ---
 
 ← [API Oratio](api_oratio.md) | → [Historique des équipements](../../historique.md)
+
+## Dans cette section
+
+[↑ Haut de page](#modèles-disponibles) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

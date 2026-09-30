@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/"
 scraped_at: "2026-09-26 02:35:49"
 ---
 
-[Sommaire](SOMMAIRE.md) › Accueil › Documentation Romeo
+[Sommaire](SOMMAIRE.md) › Accueil › Documentation Romeo · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Documentation Romeo
 
@@ -34,3 +34,7 @@ Si vous souhaitez demander l'accès à un service ou une ressource de Romeo, vou
 ---
 
 → [Accèder au portail ROMEO](creation_compte.md)
+
+## Dans cette section
+
+[↑ Haut de page](#documentation-romeo) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)

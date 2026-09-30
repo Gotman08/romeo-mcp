@@ -8,11 +8,13 @@ _Préparer la création d’un environnement Python neuf._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Construit un plan pour créer un venv sur un nœud de l’architecture choisie. Les paquets applicatifs s’installent séparément avec python_packages_prepare et python_packages_install.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -23,7 +25,7 @@ Construit un plan pour créer un venv sur un nœud de l’architecture choisie. 
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `python_env_prepare` depuis votre client MCP :
 
@@ -39,18 +41,22 @@ Arguments JSON à transmettre à `python_env_prepare` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le chemin cible, le script de création, les ressources et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Le parent doit exister et la création refuse une cible déjà présente. Choisir une spécification Python précise dans Spack, trouvée avec romeo_software, si plusieurs installations sont disponibles.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`romeo_software`](romeo_software.md) · [`python_env_create`](python_env_create.md) · [`python_packages_prepare`](python_packages_prepare.md)
 
 [Code de l’outil](../../romeo_mcp/outils_execution.py#L50) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#python_env_prepare) · [Environnements et paquets Python](../Tools.md#environnements-et-paquets-python) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

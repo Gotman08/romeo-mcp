@@ -8,11 +8,13 @@ _Réserver une courte allocation pour sonder les GPU._
 
 **Effet :** Réserve des GPU via srun et exécute une sonde matérielle.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Lance via srun des contrôles GPU sur quelques nœuds : bridage thermique ou de puissance, erreurs ECC non corrigées et fréquences. Peut proposer une clause --exclude pour les nœuds suspects.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -23,7 +25,7 @@ Lance via srun des contrôles GPU sur quelques nœuds : bridage thermique ou de 
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `cluster_gpu_health_run` depuis votre client MCP :
 
@@ -37,18 +39,22 @@ Arguments JSON à transmettre à `cluster_gpu_health_run` depuis votre client MC
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Les observations matérielles, les nœuds suspects et une éventuelle clause d’exclusion.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Cet appel consomme une allocation GPU et peut attendre des ressources. Seul check_type="gpu" est disponible ; le mode NCCL est désactivé.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`romeo_status`](romeo_status.md) · [`job_live_metrics`](job_live_metrics.md)
 
 [Code de l’outil](../../romeo_mcp/outils_mesure.py#L645) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#cluster_gpu_health_run) · [Cluster et ordonnancement](../Tools.md#cluster-et-ordonnancement) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

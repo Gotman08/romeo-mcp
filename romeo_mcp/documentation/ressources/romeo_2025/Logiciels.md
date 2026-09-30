@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/Logicie
 scraped_at: "2026-09-26 02:36:24"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Logiciels
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Logiciels · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Logiciels
 
@@ -18,3 +18,5 @@ De nombreux logiciels sont disponibles sur ROMEO en auto installation, certains 
 ---
 
 ← [Utiliser JupyterLab](7.1.utiliser_jupyterlab.md) | → [Architecture Aarch64](<Logiciels/Architecture Aarch64.md>)
+
+[↑ Haut de page](#logiciels) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

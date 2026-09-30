@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/connexion_ssh"
 scraped_at: "2026-09-26 02:36:08"
 ---
 
-[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Se connecter aux ressources et gestion des clés ssh
+[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Se connecter aux ressources et gestion des clés ssh · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Se connecter aux ressources et gestion des clés ssh
 
@@ -68,7 +68,7 @@ Ce que vous devez récuperer et garder, est la clé publique telle qu'affichée 
 
 ![Capture d'écran pour copier/ocller la clé publique](../images/Moba_sshkgpaste-dd7a0a3e2c430447bee9d76447e01105_71d51d6e.png)
 
-Vous pourrez ainsi l'ajouter à votre trousseau de clés sur le Portail à l'étape suivante [Déposer sa clé ssh sur les ressources](#Deposer-sa-cle-ssh-sur-les-ressources).
+Vous pourrez ainsi l'ajouter à votre trousseau de clés sur le Portail à l'étape suivante [Déposer sa clé ssh sur les ressources](#déposer-sa-clé-ssh-sur-les-ressources).
 
 ### GNU/Linux[​](#gnulinux "Lien direct vers GNU/Linux")
 
@@ -146,7 +146,7 @@ La commande a permis de créer deux fichiers:
 
 Les clés RSA ne sont plus supportés à cause de leur trop faible sécurité.
 
-## Déposer sa clé ssh sur les ressources[​](#Deposer-sa-cle-ssh-sur-les-ressources "Lien direct vers Déposer sa clé ssh sur les ressources")
+## Déposer sa clé ssh sur les ressources[​](#déposer-sa-clé-ssh-sur-les-ressources "Lien direct vers Déposer sa clé ssh sur les ressources")
 
 Pour mettre une clé ssh sur la ressource de calcul à laquelle vous souhaitez vous connecter, il faut procéder en deux étapes en ajoutant premièrement la clé publique à votre compte sur le portail, puis en associant la clé à la ressource de calcul.
 
@@ -189,3 +189,7 @@ La connexion aux ressources est détaillée dans une page dédiée pour chaque r
 ---
 
 ← [Description  matérielle des ressources ROMEO](description_matérielle_des_ressources.md) | → [Romeo 2025](romeo_2025.md)
+
+## Dans cette section
+
+[↑ Haut de page](#se-connecter-aux-ressources-et-gestion-des-clés-ssh) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)

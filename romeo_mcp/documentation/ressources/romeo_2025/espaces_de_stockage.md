@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/espaces
 scraped_at: "2026-09-26 02:36:34"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Espaces de stockage
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Espaces de stockage · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Espaces de stockage
 
@@ -170,3 +170,7 @@ Stockage sur bande disponible prochainement.
 ---
 
 ← [Transférer ses données](transferer_données.md) | → [Lancer un calcul sur le supercalculateur](lancer_un_calcul.md)
+
+## Dans cette section
+
+[↑ Haut de page](#espaces-de-stockage) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

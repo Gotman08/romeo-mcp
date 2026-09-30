@@ -2,6 +2,19 @@
 
 [Accueil](../README.md) › [Documentation](README.md) › Configuration
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Votre profil ROMEO](#votre-profil-romeo)
+- [Profils d’outils](#profils-doutils)
+- [Diagnostic en lecture seule](#diagnostic-en-lecture-seule)
+- [Autres clients stdio](#autres-clients-stdio)
+- [Reprendre automatiquement les préférences du client](#reprendre-automatiquement-les-préférences-du-client)
+- [Déplacer ou mettre à jour l’installation](#déplacer-ou-mettre-à-jour-linstallation)
+- [WSL](#wsl)
+
+</details>
+
 ## Votre profil ROMEO
 
 `python -m romeo_mcp configure --account VOTRE_PROJET --host romeo1 --qos normal`
@@ -29,7 +42,7 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 Les seuils locaux ne changent pas les droits Slurm. La limite effective peut
 venir du projet, de l’utilisateur, de la partition ou de la QOS. Les plafonds
 CPU/GPU configurés alimentent les avertissements de planification ; le seuil
-de jobs sert à la comparaison de `romeo_selfcheck`.
+de jobs sert à la comparaison de [`romeo_selfcheck`](tools/romeo_selfcheck.md).
 
 Pour travailler sur plusieurs projets, utilisez des profils externes et une
 entrée MCP distincte par profil avec `ROMEO_CONFIG`. Une seule instance charge
@@ -40,9 +53,9 @@ variables déjà définies dans le client.
 
 | Profil | Outils annoncés |
 |---|---|
-| `essential` | `tool_profile_get`, `tool_profile_set`, `search_docs`, `read_doc`, `romeo_status`, `romeo_quota`, `romeo_software`, `job_prepare`, `job_submit`, `job_status`, `job_log_tail`, `job_log_search`, `list_jobs`, `cancel_job`, `diagnose_job`, `job_efficiency`, `list_dir`, `upload_to_romeo`, `download_from_romeo`, `job_report_collect`, `job_report_export`, `plan_get` |
+| `essential` | [`tool_profile_get`](tools/tool_profile_get.md), [`tool_profile_set`](tools/tool_profile_set.md), [`search_docs`](tools/search_docs.md), [`read_doc`](tools/read_doc.md), [`romeo_status`](tools/romeo_status.md), [`romeo_quota`](tools/romeo_quota.md), [`romeo_software`](tools/romeo_software.md), [`job_prepare`](tools/job_prepare.md), [`job_submit`](tools/job_submit.md), [`job_status`](tools/job_status.md), [`job_log_tail`](tools/job_log_tail.md), [`job_log_search`](tools/job_log_search.md), [`list_jobs`](tools/list_jobs.md), [`cancel_job`](tools/cancel_job.md), [`diagnose_job`](tools/diagnose_job.md), [`job_efficiency`](tools/job_efficiency.md), [`list_dir`](tools/list_dir.md), [`upload_to_romeo`](tools/upload_to_romeo.md), [`download_from_romeo`](tools/download_from_romeo.md), [`job_report_collect`](tools/job_report_collect.md), [`job_report_export`](tools/job_report_export.md), [`plan_get`](tools/plan_get.md) |
 | `full` | Catalogue métier : tableaux, pipelines, services, environnements, fichiers et rapports |
-| `expert` | Catalogue `full` plus `compute_command_prepare`, `compute_command_run` et `login_command_run` |
+| `expert` | Catalogue `full` plus [`compute_command_prepare`](tools/compute_command_prepare.md), [`compute_command_run`](tools/compute_command_run.md) et [`login_command_run`](tools/login_command_run.md) |
 
 Trois façons de choisir :
 
@@ -61,7 +74,7 @@ gardent leur catalogue en cache : relire `tools/list` ou relancer le MCP si
 les outils avancés n’apparaissent pas.
 
 La priorité du démarrage est **`serve --profile` → `ROMEO_TOOL_PROFILE` →
-fichier personnel → `full`**. Le choix fait avec `tool_profile_set` ne modifie
+fichier personnel → `full`**. Le choix fait avec [`tool_profile_set`](tools/tool_profile_set.md) ne modifie
 aucun fichier. Un profil réduit la liste présentée au modèle ; il ne constitue
 pas une restriction de sécurité. Les gestionnaires avancés restent enregistrés.
 
@@ -182,7 +195,7 @@ Références : [configuration Codex](https://developers.openai.com/ja-JP/docs/co
 6. Relancer le client quand il peut charger la nouvelle version.
 
 Arrêter un client MCP n’annule pas les jobs déjà soumis à Slurm. Utilisez
-`cancel_job` uniquement pour les jobs que vous voulez réellement annuler.
+[`cancel_job`](tools/cancel_job.md) uniquement pour les jobs que vous voulez réellement annuler.
 
 ## WSL
 
@@ -191,3 +204,7 @@ dans le même environnement. L’installateur détecte WSL et peut traduire les
 chemins pour les clients Windows, mais les agents SSH et les clés ne sont pas
 automatiquement partagés entre Windows et Linux. Vérifiez `ssh romeo1` depuis
 l’environnement qui lancera effectivement le serveur.
+
+---
+
+[↑ Haut de page](#configuration) · [Accueil](../README.md) · [Documentation](README.md) · [Catalogue Tools](Tools.md)

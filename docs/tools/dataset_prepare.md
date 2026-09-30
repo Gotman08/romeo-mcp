@@ -8,11 +8,13 @@ _Préparer un téléchargement depuis un nœud de calcul._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Crée un plan pour une URL directe, un dépôt git ou un dataset Hugging Face. Le téléchargement sera exécuté par un job sur l’architecture choisie.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -26,7 +28,7 @@ Crée un plan pour une URL directe, un dépôt git ou un dataset Hugging Face. L
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `dataset_prepare` depuis votre client MCP :
 
@@ -43,18 +45,22 @@ Arguments JSON à transmettre à `dataset_prepare` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le type de source résolu, la destination, le script de téléchargement et le plan local.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Pour Hugging Face, fournir un venv de la même architecture avec huggingface_hub déjà installé. Aucun paquet n’est installé par le téléchargement ; time_limit remplace minutes lorsqu’il est renseigné.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`dataset_download`](dataset_download.md) · [`python_packages_prepare`](python_packages_prepare.md) · [`romeo_quota`](romeo_quota.md)
 
 [Code de l’outil](../../romeo_mcp/outils_donnees.py#L349) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#dataset_prepare) · [Fichiers, stockage et données](../Tools.md#fichiers-stockage-et-données) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

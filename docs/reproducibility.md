@@ -6,9 +6,19 @@ Une fiche rassemble les informations disponibles pour retrouver les conditions
 d’un calcul soumis par ce MCP. Elle distingue les observations faites à des
 dates différentes et signale les informations manquantes.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Choisir les données avant le calcul](#choisir-les-données-avant-le-calcul)
+- [Collecter puis exporter après le calcul](#collecter-puis-exporter-après-le-calcul)
+- [Ce qui est réellement mesuré](#ce-qui-est-réellement-mesuré)
+- [Périmètre et protection des données](#périmètre-et-protection-des-données)
+
+</details>
+
 ## Choisir les données avant le calcul
 
-Dans `job_prepare`, ajoutez les chemins absolus des entrées scientifiques à
+Dans [`job_prepare`](tools/job_prepare.md), ajoutez les chemins absolus des entrées scientifiques à
 `data_files`. Exemple à adapter avec votre propre répertoire scratch :
 
 ```json
@@ -24,7 +34,7 @@ Dans `job_prepare`, ajoutez les chemins absolus des entrées scientifiques à
 }
 ```
 
-Vérifiez le plan, puis appelez `job_submit` avec son `plan_id` et `confirm: true`. Le dossier de
+Vérifiez le plan, puis appelez [`job_submit`](tools/job_submit.md) avec son `plan_id` et `confirm: true`. Le dossier de
 travail peut être un checkout Git : la capture y cherche `HEAD`, sans lancer
 de filtre Git, de commande du projet ou de parcours des fichiers non suivis.
 
@@ -129,3 +139,7 @@ après le calcul. Le contenu des paramètres n'est pas ajouté à cette métadon
 
 Le registre local existant reste privé et conserve les scripts d’origine.
 L’export n’altère ni ce registre ni le script exécuté sur ROMEO.
+
+---
+
+[↑ Haut de page](#fiches-de-reproductibilité) · [Accueil](../README.md) · [Documentation](README.md) · [Catalogue Tools](Tools.md)

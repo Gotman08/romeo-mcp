@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/services/Oratio/gui_oratio"
 scraped_at: "2026-09-26 02:37:11"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › Interface Web Oratio
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › Interface Web Oratio · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Interface Web Oratio
 
@@ -221,3 +221,7 @@ Un modèle peut produire des informations incorrectes ou présenter avec assuran
 ---
 
 ← [Oratio](../Oratio.md) | → [API Oratio](api_oratio.md)
+
+## Dans cette section
+
+[↑ Haut de page](#interface-web-oratio) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)

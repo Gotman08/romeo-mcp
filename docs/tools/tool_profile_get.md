@@ -8,15 +8,17 @@ _Consulter le profil actif et les outils annoncés._
 
 **Effet :** Lecture ou traitement local, sans connexion SSH ni modification de ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Permet de comprendre quels outils votre assistant peut découvrir dans la connexion actuelle. Le résultat liste les noms des outils du profil actif.
 
-## ⚙️ Paramètres
+## Paramètres
 
 Cet outil ne prend aucun paramètre. Utiliser un objet vide `{}`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `tool_profile_get` depuis votre client MCP :
 
@@ -26,18 +28,22 @@ Arguments JSON à transmettre à `tool_profile_get` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le profil actif, la liste des outils, leur nombre et la portée du choix dans le processus MCP.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Les profils organisent la découverte des outils ; ils ne remplacent pas les autorisations du client ou de ROMEO.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`tool_profile_set`](tool_profile_set.md)
 
 [Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L13) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#tool_profile_get) · [Profil et documentation](../Tools.md#profil-et-documentation) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

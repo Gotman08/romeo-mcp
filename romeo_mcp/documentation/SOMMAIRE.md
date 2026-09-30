@@ -1,6 +1,22 @@
 # Documentation ROMEO : sommaire
 
+[Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
+
 Arborescence reconstruite depuis la barre latérale officielle du site.
+
+**Sur cette page :** [Parcours de lecture](#parcours-de-lecture) · [Toutes les pages officielles](#toutes-les-pages-officielles)
+
+## Parcours de lecture
+
+| Votre besoin | Point d’entrée |
+|---|---|
+| Premier calcul | [Parcours ROMEO 2025](ressources/romeo_2025/README.md) |
+| Matériel, accès et logiciels | [Ressources](ressources/README.md) · [Logiciels par architecture](ressources/romeo_2025/Logiciels/README.md) |
+| Assistance et services | [Services ROMEO](services/README.md) · [Oratio](services/Oratio/README.md) |
+| Contexte historique | [Historique](historique/README.md) · [Archives](ressources/archives/README.md) |
+| Illustrations et provenance | [Images](images/README.md) · [Provenance du corpus](README.md#provenance-et-intégrité) |
+
+## Toutes les pages officielles
 
 - [Documentation Romeo](index.md)
 - [Accèder au portail ROMEO](creation_compte.md)
@@ -44,3 +60,7 @@ Arborescence reconstruite depuis la barre latérale officielle du site.
   - [Supercalculateur ROMEO 2013](historique/romeo2013.md)
 - [Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo](bonnes_pratiques_cybersecurite.md)
 - [Conditions Générales d’Utilisation des ressources de calcul de ROMEO](2.5.charte.md)
+
+---
+
+[↑ Haut de page](#documentation-romeo--sommaire) · [Corpus ROMEO](README.md) · [Sommaire officiel](SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

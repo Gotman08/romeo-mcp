@@ -1,9 +1,13 @@
 # Sécurité et données personnelles
 
+[Accueil](README.md) › [Documentation](docs/README.md) › Sécurité et données personnelles
+
 Ce serveur s’exécute localement avec les droits de son utilisateur et utilise
 sa connexion SSH. Les contrôles de commandes réduisent les erreurs courantes ;
 ils ne constituent pas un environnement isolé pour du code hostile. Autorisez
 les actions mutantes de l’assistant selon vos besoins.
+
+**Sur cette page :** [Fichiers privés](#fichiers-privés) · [Signaler un problème](#signaler-un-problème)
 
 ## Fichiers privés
 
@@ -27,3 +31,7 @@ En cas de secret exposé, révoquez-le ou remplacez-le auprès du service concer
 Retirer une ligne du dernier commit ne la retire pas de l’historique. Une
 réécriture Git ne supprime pas non plus les anciennes copies, forks ou vues
 mises en cache par la forge.
+
+---
+
+[↑ Haut de page](#sécurité-et-données-personnelles) · [Accueil](README.md) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

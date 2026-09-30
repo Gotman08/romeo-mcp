@@ -7,6 +7,16 @@ connecter, préparer ses fichiers et logiciels, soumettre, puis examiner le
 résultat. La [présentation de ROMEO 2025](../romeo_2025.md) donne le contexte
 de cette ressource.
 
+<details>
+<summary>Sommaire de cette page</summary>
+
+- [Avant le premier calcul](#avant-le-premier-calcul)
+- [Parcours conseillé](#parcours-conseillé)
+- [Selon le type de travail](#selon-le-type-de-travail)
+- [Portée des informations](#portée-des-informations)
+
+</details>
+
 ## Avant le premier calcul
 
 Disposer d’un [compte autorisé](../../creation_compte.md), d’un accès SSH et
@@ -24,8 +34,8 @@ lance le client IA.
 | 4. Décrire le job | [Script de soumission](ecrire_un_fichier_de_soumission.md) | Commande, durée, CPU, mémoire et éventuels GPU |
 | 5. Soumettre et suivre | [Lancer un calcul](lancer_un_calcul.md), [commandes utiles](commandes_utiles.md) | Identifiant du job, script et journaux |
 
-Dans le MCP, appeler d’abord `job_prepare`, lire le script et les
-avertissements, puis appeler `job_submit` avec le `plan_id` reçu et `confirm: true`. Les informations de ces étapes
+Dans le MCP, appeler d’abord [`job_prepare`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/job_prepare.md), lire le script et les
+avertissements, puis appeler [`job_submit`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/job_submit.md) avec le `plan_id` reçu et `confirm: true`. Les informations de ces étapes
 servent ensuite au suivi, au diagnostic et à la fiche de reproductibilité.
 
 ## Selon le type de travail
@@ -49,3 +59,7 @@ qui l’expliquent.
 [Retour aux ressources](../README.md) · [Sommaire officiel](../../SOMMAIRE.md)
 
 *Guide de navigation du projet MCP. Les procédures liées sont attribuées à ROMEO / URCA.*
+
+---
+
+[↑ Haut de page](#utiliser-romeo-2025) · [Corpus ROMEO](../../README.md) · [Sommaire officiel](../../SOMMAIRE.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

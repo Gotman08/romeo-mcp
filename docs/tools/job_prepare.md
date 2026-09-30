@@ -8,11 +8,13 @@ _Préparer le script exact d’un job Slurm._
 
 **Effet :** Enregistre un plan local. Peut lire les racines par SSH ; aucune écriture ni soumission sur ROMEO.
 
-## 🎯 Utilisation
+**Dans cette fiche :** [Utilisation](#utilisation) · [Paramètres](#paramètres) · [Exemple](#exemple) · [Résultat](#résultat) · [Prérequis et limites](#prérequis-et-limites) · [Voir aussi](#voir-aussi)
+
+## Utilisation
 
 Valide les ressources et génère le script du calcul sans le soumettre. Les options MPI, PyTorch, conteneur, caches et staging sont facultatives ; utiliser celles qui correspondent à votre programme.
 
-## ⚙️ Paramètres
+## Paramètres
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
@@ -43,7 +45,7 @@ Valide les ressources et génère le script du calcul sans le soumettre. Les opt
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
-## ▶️ Exemple
+## Exemple
 
 Arguments JSON à transmettre à `job_prepare` depuis votre client MCP :
 
@@ -60,18 +62,22 @@ Arguments JSON à transmettre à `job_prepare` depuis votre client MCP :
 
 Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
 
-## 📤 Résultat
+## Résultat
 
 Le script, les ressources résolues, les avertissements, plan_id, plan_sha256, expires_at et l’indication submittable.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
-## 📌 Prérequis et limites
+## Prérequis et limites
 
 Le projet Slurm doit être configuré. Un aperçu hors ligne aux chemins illustratifs a submittable=false et plan_id=null. Les empreintes d’entrée sont limitées à 20 fichiers et 64 Mio par relevé.
 
-## 🔗 Voir aussi
+## Voir aussi
 
 [`plan_get`](plan_get.md) · [`job_submit`](job_submit.md) · [`sbatch_validate`](sbatch_validate.md)
 
 [Code de l’outil](../../romeo_mcp/outils_calcul.py#L85) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+
+---
+
+[↑ Haut de page](#job_prepare) · [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)

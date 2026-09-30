@@ -4,7 +4,7 @@ source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/se_conn
 scraped_at: "2026-09-26 02:36:40"
 ---
 
-[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Se connecter à ROMEO 2025
+[Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Se connecter à ROMEO 2025 · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
 
 # Se connecter à ROMEO 2025
 
@@ -43,3 +43,7 @@ User=[UserName]
 ---
 
 ← [Romeo 2025](../romeo_2025.md) | → [Transférer ses données](transferer_données.md)
+
+## Dans cette section
+
+[↑ Haut de page](#se-connecter-à-romeo-2025) · [Sommaire officiel](../../SOMMAIRE.md) · [Guide du corpus](../../README.md)
