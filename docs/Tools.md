@@ -156,12 +156,16 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 
 | Outil — cliquez pour ouvrir la fiche | À quoi il sert | Profils |
 |---|---|---|
-| [`python_env_prepare`](tools/python_env_prepare.md) | Préparer la création d’un environnement Python neuf. | `full`, `expert` |
+| [`python_env_prepare`](tools/python_env_prepare.md) | Préparer un environnement Python neuf avec une spécification Spack non ambiguë. | `full`, `expert` |
 | [`python_env_create`](tools/python_env_create.md) | Soumettre la création d’un venv à partir du plan relu. | `full`, `expert` |
 | [`python_packages_prepare`](tools/python_packages_prepare.md) | Préparer l’installation de paquets dans un venv. | `full`, `expert` |
 | [`python_packages_install`](tools/python_packages_install.md) | Soumettre l’installation de paquets à partir du plan relu. | `full`, `expert` |
 | [`python_wheel_prepare`](tools/python_wheel_prepare.md) | Préparer la construction d’une roue Python. | `full`, `expert` |
 | [`python_wheel_build`](tools/python_wheel_build.md) | Soumettre la construction d’une roue Python à partir du plan relu. | `full`, `expert` |
+
+Pour créer un environnement, rechercher Python avec [`romeo_software`](tools/romeo_software.md),
+puis fournir dans `spack_packages` une spécification précise (version, compilateur ou empreinte).
+Une liste absente ou vide, ainsi que le nom `python` seul, sont refusés dès la préparation.
 
 ### Fichiers, stockage et données
 

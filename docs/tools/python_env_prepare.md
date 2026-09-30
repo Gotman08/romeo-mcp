@@ -21,9 +21,12 @@ Construit un plan pour créer un venv sur un nœud de l’architecture choisie. 
 | `env_path` | `str` | Oui | — | Chemin du nouveau venv : parent existant et cible encore absente. |
 | `arch` | `str` | Non | `"armgpu"` | Architecture cible : x64cpu ou armgpu. null laisse la préparation la déduire lorsque l’outil l’accepte. |
 | `time_limit` | `str` | Non | `"15m"` | Durée maximale, par exemple 1m, 1h ou 2h. |
-| `spack_packages` | `list[str] \| None` | Non | `null` | Spécifications Spack à charger pour l’architecture du job. |
+| `spack_packages` | `list[str] \| None` | Non | `null` | Liste requise en pratique : fournir une spécification Python Spack non ambiguë pour l’architecture du job. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
+
+Pour cet outil, la validation exige toutefois une liste `spack_packages` non vide.
+L’omission, `null`, `[]` et le nom `python` seul provoquent une erreur avant toute connexion SSH ou création de plan.
 
 ## Exemple
 
@@ -49,7 +52,7 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
-Le parent doit exister et la création refuse une cible déjà présente. Choisir une spécification Python précise dans Spack, trouvée avec romeo_software, si plusieurs installations sont disponibles.
+Le parent doit exister et la création refuse une cible déjà présente. Rechercher Python avec [`romeo_software`](romeo_software.md), puis fournir une spécification précise (version, compilateur ou empreinte) dans `spack_packages`. Le nom `python` seul est ambigu sur ROMEO et reste refusé.
 
 ## Voir aussi
 
