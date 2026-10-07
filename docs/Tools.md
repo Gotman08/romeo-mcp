@@ -74,9 +74,9 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
-| `essential` | 22 | Documentation, contexte cluster, jobs simples, transferts et relevés courants. |
-| `full` | 68 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
-| `expert` | 71 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `essential` | 35 | Documentation, contexte cluster, jobs, reprise, mises à jour et relevés courants. |
+| `full` | 90 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
+| `expert` | 93 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -91,6 +91,18 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 | [`tool_profile_set`](tools/tool_profile_set.md) | Changer le profil d’outils de la connexion. | `essential`, `full`, `expert` |
 | [`search_docs`](tools/search_docs.md) | Trouver les sections utiles dans la documentation ROMEO. | `essential`, `full`, `expert` |
 | [`read_doc`](tools/read_doc.md) | Lire une page ou une plage de lignes du corpus local. | `essential`, `full`, `expert` |
+
+### Mise à jour du MCP
+
+| Outil | Rôle | Profils |
+|---|---|---|
+| [`mcp_update_check`](tools/mcp_update_check.md) | Détecter une release et présenter les versions exécutée et sélectionnée. | Tous |
+| [`mcp_update_policy`](tools/mcp_update_policy.md) | Conserver l'autorisation automatique sans la redemander à chaque version. | Tous |
+| [`mcp_update_start`](tools/mcp_update_start.md) | Préparer la release vérifiée dans un environnement séparé. | Tous |
+| [`mcp_update_status`](tools/mcp_update_status.md) | Suivre la progression et relire le résultat après reconnexion. | Tous |
+| [`mcp_update_rollback`](tools/mcp_update_rollback.md) | Revenir à la version précédente après vérification. | Tous |
+
+Voir le [parcours automatique et les limites de l'activation](updates.md#mise-à-jour-par-le-modèle).
 
 ### Cluster et ordonnancement
 

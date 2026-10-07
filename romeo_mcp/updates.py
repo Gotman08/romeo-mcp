@@ -59,7 +59,15 @@ def _write_json(path: Path, value: dict) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     try:
-        os.replace(temporary, path)
+        # Sous Windows, un lecteur concurrent peut garder un handle tres bref.
+        for attempt in range(6):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.01 * (attempt + 1))
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -214,7 +222,9 @@ def _windows_run(arguments: list[str], env: dict) -> int:
     process = None
     try:
         limits = ExtendedLimits()
-        limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        # Les workers de mise a jour demandent explicitement BREAKAWAY ; les
+        # autres enfants restent lies a la fermeture du lanceur.
+        limits.basic.flags = 0x2000 | 0x800  # KILL_ON_JOB_CLOSE | BREAKAWAY_OK
         if not kernel.SetInformationJobObject(job, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
             raise ctypes.WinError(ctypes.get_last_error())
         process = subprocess.Popen(arguments, env=env)
@@ -288,6 +298,23 @@ def check() -> dict:
     return {"current_version": __version__, "latest_version": release["version"] if release else None,
             "update_available": bool(release and version_tuple(release["version"]) > version_tuple(__version__)),
             "release": release}
+
+
+def validate_release(release: dict) -> None:
+    """Revalide aussi les metadonnees relues depuis un plan/cache local."""
+    try:
+        version = release["version"]
+        version_tuple(version)
+        tag = "v" + version
+        name = f"romeo_mcp-{version}-py3-none-any.whl"
+        if (release["tag"] != tag or release["name"] != name
+                or release["url"] != f"https://github.com/{REPOSITORY}/releases/download/{tag}/{name}"
+                or release["page"] != f"https://github.com/{REPOSITORY}/releases/tag/{tag}"
+                or not re.fullmatch(r"[a-f0-9]{64}", release["sha256"])
+                or type(release["size"]) is not int or not 0 < release["size"] <= MAX_ASSET):
+            raise ValueError()
+    except (KeyError, TypeError, ValueError) as exc:
+        raise UpdateError("Metadonnees de release officielle invalides.") from exc
 
 
 def _source_guard(target: Installation) -> None:
@@ -378,8 +405,9 @@ def _download(release: dict, destination: Path) -> None:
         raise UpdateError("L'empreinte ou la taille du telechargement ne correspond pas a la release.")
 
 
-def apply_release(target: Installation, release: dict, before: dict) -> dict:
+def apply_release(target: Installation, release: dict, before: dict, *, progress=None) -> dict:
     """Sous verrou ; aucun fichier de l'environnement actif n'est remplace."""
+    validate_release(release)
     if target.state() != before:
         raise UpdateError("La version active a change depuis la confirmation ; relancer la commande.")
     _source_guard(target)
@@ -389,11 +417,19 @@ def apply_release(target: Installation, release: dict, before: dict) -> dict:
     activated = False
     try:
         wheel = candidate / release["name"]
+        if progress:
+            progress("download")
         _download(release, wheel)
+        if progress:
+            progress("environment")
         _run([str(target.python), "-I", "-m", "venv", str(candidate / "venv")])
         python = target.executable(slot)
+        if progress:
+            progress("install")
         _run([str(python), "-I", "-m", "pip", "install", "--disable-pip-version-check",
               "--no-input", str(wheel)])
+        if progress:
+            progress("verify")
         if health_check(python) != release["version"]:
             raise UpdateError("La version du paquet differe de celle annoncee par la release.")
         _source_guard(target)
@@ -402,6 +438,8 @@ def apply_release(target: Installation, release: dict, before: dict) -> dict:
         state = {**before, "schema": 1, "active": slot, "previous": before.get("active"),
                  "can_rollback": True, "base_fingerprint": before.get("base_fingerprint") or _fingerprint(target.package)}
         _write_json(candidate / "release.json", {k: v for k, v in release.items() if k != "notes"})
+        if progress:
+            progress("select")
         _write_json(target.root / "state.json", state)
         activated = True
         return {"version": release["version"], "active": slot, "restart_required": True}
@@ -417,12 +455,14 @@ def apply_release(target: Installation, release: dict, before: dict) -> dict:
                 shutil.rmtree(candidate, ignore_errors=True)
 
 
-def rollback(target: Installation, before: dict) -> dict:
+def rollback(target: Installation, before: dict, *, progress=None) -> dict:
     if target.state() != before:
         raise UpdateError("La version active a change depuis la confirmation.")
     if not before.get("can_rollback"):
         raise UpdateError("Aucune version precedente n'est enregistree.")
     _source_guard(target)
+    if progress:
+        progress("verify_previous")
     previous = before.get("previous")
     if previous is None:
         if _fingerprint(target.package) != before.get("base_fingerprint"):
@@ -433,6 +473,10 @@ def rollback(target: Installation, before: dict) -> dict:
     _source_guard(target)
     if target.state() != before:
         raise UpdateError("La version active a change pendant la verification.")
+    if progress:
+        progress("select_previous")
+    from .update_service import hold_version
+    hold_version(target, before)
     _write_json(target.root / "state.json", {**before, "active": previous, "previous": before.get("active")})
     return {"version": version, "active": previous, "restart_required": True}
 
@@ -472,6 +516,10 @@ def command(*, check_only: bool = False, revert: bool = False, yes: bool = False
             print("Aucune mise a jour disponible." if result["latest_version"] else "Aucune release stable publiee.")
             return
         release = result["release"]
+        active = before.get("active")
+        if active and version_tuple(active.split("-", 1)[0][1:]) >= version_tuple(release["version"]):
+            print("Cette version est deja preparee. Reconnecter le MCP pour l'activer.")
+            return
         print(f"ROMEO MCP {__version__} -> {release['version']}\n{release['page']}")
         # Les notes distantes sont des donnees, jamais une commande a executer.
         print(re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", release["notes"])[:12000])
@@ -487,26 +535,16 @@ def command(*, check_only: bool = False, revert: bool = False, yes: bool = False
 
 
 def start_notice() -> None:
-    """Controle au plus quotidien, hors du chemin critique et uniquement sur stderr."""
+    """Controle et eventuelle installation autorisee, hors du chemin critique."""
     if os.environ.get("ROMEO_UPDATE_CHECK", "1").casefold() in {"0", "false", "no"}:
         return
 
     def worker():
         try:
-            target = installation()
-            with file_lock(target.root / "notice.lock"):
-                path = target.root / "check.json"
-                cached = _read_json(path, {})
-                if time.time() - float(cached.get("checked_at", 0)) >= 86400:
-                    try:
-                        release = latest_release()
-                        cached = {"checked_at": time.time(), "version": release["version"] if release else None}
-                    except UpdateError:
-                        cached = {"checked_at": time.time(), "version": None}
-                    _write_json(path, cached)
-                version = cached.get("version")
-                if version and version_tuple(version) > version_tuple(__version__):
-                    print(f"ROMEO MCP : version {version} disponible. Executer python -m romeo_mcp update pour la consulter.", file=sys.stderr, flush=True)
+            from .update_service import startup
+            result = startup(installation())
+            if result.get("message") and (result.get("update_available") or result.get("restart_required") or not result.get("ok")):
+                print("ROMEO MCP : " + result["message"], file=sys.stderr, flush=True)
         except (OSError, ValueError, TypeError, AttributeError):
             # Un controle facultatif ne doit pas empecher le serveur de demarrer.
             return

@@ -35,7 +35,7 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **88 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **93 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 
@@ -89,12 +89,12 @@ la provenance et les limites de cette copie. Le
 
 - [Configuration](configuration.md) : accès personnels, priorités des réglages,
   profils `essential`, `full` et `expert`, clients stdio, `doctor --live`, déplacement et WSL.
-- [Tools](Tools.md) : catalogue cliquable de 88 outils MCP, fiches par outil, MPI et GPU, logiciels,
+- [Tools](Tools.md) : catalogue cliquable de 93 outils MCP, fiches par outil, MPI et GPU, logiciels,
   stockage, diagnostics, mesures et limites de conception.
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
-- [Mises à jour](updates.md) : versions stables, confirmation, activation et retour arrière.
+- [Mises à jour](updates.md) : outils MCP, accord automatique durable, progression, activation et retour arrière.
 
 ## Lire un résultat dans son contexte
 

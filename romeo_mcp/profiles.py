@@ -9,6 +9,7 @@ from .config import setting
 PROFILES = ("essential", "full", "expert")
 EXPERT_TOOLS = frozenset({"compute_command_prepare", "compute_command_run", "login_command_run"})
 ESSENTIAL_TOOLS = frozenset({
+    "mcp_update_check", "mcp_update_start", "mcp_update_status", "mcp_update_rollback", "mcp_update_policy",
     "tool_profile_get", "tool_profile_set", "search_docs", "read_doc", "romeo_status", "romeo_quota",
     "romeo_software", "job_prepare", "job_submit", "job_status", "job_log_tail", "job_log_search", "list_jobs",
     "cancel_job", "diagnose_job", "job_efficiency", "list_dir",

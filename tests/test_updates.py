@@ -2,6 +2,7 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 import hashlib
+import base64
 import io
 import json
 import os
@@ -276,6 +277,31 @@ else:
 
 
 class ProcessIntegrationTests(TemporaryInstallation):
+    @unittest.skipUnless(os.name == "nt", "Job Object propre a Windows")
+    def test_explicit_worker_breakaway_survives_launcher_exit(self):
+        # Le lanceur garde ses serveurs dans un Job Object, mais un worker de
+        # mise a jour doit pouvoir finir apres fermeture de ce lanceur.
+        marker = self.root / "worker-finished.txt"
+        started = self.root / "worker-started.txt"
+        child_code = ("from pathlib import Path; import time; "
+                      "Path(" + repr(str(started)) + ").write_text('started'); "
+                      "time.sleep(0.8); Path(" + repr(str(marker)) + ").write_text('finished')")
+        server_code = ("import subprocess, sys; "
+                       "subprocess.Popen([sys.executable, '-I', '-c', " + repr(child_code) + "], "
+                       "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, "
+                       "creationflags=subprocess.CREATE_NO_WINDOW | subprocess.CREATE_BREAKAWAY_FROM_JOB)")
+        launcher_code = ("import sys, os; sys.path.insert(0, " + repr(str(ROOT)) + "); "
+                         "from romeo_mcp.updates import _windows_run; "
+                         "sys.exit(_windows_run([sys.executable, '-I', '-c', " + repr(server_code) + "], dict(os.environ)))")
+        process = subprocess.run([sys.executable, "-I", "-c", launcher_code], capture_output=True, timeout=20)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        import time
+        deadline = time.monotonic() + 10
+        while not marker.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        self.assertTrue(started.exists())
+        self.assertTrue(marker.exists(), "le worker a ete arrete avec le lanceur")
+
     def test_real_install_dispatch_stdio_and_rollback_without_network(self):
         # Les chemins du lanceur restent constants meme apres un exec isole.
         env = {**os.environ, u.ORIGIN_ENV: json.dumps(self.target.origin),
@@ -285,18 +311,39 @@ class ProcessIntegrationTests(TemporaryInstallation):
             target = u.installation()
         data = fixture_wheel()
         expected = release(data)
-        run = u._run
-        def offline_run(command, **kwargs):
-            if "pip" in command:
-                command = [*command[:-1], "--no-index", "--no-deps", command[-1]]
-            return run(command, **kwargs)
         private = self.root / "private-config.json"
         private.write_text('{"ROMEO_ACCOUNT":"test-project"}', encoding="utf-8")
         private_before = private.read_bytes()
         source_before = u._fingerprint(self.package)
-        before = target.state()
-        with patch.object(u, "_request", return_value=io.BytesIO(data)), patch.object(u, "_run", side_effect=offline_run):
-            result = u.apply_release(target, expected, before)
+        # Exercer le vrai worker detache avec une wheel locale, sans index.
+        from romeo_mcp import update_service as service
+        original_spawn = subprocess.Popen
+        children = []
+        encoded = base64.b64encode(data).decode("ascii")
+        def offline_spawn(command, **kwargs):
+            code = ("import sys; sys.path.insert(0, " + repr(str(ROOT)) + "); "
+                    "import base64, io; from romeo_mcp import updates as u; "
+                    "u._request = lambda url: io.BytesIO(base64.b64decode(" + repr(encoded) + ")); "
+                    "original_run = u._run; "
+                    "u._run = lambda command, **kwargs: original_run([*command[:-1], '--no-index', '--no-deps', command[-1]] if 'pip' in command else command, **kwargs); "
+                    "from romeo_mcp.update_worker import main; main()")
+            child = original_spawn([command[0], "-I", "-c", code, command[-1]], **kwargs)
+            children.append(child)
+            return child
+        with patch.dict(os.environ, env), patch.object(u, "latest_release", return_value=expected), \
+             patch.object(service.subprocess, "Popen", side_effect=offline_spawn):
+            launched = service.start(True, "9.0.0", target=target)
+        self.assertTrue(launched["started"])
+        self.assertFalse(launched["result_validated"])
+        try:
+            self.assertEqual(children[0].wait(timeout=60), 0, service.status(target=target))
+        finally:
+            if children[0].poll() is None:
+                children[0].kill()
+                children[0].wait(timeout=15)
+        result = service.status(launched["operation_id"], target=target)["operation"]
+        self.assertEqual(result["state"], "ready")
+        self.assertTrue(result["result_validated"])
         self.assertEqual(result["version"], "9.0.0")
         self.assertEqual(u._fingerprint(self.package), source_before)
         self.assertEqual(private.read_bytes(), private_before)

@@ -45,6 +45,7 @@ SSH au calculateur.
 | `setup` | [test_setup.py](test_setup.py) | Configuration personnelle, installation et confidentialité |
 | `accompagnement` | [test_accompagnement.py](test_accompagnement.py) | Profils d’outils, diagnostic simulé, filtrage et reproductibilité |
 | `updates` | [test_updates.py](test_updates.py) | Intégrité des releases, confirmation, installation isolée réelle sans réseau, stdio et retour arrière avec processus actif |
+| `update-tools` | [test_update_tools.py](test_update_tools.py) | Accord automatique, erreurs explicites, absence de doublons, interruptions, écartement après retour et outils par stdio |
 | `corpus` | [verify_corpus.py](../tools/verify_corpus.py) | Liens, images, accessibilité et empreintes de la documentation |
 
 Les appuis partagés se trouvent dans [commun.py](commun.py) et

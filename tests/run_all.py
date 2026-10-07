@@ -54,6 +54,8 @@ SUITES = [
      "profils MCP, diagnostic distant simule et reproductibilite privee", False),
     ("updates", "tests/test_updates.py",
      "releases, confirmation, activation, retour et isolation des mises a jour", False),
+    ("update-tools", "tests/test_update_tools.py",
+     "automatisme autorise, workers, interruptions, retour et protocole MCP", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.
