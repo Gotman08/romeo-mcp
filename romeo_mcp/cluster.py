@@ -362,7 +362,8 @@ def cheatsheet() -> str:
     lines += ["- `{}`".format(name) for name in MODULES_KNOWN]
     lines += [
         "",
-        "Attention : `openmpi/aarch64/*` pour `armgpu`, `openmpi/gnu/*` pour `x64cpu`.",
+        "Ces modules historiques ne remplacent pas le catalogue Spack actuel.",
+        "ROMEO 2025 : OpenMPI sur x64cpu ; NVHPC/HPC-X sur armgpu. Fixer une empreinte /hash avec romeo_software.",
         "",
         "## Charger des logiciels : la voie officielle",
         "",

@@ -12,7 +12,7 @@ Lecture locale de la configuration et du profil ; la disponibilite du cluster re
 
 | Nom | Type | Obligatoire | Defaut |
 |---|---|---|---|
-| `task` | string : all, jobs, services, python, files | Non | "all" |
+| `task` | string : all, jobs, resume, parallel, services, python, files | Non | "all" |
 
 ## Exemple
 

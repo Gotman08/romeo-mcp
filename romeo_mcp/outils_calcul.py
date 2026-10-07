@@ -108,6 +108,12 @@ def job_prepare(
     cpu_bind: str | None = None,
     secret_env_file: str | None = None,
     data_files: list[str] | None = None,
+    reservation: str | None = None,
+    gpus_per_task: int = 0,
+    gpu_bind: str | None = None,
+    omp_places: str = "cores",
+    omp_proc_bind: str = "close",
+    mpi_environment: dict | None = None,
 ) -> dict[str, Any]:
     """Prepare le script exact et conserve un plan local, sans soumettre."""
     require_account()
@@ -131,6 +137,8 @@ def job_prepare(
         container=container,
         redirect_caches=redirect_caches,
         nccl_debug=nccl_debug,
+        reservation=reservation, gpus_per_task=gpus_per_task, gpu_bind=gpu_bind,
+        omp_places=omp_places, omp_proc_bind=omp_proc_bind, mpi_environment=mpi_environment,
         stage_archive=stage_archive,
         job_tmpdir=job_tmpdir,
         keep_patterns=keep_patterns or [],
@@ -167,6 +175,10 @@ def job_prepare(
         "redirect_caches": plan.spec.redirect_caches,
         "ntasks_per_node": plan.spec.ntasks_per_node,
         "mem_gb": plan.spec.mem_gb,
+        "reservation": plan.spec.reservation, "gpus_per_task": plan.spec.gpus_per_task,
+        "gpu_bind": plan.spec.gpu_bind, "cpu_bind": plan.spec.cpu_bind,
+        "omp_places": plan.spec.omp_places, "omp_proc_bind": plan.spec.omp_proc_bind,
+        "mpi_environment": plan.spec.mpi_environment,
     }
 
     return _prepare_submission("job", s, foyer, racine, hors_ligne,
@@ -664,6 +676,17 @@ def job_resilient_prepare(
     spack_packages: list[str] | None = None,
     stage_archive: str | None = None,
     workdir: str | None = None,
+    nodes: int = 1,
+    ntasks_per_node: int = 1,
+    distributed: str | None = None,
+    cpu_bind: str | None = None,
+    reservation: str | None = None,
+    gpus_per_task: int = 0,
+    gpu_bind: str | None = None,
+    omp_places: str = "cores",
+    omp_proc_bind: str = "close",
+    mpi_environment: dict | None = None,
+    checkpoint_contract: dict | None = None,
 ) -> dict[str, Any]:
     return workload_preparation.job_resilient_prepare(
         name=name, command=command, segment_time=segment_time,
@@ -671,6 +694,10 @@ def job_resilient_prepare(
         cpus_per_task=cpus_per_task, gpus_per_node=gpus_per_node, mem_gb=mem_gb,
         arch=arch, spack_packages=spack_packages, stage_archive=stage_archive,
         workdir=workdir,
+        nodes=nodes, ntasks_per_node=ntasks_per_node, distributed=distributed, cpu_bind=cpu_bind,
+        reservation=reservation, gpus_per_task=gpus_per_task, gpu_bind=gpu_bind,
+        omp_places=omp_places, omp_proc_bind=omp_proc_bind,
+        mpi_environment=mpi_environment, checkpoint_contract=checkpoint_contract,
     )
 
 

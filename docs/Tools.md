@@ -2,7 +2,7 @@
 
 [Accueil](../README.md) › [Documentation](README.md) › Tools
 
-Catalogue des **78 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
+Catalogue des outils MCP du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
 Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son résultat, ses effets et ses limites.
 
 <details>
@@ -789,3 +789,20 @@ d'intégrité conservent leur intention unique.
 | [`transfer_start`](tools/transfer_start.md) | Lance la copie apres confirmation, une seule fois par plan. |
 | [`transfer_status`](tools/transfer_status.md) | Relit les traces locales, sans attendre ni relancer une copie. |
 | [`transfer_cancel`](tools/transfer_cancel.md) | Demande l annulation ; seul le worker peut en confirmer l observation. |
+
+## Checkpoints, reprise et environnement parallele
+
+[Guide du contrat generique](checkpoints.md)
+
+| Outil | Effet |
+|---|---|
+| [`job_resume_prepare`](tools/job_resume_prepare.md) | Enregistre un plan local depuis un job termine. Lit les preuves et l etat Slurm ; aucune ecriture ni soumission sur ROMEO. |
+| [`job_resume_submit`](tools/job_resume_submit.md) | Ecrit les fichiers scelles et appelle sbatch apres confirm=true, une seule fois par plan. |
+| [`job_resume_status`](tools/job_resume_status.md) | Lecture des preuves distantes et de Slurm ; conserve une observation locale datee. |
+| [`job_checkpoint_request`](tools/job_checkpoint_request.md) | Envoie SIGUSR1 au batch apres observation RUNNING. Ne certifie aucune sauvegarde. |
+| [`checkpoint_inspect`](tools/checkpoint_inspect.md) | Lecture bornee des manifestes ; aucun hachage des gros fichiers ni soumission. |
+| [`checkpoint_protect_prepare`](tools/checkpoint_protect_prepare.md) | Enregistre un plan local pour un petit job de verification/copie. Aucune copie pendant la preparation. |
+| [`checkpoint_protect_submit`](tools/checkpoint_protect_submit.md) | Depose le plan exact et appelle sbatch apres confirm=true. |
+| [`checkpoint_export_prepare`](tools/checkpoint_export_prepare.md) | Prepare un transfert local scelle, sans copier de fichier. |
+| [`checkpoint_export_status`](tools/checkpoint_export_status.md) | Lit le transfert et, apres copie, hache les fichiers sur la machine du client. Conserve une preuve locale datee. |
+| [`job_environment_status`](tools/job_environment_status.md) | Lit le releve MPI produit dans l allocation et conserve une observation locale datee. |

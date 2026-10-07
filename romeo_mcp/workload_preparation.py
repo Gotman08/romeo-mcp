@@ -111,6 +111,17 @@ def job_resilient_prepare(
     spack_packages: list[str] | None = None,
     stage_archive: str | None = None,
     workdir: str | None = None,
+    nodes: int = 1,
+    ntasks_per_node: int = 1,
+    distributed: str | None = None,
+    cpu_bind: str | None = None,
+    reservation: str | None = None,
+    gpus_per_task: int = 0,
+    gpu_bind: str | None = None,
+    omp_places: str = "cores",
+    omp_proc_bind: str = "close",
+    mpi_environment: dict | None = None,
+    checkpoint_contract: dict | None = None,
 ) -> dict[str, Any]:
     """Chaine plusieurs segments dependants autour d'un point de reprise."""
     require_account()
@@ -127,7 +138,7 @@ def job_resilient_prepare(
             "un segment de moins de 10 minutes laisse trop peu de temps utile "
             "une fois le preavis de sauvegarde deduit."
         )
-    if signal_before >= duree_segment:
+    if signal_before < 1 or signal_before >= duree_segment:
         return _error(
             "le preavis ({} s) doit rester inferieur a la duree d'un segment "
             "({} s).".format(signal_before, duree_segment)
@@ -143,6 +154,15 @@ def job_resilient_prepare(
     dossier = checkpoint_dir or posixpath.join(scratch, "ckpts", name)
     try:
         dossier = check_path(dossier, home, scratch, aliases)
+        if checkpoint_contract is not None:
+            checkpoint_contract = dict(checkpoint_contract)
+            for field in ("code_files", "data_files"):
+                if field in checkpoint_contract:
+                    if not isinstance(checkpoint_contract[field], list) or any(not isinstance(p, str) for p in checkpoint_contract[field]):
+                        return _error("checkpoint_contract.%s attend une liste de chemins" % field)
+                    checkpoint_contract[field] = [check_path(p, home, scratch, aliases) for p in checkpoint_contract[field]]
+            if checkpoint_contract.get("backup_dir"):
+                checkpoint_contract["backup_dir"] = check_path(checkpoint_contract["backup_dir"], home, scratch, aliases)
     except GuardError as exc:
         return _error(str(exc))
 
@@ -152,6 +172,10 @@ def job_resilient_prepare(
         arch=arch, spack_packages=spack_packages or [], workdir=workdir,
         checkpoint_dir=dossier, signal_before=int(signal_before),
         stage_archive=stage_archive,
+        nodes=nodes, ntasks_per_node=ntasks_per_node, distributed=distributed, cpu_bind=cpu_bind,
+        reservation=reservation, gpus_per_task=gpus_per_task, gpu_bind=gpu_bind,
+        omp_places=omp_places, omp_proc_bind=omp_proc_bind,
+        mpi_environment=mpi_environment, checkpoint_contract=checkpoint_contract,
     )
     try:
         if workdir:
@@ -168,14 +192,25 @@ def job_resilient_prepare(
         "arch": plan.arch,
         "checkpoint_dir": dossier,
         "preavis_s": int(signal_before),
+        "nodes": plan.spec.nodes, "ntasks_per_node": plan.spec.ntasks_per_node,
+        "distributed": plan.spec.distributed, "cpu_bind": plan.spec.cpu_bind,
+        "checkpoint_contract": plan.spec.checkpoint_contract,
+        "checkpoint_verified_mode": plan.spec.checkpoint_contract is not None,
     }
 
     entries = [{"plan": asdict(plan), "reuse_previous_script": bool(i), "stage": {
         "name": str(i), "depends_on": [str(i-1)] if i else [], "condition": "afterany"}}
         for i in range(segments)]
+    warnings = list(plan.warnings)
+    if checkpoint_contract is None:
+        warnings.append("Mode historique : fichiers et marqueur TERMINE non verifies. Fournir checkpoint_contract pour une reprise prouvee.")
+    else:
+        warnings.append("Le programme doit publier un manifeste coherent et les preuves loaded/progress/completed ; aucun etat en memoire n'est sauvegarde automatiquement.")
+        if not checkpoint_contract.get("backup_dir"):
+            warnings.append("Aucune copie de conservation configuree. Les espaces ROMEO ne sont pas sauvegardes automatiquement ; preparer un export independant.")
     return _prepare_submission("resilient", s, home, scratch, offline, entries,
-                               {"resolved": resume, "warnings": plan.warnings, "script": plan.script,
-                                "prerequis": "Le programme doit reprendre le checkpoint et traiter SIGUSR1."})
+                               {"resolved": resume, "warnings": warnings, "script": plan.script,
+                                "prerequis": "Le programme doit reprendre le checkpoint et traiter SIGUSR1 ; le mode verifie exige les preuves du protocole."})
 
 
 def job_profile_prepare(

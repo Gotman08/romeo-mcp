@@ -28,9 +28,12 @@ def job_observation_get(job_id: str) -> dict[str, Any]:
 
 
 @outil(annotations=READ_ONLY, description="Outils pertinents pour une tache et leur visibilite dans le profil actuel. Verification locale ; ne certifie ni connexion SSH ni ressources libres.")
-def romeo_capabilities(task: Literal["all", "jobs", "services", "python", "files"] = "all") -> dict[str, Any]:
+def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "python", "files"] = "all") -> dict[str, Any]:
     groups = {
         "jobs": ["job_prepare", "plan_get", "job_submit", "job_status", "job_observation_get", "job_log_tail", "job_efficiency"],
+        "resume": ["checkpoint_inspect", "job_checkpoint_request", "job_resilient_prepare", "job_resilient_submit", "job_resume_prepare", "job_resume_submit",
+                   "job_resume_status", "checkpoint_protect_prepare", "checkpoint_protect_submit", "checkpoint_export_prepare", "transfer_start", "checkpoint_export_status"],
+        "parallel": ["romeo_software", "job_prepare", "job_submit", "job_environment_status", "job_efficiency"],
         "services": ["service_prepare", "service_start", "service_status", "service_connection_info", "service_stop"],
         "python": ["python_env_prepare", "python_env_create", "python_packages_prepare", "python_packages_install", "romeo_software"],
         "files": ["list_dir", "upload_to_romeo", "download_from_romeo", "transfer_prepare", "transfer_start", "transfer_status", "transfer_cancel"],

@@ -119,3 +119,5 @@ personnels restent hors du dépôt.
 ## Fraicheur et operations persistantes
 
 `python tests/run_all.py --only observability` verifie les caches expires, les ecritures SSH ambigues, les observations persistantes, les transferts consommables une fois et l annulation de processus locaux jetables. Cette suite est incluse dans la commande hors ligne par defaut.
+
+La suite `checkpoints` verifie les fichiers reels, les preuves par rang, les quotas et exports. Les tests POSIX utilisent de vrais processus avec un lanceur srun de test ; les contrats purs passent aussi sous Windows. Aucun job ROMEO ne tourne dans cette suite.

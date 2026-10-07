@@ -70,6 +70,20 @@ A savoir avant toute action :
   Ne precise pas la partition : elle est deduite du temps demande.
 - Apres un job, lis `job_efficiency` : il remplace `seff` (absent) et indique
   comment recalibrer le dimensionnement au run suivant.
+- Reprise : checkpoint_inspect lit les declarations, sans certifier les fichiers.
+  job_resilient_prepare(checkpoint_contract=...) exige un manifeste coherent
+  et des preuves applicatives loaded/progress/completed par rang. Reprendre un
+  job termine avec job_resume_prepare/job_resume_submit ; verifier avec
+  job_resume_status. Ne jamais annoncer une reprise sur un signal ou un fichier
+  trouve seulement. Les calculs depuis le dernier checkpoint peuvent etre refaits.
+- OpenMP explicite : distributed='openmp', un noeud et une tache ; MPI hybride :
+  distributed='mpi', nodes/ntasks_per_node/cpus_per_task et cpu_bind.
+  romeo_software expose compiler/variantes/hash ; preferer /hash et demander
+  mpi_environment pour verifier l'ELF et la libmpi sur le noeud alloue.
+- Les espaces ROMEO ne sont pas sauvegardes automatiquement. checkpoint_protect
+  prepare une copie avec quotas/retention ; une copie sur ROMEO n'est pas une
+  sauvegarde independante. checkpoint_export_prepare, transfer_start puis
+  checkpoint_export_status verifient une copie sur la machine du client.
 - Commence par lire la ressource `romeo://cheatsheet` en cas de doute.
 - La documentation officielle du cluster est disponible hors ligne : interroge-la
   avec `search_docs` (mots-cles ou question) avant une commande incertaine.

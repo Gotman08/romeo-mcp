@@ -10,6 +10,7 @@ import shlex
 import time
 import threading
 from .observability import ReadCache
+from .parallel_runtime import parse_spack_catalog
 from typing import Any
 from .cluster import (
     ARCHS,
@@ -253,7 +254,7 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
             # bruit.
             result = _sh(
                 s,
-                "{} >/dev/null || exit $?; spack find --no-groups".format(node["env_loader"]),
+                "{} >/dev/null || exit $?; spack find --json --deps".format(node["env_loader"]),
                 timeout=180,
                 max_chars=300_000,
                 read_only=True,
@@ -261,13 +262,6 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
         except (SSHError, SSHTimeout) as exc:
             return _error(str(exc))
 
-        catalogue = sorted(
-            {
-                line.strip()
-                for line in result.stdout.splitlines()
-                if line.strip() and "@" in line and not line.startswith("-")
-            }
-        )
         if not result.ok or result.truncated:
             return _error(
                 "`spack find` a echoue sur {} (code {}). Le catalogue n'est pas "
@@ -276,6 +270,11 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
                 ),
                 detail=result.stdout.strip()[:300],
             )
+        try:
+            specifications = parse_spack_catalog(result.stdout)
+        except ValueError as exc:
+            return _error(str(exc))
+        catalogue = [item["package"] for item in specifications]
         if not catalogue:
             return _error(
                 "`spack find` n'a rien renvoye d'exploitable pour {} : ne "
@@ -283,16 +282,17 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
                 detail=result.stdout.strip()[:300],
             )
         # On ne memorise qu'un catalogue reellement obtenu.
-        observation = {"packages": catalogue, "observed_at": time.time()}
+        observation = {"packages": catalogue, "specifications": specifications, "observed_at": time.time()}
         _SPACK_CACHE.put(cache_key, observation)
         age = 0
     else:
         observation, age = cached
 
-    packages = observation["packages"]
+    specifications = observation["specifications"]
     needle = (search or "").strip().lower()
     if needle:
-        packages = [p for p in packages if needle in p.lower()]
+        specifications = [p for p in specifications if needle in str(p).lower()]
+    packages = [p["package"] for p in specifications]
 
     limit = max(1, min(int(limit), 200))
     shown = packages[:limit]
@@ -306,6 +306,10 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
         "count": len(packages),
         "truncated": len(packages) > limit,
         "packages": shown,
+        "specifications": specifications[:limit],
+        "details_available": all(p["details_available"] for p in specifications[:limit]),
+        "dependency_records_included": True,
+        "mpi_guidance": "OpenMPI sur x64cpu ; NVHPC/HPC-X sur armgpu. Charger une empreinte /hash pour fixer l'installation.",
         "usage": (
             "Passe ces noms a job_prepare(spack_packages=[...]) ou "
             "compute_command_prepare(spack_packages=[...]) : le script generera "

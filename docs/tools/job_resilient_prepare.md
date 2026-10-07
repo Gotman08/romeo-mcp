@@ -31,6 +31,17 @@ Découpe un calcul long en segments reliés par des dépendances. Un signal SIGU
 | `spack_packages` | `list[str] \| None` | Non | `null` | Spécifications Spack à charger pour l’architecture du job. |
 | `stage_archive` | `str \| None` | Non | `null` | Archive de données à extraire dans /dev/shm pour le calcul. |
 | `workdir` | `str \| None` | Non | `null` | Répertoire de travail distant autorisé ; null utilise le dossier prévu par la préparation. |
+| `nodes` | `int` | Non | `1` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `ntasks_per_node` | `int` | Non | `1` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `distributed` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `cpu_bind` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `reservation` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `gpus_per_task` | `int` | Non | `0` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `gpu_bind` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `omp_places` | `str` | Non | `"cores"` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `omp_proc_bind` | `str` | Non | `"close"` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `mpi_environment` | `dict \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `checkpoint_contract` | `dict \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -71,3 +82,7 @@ Votre programme doit savoir sauvegarder et reprendre ses checkpoints. Un segment
 ---
 
 [↑ Haut de page](#job_resilient_prepare) · [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
+
+## Reprise et controle MPI
+
+Consulter le [guide du contrat generique](../checkpoints.md). Les interfaces de preparation ne certifient jamais un checkpoint ou un executable avant les controles effectues dans l allocation.

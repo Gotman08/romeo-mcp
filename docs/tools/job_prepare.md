@@ -42,6 +42,12 @@ Valide les ressources et génère le script du calcul sans le soumettre. Les opt
 | `cpu_bind` | `str \| None` | Non | `null` | Politique d’affinité CPU transmise à srun. |
 | `secret_env_file` | `str \| None` | Non | `null` | Chemin du fichier privé à sourcer au lancement ; aucune valeur de secret à fournir ici. |
 | `data_files` | `list[str] \| None` | Non | `null` | Fichiers d’entrée dont relever les empreintes : au plus 20 et 64 Mio au total. |
+| `reservation` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `gpus_per_task` | `int` | Non | `0` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `gpu_bind` | `str \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `omp_places` | `str` | Non | `"cores"` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `omp_proc_bind` | `str` | Non | `"close"` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
+| `mpi_environment` | `dict \| None` | Non | `null` | Voir le [contrat de reprise et parallelisme](../checkpoints.md). |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -81,3 +87,7 @@ Le projet Slurm doit être configuré. Un aperçu hors ligne aux chemins illustr
 ---
 
 [↑ Haut de page](#job_prepare) · [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
+
+## Reprise et controle MPI
+
+Consulter le [guide du contrat generique](../checkpoints.md). Les interfaces de preparation ne certifient jamais un checkpoint ou un executable avant les controles effectues dans l allocation.
