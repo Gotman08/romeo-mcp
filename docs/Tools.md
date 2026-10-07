@@ -2,7 +2,7 @@
 
 [Accueil](../README.md) › [Documentation](README.md) › Tools
 
-Catalogue des **71 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
+Catalogue des outils MCP du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
 Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son résultat, ses effets et ses limites.
 
 <details>
@@ -74,9 +74,9 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
-| `essential` | 22 | Documentation, contexte cluster, jobs simples, transferts et relevés courants. |
-| `full` | 68 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
-| `expert` | 71 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `essential` | 35 | Documentation, contexte cluster, jobs, reprise, mises à jour et relevés courants. |
+| `full` | 90 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
+| `expert` | 93 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -91,6 +91,18 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 | [`tool_profile_set`](tools/tool_profile_set.md) | Changer le profil d’outils de la connexion. | `essential`, `full`, `expert` |
 | [`search_docs`](tools/search_docs.md) | Trouver les sections utiles dans la documentation ROMEO. | `essential`, `full`, `expert` |
 | [`read_doc`](tools/read_doc.md) | Lire une page ou une plage de lignes du corpus local. | `essential`, `full`, `expert` |
+
+### Mise à jour du MCP
+
+| Outil | Rôle | Profils |
+|---|---|---|
+| [`mcp_update_check`](tools/mcp_update_check.md) | Détecter une release et présenter les versions exécutée et sélectionnée. | Tous |
+| [`mcp_update_policy`](tools/mcp_update_policy.md) | Conserver l'autorisation automatique sans la redemander à chaque version. | Tous |
+| [`mcp_update_start`](tools/mcp_update_start.md) | Préparer la release vérifiée dans un environnement séparé. | Tous |
+| [`mcp_update_status`](tools/mcp_update_status.md) | Suivre la progression et relire le résultat après reconnexion. | Tous |
+| [`mcp_update_rollback`](tools/mcp_update_rollback.md) | Revenir à la version précédente après vérification. | Tous |
+
+Voir le [parcours automatique et les limites de l'activation](updates.md#mise-à-jour-par-le-modèle).
 
 ### Cluster et ordonnancement
 
@@ -775,3 +787,34 @@ d'intégrité conservent leur intention unique.
 ---
 
 [↑ Haut de page](#tools) · [Accueil](../README.md) · [Documentation](README.md)
+
+## Diagnostics et transferts detaches
+
+[Parcours, mesures et limites](observability.md)
+
+| Outil | Fonction |
+|---|---|
+| [`mcp_diagnostics`](tools/mcp_diagnostics.md) | Lecture locale des compteurs ; aucune connexion SSH ouverte. |
+| [`romeo_capabilities`](tools/romeo_capabilities.md) | Lecture locale de la configuration et du profil ; la disponibilite du cluster reste a observer. |
+| [`job_observation_get`](tools/job_observation_get.md) | Dernier etat conserve, avec son age. Ne certifie pas la cible ou l etat actuel. |
+| [`transfer_prepare`](tools/transfer_prepare.md) | Ecrit uniquement un plan local. Verifie les chemins avec les racines SSH configurees. |
+| [`transfer_start`](tools/transfer_start.md) | Lance la copie apres confirmation, une seule fois par plan. |
+| [`transfer_status`](tools/transfer_status.md) | Relit les traces locales, sans attendre ni relancer une copie. |
+| [`transfer_cancel`](tools/transfer_cancel.md) | Demande l annulation ; seul le worker peut en confirmer l observation. |
+
+## Checkpoints, reprise et environnement parallele
+
+[Guide du contrat generique](checkpoints.md)
+
+| Outil | Effet |
+|---|---|
+| [`job_resume_prepare`](tools/job_resume_prepare.md) | Enregistre un plan local depuis un job termine. Lit les preuves et l etat Slurm ; aucune ecriture ni soumission sur ROMEO. |
+| [`job_resume_submit`](tools/job_resume_submit.md) | Ecrit les fichiers scelles et appelle sbatch apres confirm=true, une seule fois par plan. |
+| [`job_resume_status`](tools/job_resume_status.md) | Lecture des preuves distantes et de Slurm ; conserve une observation locale datee. |
+| [`job_checkpoint_request`](tools/job_checkpoint_request.md) | Envoie SIGUSR1 au batch apres observation RUNNING. Ne certifie aucune sauvegarde. |
+| [`checkpoint_inspect`](tools/checkpoint_inspect.md) | Lecture bornee des manifestes ; aucun hachage des gros fichiers ni soumission. |
+| [`checkpoint_protect_prepare`](tools/checkpoint_protect_prepare.md) | Enregistre un plan local pour un petit job de verification/copie. Aucune copie pendant la preparation. |
+| [`checkpoint_protect_submit`](tools/checkpoint_protect_submit.md) | Depose le plan exact et appelle sbatch apres confirm=true. |
+| [`checkpoint_export_prepare`](tools/checkpoint_export_prepare.md) | Prepare un transfert local scelle, sans copier de fichier. |
+| [`checkpoint_export_status`](tools/checkpoint_export_status.md) | Lit le transfert et, apres copie, hache les fichiers sur la machine du client. Conserve une preuve locale datee. |
+| [`job_environment_status`](tools/job_environment_status.md) | Lit le releve MPI produit dans l allocation et conserve une observation locale datee. |

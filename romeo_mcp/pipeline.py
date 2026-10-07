@@ -29,6 +29,8 @@ CHAMPS_ETAPE = {
     "cpus_per_task", "gpus_per_node", "mem_gb", "arch", "partition",
     "modules", "spack_packages", "array", "distributed", "container",
     "redirect_caches", "job_tmpdir", "depends_on", "condition",
+    "reservation", "gpus_per_task", "gpu_bind", "cpu_bind",
+    "omp_places", "omp_proc_bind", "mpi_environment",
 }
 
 #: Conditions de dependance SLURM utiles ici. `afterok` est le defaut : une

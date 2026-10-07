@@ -36,7 +36,7 @@ _CACHES = (
 #: `mpi` est la voie generique du calcul parallele sur ce cluster ; les
 #: autres familles sont propres a l'ecosysteme PyTorch et n'ont de sens que
 #: pour des charges de travail qui l'utilisent.
-FAMILLES_DISTRIBUEES = ("mpi", "ddp", "accelerate", "deepspeed", "srun")
+FAMILLES_DISTRIBUEES = ("mpi", "openmp", "ddp", "accelerate", "deepspeed", "srun")
 
 #: Familles supposant des GPU et un point de rendez-vous PyTorch.
 FAMILLES_PYTORCH = ("ddp", "accelerate", "deepspeed", "srun")
@@ -79,7 +79,7 @@ def preambule_distribue(famille: str, gpus_par_noeud: int, nccl_debug: bool) -> 
     Le MPI generique n'a besoin d'aucun point de rendez-vous : SLURM et
     OpenMPI se coordonnent seuls des lors que la commande passe par `srun`.
     Le rendez-vous MASTER_ADDR/MASTER_PORT est propre a PyTorch."""
-    if famille == "mpi":
+    if famille in {"mpi", "openmp"}:
         return [
             "# SLURM et OpenMPI se coordonnent via srun : aucun point de",
             "# rendez-vous a declarer.",
@@ -112,7 +112,7 @@ def lanceur_distribue(famille: str, commande: str, gpus_par_noeud: int,
                       affinite: str = "") -> str:
     """Enveloppe la commande de l'utilisateur dans le lanceur adapte."""
     prefixe = "srun {} ".format(affinite) if affinite else "srun "
-    if famille == "mpi":
+    if famille in {"mpi", "openmp"}:
         # Forme documentee par ROMEO : le simple prefixe srun suffit.
         return prefixe + commande
     if famille == "ddp":
@@ -260,15 +260,17 @@ def preambule_tmpdir(scratch: str, conserver: list[str] | None = None) -> list[s
         'mkdir -p "$TMPDIR"',
         "_romeo_rapatrier() {",
         '  # Les resultats sont sauves AVANT la destruction du temporaire.',
-        '  local destination="${SLURM_SUBMIT_DIR:-$PWD}" fichier',
+        '  local destination="${SLURM_SUBMIT_DIR:-$PWD}" fichier echec=0',
         "  shopt -s nullglob",
         '  for fichier in {}; do'.format(
             " ".join('"$TMPDIR"/{}'.format(m) for m in motifs)
         ),
-        '    cp -a "$fichier" "$destination"/ 2>/dev/null || true',
+        '    cp -a "$fichier" "$destination"/ || echec=1',
         "  done",
         "  shopt -u nullglob",
-        '  rm -rf "$TMPDIR"',
+        '  if [ "$echec" -eq 0 ]; then rm -rf "$TMPDIR"; else',
+        '    echo "[romeo-mcp] copie echouee : TMPDIR conserve dans $TMPDIR" >&2',
+        '  fi',
         "}",
         "_ROMEO_NETTOYAGE+=('_romeo_rapatrier')",
         'echo "[romeo-mcp] TMPDIR=$TMPDIR (detruit en fin de job, {} conserves)"'.format(

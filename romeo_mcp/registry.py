@@ -11,6 +11,7 @@ SQLite, dans ``~/.romeo-mcp/jobs.db``.
 from __future__ import annotations
 
 import os
+import atexit
 import hashlib
 import json
 import sqlite3
@@ -52,6 +53,13 @@ CREATE TABLE IF NOT EXISTS report_snapshots (
     report_id TEXT PRIMARY KEY,
     payload TEXT NOT NULL,
     sha256 TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS job_observations (
+    job_id TEXT NOT NULL,
+    target TEXT NOT NULL,
+    observed_at REAL NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (job_id, target)
 );
 """
 
@@ -144,6 +152,28 @@ class Registry:
             )
             self._conn.commit()
 
+    def save_observation(self, job_id: str, target: dict, payload: dict) -> dict:
+        """Retain the latest observed state across SSH and MCP restarts."""
+        observed = time.time()
+        key = json.dumps(target, sort_keys=True)
+        with self._lock, self._conn:
+            self._conn.execute("INSERT OR REPLACE INTO job_observations VALUES (?, ?, ?, ?)",
+                               (str(job_id), key, observed, json.dumps(payload, ensure_ascii=False)))
+        return {"observed_at": observed, "target": target, "source": "slurm", "current_state_observed": True}
+
+    def observation(self, job_id: str, target: dict | None = None) -> dict | None:
+        with self._lock:
+            if target is None:
+                row = self._conn.execute("SELECT * FROM job_observations WHERE job_id=? ORDER BY observed_at DESC LIMIT 1", (str(job_id),)).fetchone()
+            else:
+                row = self._conn.execute("SELECT * FROM job_observations WHERE job_id=? AND target=?",
+                                         (str(job_id), json.dumps(target, sort_keys=True))).fetchone()
+        if row is None:
+            return None
+        return {"job_id": str(job_id), "target": json.loads(row["target"]), "observed_at": row["observed_at"],
+                "age_seconds": max(0, time.time() - row["observed_at"]), "current_state_observed": False,
+                "result": json.loads(row["payload"])}
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
@@ -217,4 +247,5 @@ def registry() -> Registry:
     with _REGISTRY_LOCK:
         if _REGISTRY is None:
             _REGISTRY = Registry()
+            atexit.register(_REGISTRY.close)
         return _REGISTRY

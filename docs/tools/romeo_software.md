@@ -57,3 +57,7 @@ Les catalogues x64cpu et armgpu diffèrent. L’absence d’un programme dans le
 ---
 
 [↑ Haut de page](#romeo_software) · [Cluster et ordonnancement](../Tools.md#cluster-et-ordonnancement) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
+
+## Catalogue detaille
+
+`specifications` expose compilateurs, variantes, architecture, dependances et `load_spec=/hash`. Les noms historiques restent dans `packages`. Si la sortie ne contient pas ces details, `details_available=false` ne permet aucune conclusion de compatibilite. Voir le [guide MPI](../checkpoints.md#mpi-openmp-et-ressources-slurm).

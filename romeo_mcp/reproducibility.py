@@ -212,6 +212,11 @@ def submission_provenance(connection, plan) -> dict:
                                       "cpus_per_task": spec.cpus_per_task, "gpus_per_node": spec.gpus_per_node,
                                       "mem_gb": spec.mem_gb, "seconds": plan.seconds,
                                       "partition": plan.partition}}
+    if spec.checkpoint_contract is not None or spec.mpi_environment is not None:
+        from dataclasses import asdict
+        result["checkpoint_job"] = {"spec": asdict(spec), "architecture": plan.arch,
+                                    "target": {"host": getattr(connection, "host", ""),
+                                               "user": getattr(connection, "user", ""), "account": spec.account}}
     try:
         result["code"] = observe_files(connection, plan.workdir, [])["git"]
     except (SSHError, SSHTimeout, ValueError, OSError):

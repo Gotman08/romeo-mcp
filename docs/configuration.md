@@ -34,6 +34,9 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_HOST` | `romeo1` | Alias dans votre configuration OpenSSH |
 | `ROMEO_QOS` | `normal` | QOS autorisée pour le projet |
 | `ROMEO_TOOL_PROFILE` | `full` | Catalogue annoncé : `essential`, `full` ou `expert` |
+| `ROMEO_AUTO_UPDATE` | Accord local, désactivé initialement | `1` autorise les installations automatiques ; `0` les bloque, même après un accord enregistré |
+| `ROMEO_UPDATE_CHECK` | `1` | `0` désactive le contrôle au démarrage ; les outils et le CLI restent utilisables |
+| `ROMEO_UPDATES_DIR` | Dossier utilisateur hors Git | Racine des versions isolées, de la politique et des observations |
 | `ROMEO_MAX_CPUS`, `ROMEO_MAX_GPUS`, `ROMEO_MAX_JOBS` | `0` | Seuils locaux indicatifs ; `0` signifie inconnu, sans avertissement de dépassement |
 | `ROMEO_MCP_DB` | `~/.romeo-mcp/jobs.db` | Registre privé des jobs et scripts soumis |
 | `ROMEO_SCRATCH`, `ROMEO_HOME` | Découverts par SSH | Racines distantes ; permettent aussi une simulation hors ligne |

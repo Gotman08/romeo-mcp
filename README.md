@@ -306,3 +306,5 @@ Code distribué sous [licence MIT](LICENSE). La documentation et les visuels off
 ---
 
 [↑ Haut de page](#romeo-mcp) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)
+
+[Checkpoints, MPI et OpenMP](docs/checkpoints.md)

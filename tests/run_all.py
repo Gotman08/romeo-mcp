@@ -40,6 +40,10 @@ SUITES = [
      "effets MCP, plans persistants, soumission exacte et recherches bornees", False),
     ("lifecycles", "tests/test_lifecycles.py",
      "services, configurations typees, fichiers atomiques et releves immuables", False),
+    ("observability", "tests/test_observable_operations.py",
+     "fraicheur, coupures SSH, operations persistantes, transferts et annulation", False),
+    ("checkpoints", "tests/test_checkpoints.py",
+     "reprise prouvee, rangs/signaux, quotas, protection et ressources paralleles", False),
     ("ajouts", "tests/test_ajouts.py",
      "enchainements de jobs, controle de derive du modele", False),
     ("docs", "tests/test_docs.py",
@@ -50,6 +54,8 @@ SUITES = [
      "profils MCP, diagnostic distant simule et reproductibilite privee", False),
     ("updates", "tests/test_updates.py",
      "releases, confirmation, activation, retour et isolation des mises a jour", False),
+    ("update-tools", "tests/test_update_tools.py",
+     "automatisme autorise, workers, interruptions, retour et protocole MCP", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.

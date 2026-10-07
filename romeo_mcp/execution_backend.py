@@ -8,7 +8,7 @@ import time
 import uuid
 import hashlib
 from .cluster import ClusterError, parse_duration
-from .ssh import SSHError, SSHTimeout, session
+from .ssh import SSHError, SSHTimeout, RomeoSession, session
 from .registry import registry
 from .validation import blocking_problems as _controle_du_script_genere
 SEUIL_SESSION_LONGUE = 120
@@ -22,8 +22,11 @@ def _sh(session_obj, command: str, **kwargs):
     passage vers le transport, et le delai demande dit deja tout ce qu'il faut
     savoir pour trancher.
     """
+    read_only = kwargs.pop("read_only", False)
     if kwargs.get("timeout", 30) >= SEUIL_SESSION_LONGUE:
         session_obj = session(longue=True)
+    if read_only and isinstance(session_obj, RomeoSession):
+        return session_obj.read(command, **kwargs)
     return session_obj.run(command, **kwargs)
 
 

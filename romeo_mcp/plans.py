@@ -18,6 +18,7 @@ _SUBMIT_TOOLS = {
     "python_env": "python_env_create", "python_packages": "python_packages_install",
     "python_wheel": "python_wheel_build", "allocation": "cluster_allocation_start",
     "command": "compute_command_run",
+    "resume": "job_resume_submit", "checkpoint_protect": "checkpoint_protect_submit",
 }
 
 
@@ -28,13 +29,26 @@ def _submission_target(s, home: str, scratch: str) -> dict:
 
 def prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dict:
     """Fige les scripts ; une simulation illustrative ne devient jamais executable."""
+    from .checkpoint_jobs import runtime_files
+    generated = {}
+    for entry in entries:
+        value = entry["plan"]
+        plan = Plan(**{**value, "spec": JobSpec(**value["spec"])})
+        for item in runtime_files(plan):
+            previous = generated.get(item["path"])
+            if previous and previous["sha256"] != item["sha256"]:
+                raise ValueError("Deux etapes declarent des fichiers runtime differents au meme chemin")
+            generated[item["path"]] = item
+    files = list(generated.values())
+    metadata = [{k: v for k, v in item.items() if k != "content"} for item in files]
     result = {"ok": True, "submitted": False, "mode": "prepared", **preview,
+              "runtime_artifacts": metadata,
               "submittable": not bool(offline)}
     if offline:
         return {**result, "mode": "simulation", "plan_id": None,
                 "next_step": "Reconnecte-toi ou configure ROMEO_SCRATCH, puis prepare un nouveau plan."}
     payload = {"kind": kind, "target": _submission_target(s, home, scratch),
-               "entries": entries, "preview": preview}
+               "entries": entries, "preview": preview, "runtime_files": files}
     identity = registry().prepare_submission(payload)
     return {**result, **identity, "storage": str(registry().path),
             "next_step": "Relis les scripts et avertissements, puis appelle {} avec ce plan_id et confirm=true."
@@ -74,6 +88,15 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
         if problems:
             return _error("Controle du script : " + " ; ".join(problems), submitted=False)
         plans.append((entry, plan))
+    from .checkpoint_jobs import RUNTIME_MODULES, runtime_directory
+    allowed_files = {runtime_directory(plan.spec, plan.workdir) + "/" + name
+                     for _, plan in plans if plan.spec.checkpoint_contract is not None or plan.spec.mpi_environment is not None
+                     for name in (*RUNTIME_MODULES, "config.json")}
+    files = payload.get("runtime_files", [])
+    if {item["path"] for item in files} != allowed_files or any(
+        hashlib.sha256(item["content"].encode()).hexdigest() != item["sha256"] for item in files
+    ):
+        return _error("Fichiers runtime absents, alteres ou hors du plan", submitted=False)
     if kind == "job":
         previous = _doublon_recent(plans[0][1].script)
         if previous:
@@ -86,8 +109,11 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
     result = {}
     previous_script = None
     try:
+        for item in files:
+            check_path(item["path"], home, scratch, getattr(s, "path_aliases", []))
+            s.write_file(item["path"], item["content"], mode="400")
         for entry, plan in plans:
-            artifacts = {}
+            artifacts = {"runtime": [{k: v for k, v in item.items() if k != "content"} for item in files]} if files else {}
             if "parameters_path" in entry:
                 s.write_file(entry["parameters_path"], entry["parameters_text"], mode="400")
                 artifacts["parameters"] = {
@@ -120,7 +146,8 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
                 store.update_submission(plan_id, "submitting", {"submitted_stages": submitted})
         else:
             preview = payload["preview"]
-            result = {"ok": True, "submitted": True, "warnings": preview["warnings"],
+            result = {"ok": True, "submitted": True, "submission_observed": True,
+                      "scheduler_completed": False, "result_validated": False, "warnings": preview["warnings"],
                       "next_step": "Consulte job_status, job_log_tail puis job_efficiency."}
             if kind in {"pipeline", "resilient"}:
                 result.update(pipeline=preview.get("pipeline", "resilient"), stages=submitted,
@@ -138,9 +165,11 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
         # La tentative reste consommee : apres une coupure reseau, l'absence
         # d'accuse de reception n'est pas une preuve d'absence du job.
         result = _error("Soumission interrompue : {}. Verifie list_jobs avant toute nouvelle tentative."
-                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()))
+                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()),
+                        submission_outcome="unknown", retry_safe=False)
     result.update(plan_id=plan_id, plan_sha256=saved["sha256"])
-    store.update_submission(plan_id, "submitted" if result["ok"] else "failed", result)
+    state = "submitted" if result["ok"] else "uncertain" if result.get("submission_outcome") == "unknown" else "failed"
+    store.update_submission(plan_id, state, result)
     return result
 
 

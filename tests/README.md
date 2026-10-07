@@ -45,6 +45,7 @@ SSH au calculateur.
 | `setup` | [test_setup.py](test_setup.py) | Configuration personnelle, installation et confidentialité |
 | `accompagnement` | [test_accompagnement.py](test_accompagnement.py) | Profils d’outils, diagnostic simulé, filtrage et reproductibilité |
 | `updates` | [test_updates.py](test_updates.py) | Intégrité des releases, confirmation, installation isolée réelle sans réseau, stdio et retour arrière avec processus actif |
+| `update-tools` | [test_update_tools.py](test_update_tools.py) | Accord automatique, erreurs explicites, absence de doublons, interruptions, écartement après retour et outils par stdio |
 | `corpus` | [verify_corpus.py](../tools/verify_corpus.py) | Liens, images, accessibilité et empreintes de la documentation |
 
 Les appuis partagés se trouvent dans [commun.py](commun.py) et
@@ -115,3 +116,9 @@ personnels restent hors du dépôt.
 ---
 
 [↑ Haut de page](#tests-et-niveaux-de-vérification) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)
+
+## Fraicheur et operations persistantes
+
+`python tests/run_all.py --only observability` verifie les caches expires, les ecritures SSH ambigues, les observations persistantes, les transferts consommables une fois et l annulation de processus locaux jetables. Cette suite est incluse dans la commande hors ligne par defaut.
+
+La suite `checkpoints` verifie les fichiers reels, les preuves par rang, les quotas et exports. Les tests POSIX utilisent de vrais processus avec un lanceur srun de test ; les contrats purs passent aussi sous Windows. Aucun job ROMEO ne tourne dans cette suite.

@@ -25,6 +25,7 @@ from .cluster import (
 )
 from .guard import GuardError, check_path
 from .registry import registry
+from .job_observation import parse_status, status_command
 from .sortie import decouper, marqueur, nouveau_jeton
 from .pipeline import heriter, ordonner, valider_etapes
 from .slurm import JobSpec, TERMINAL_STATES, parse_pipe_table, plan_job, summarize_efficiency
@@ -107,6 +108,12 @@ def job_prepare(
     cpu_bind: str | None = None,
     secret_env_file: str | None = None,
     data_files: list[str] | None = None,
+    reservation: str | None = None,
+    gpus_per_task: int = 0,
+    gpu_bind: str | None = None,
+    omp_places: str = "cores",
+    omp_proc_bind: str = "close",
+    mpi_environment: dict | None = None,
 ) -> dict[str, Any]:
     """Prepare le script exact et conserve un plan local, sans soumettre."""
     require_account()
@@ -130,6 +137,8 @@ def job_prepare(
         container=container,
         redirect_caches=redirect_caches,
         nccl_debug=nccl_debug,
+        reservation=reservation, gpus_per_task=gpus_per_task, gpu_bind=gpu_bind,
+        omp_places=omp_places, omp_proc_bind=omp_proc_bind, mpi_environment=mpi_environment,
         stage_archive=stage_archive,
         job_tmpdir=job_tmpdir,
         keep_patterns=keep_patterns or [],
@@ -166,6 +175,10 @@ def job_prepare(
         "redirect_caches": plan.spec.redirect_caches,
         "ntasks_per_node": plan.spec.ntasks_per_node,
         "mem_gb": plan.spec.mem_gb,
+        "reservation": plan.spec.reservation, "gpus_per_task": plan.spec.gpus_per_task,
+        "gpu_bind": plan.spec.gpu_bind, "cpu_bind": plan.spec.cpu_bind,
+        "omp_places": plan.spec.omp_places, "omp_proc_bind": plan.spec.omp_proc_bind,
+        "mpi_environment": plan.spec.mpi_environment,
     }
 
     return _prepare_submission("job", s, foyer, racine, hors_ligne,
@@ -182,74 +195,24 @@ def job_prepare(
     ),
 )
 def job_status(job_id: str) -> dict[str, Any]:
-    """Interroge squeue, avec repli sur sacct pour les jobs termines."""
+    """Read live state, persist its evidence, retain it on subsequent SSH failure."""
     s = session()
     jid = str(job_id).strip()
-    command = (
-        "echo '###LIVE'; squeue -h -j {jid} -o '%i|%j|%P|%T|%M|%L|%D|%R' 2>/dev/null; "
-        "echo '###START'; squeue -h -j {jid} --start -o '%S' 2>/dev/null; "
-        "echo '###PAST'; sacct -j {jid} -X -n -P "
-        "-o JobID,JobName,Partition,State,Elapsed,ExitCode,Start,End 2>/dev/null"
-    ).format(jid=shlex.quote(jid))
-
+    command = status_command(jid)
+    target = {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}
     try:
-        result = _sh(s, command, timeout=40, max_chars=10_000)
+        result = _sh(s, command, timeout=40, max_chars=10_000, read_only=True)
+        if not result.ok or result.truncated:
+            raise SSHError("Observation Slurm incomplete ou en echec")
     except (SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
-
-    sections: dict[str, list[str]] = {}
-    current = None
-    for line in result.stdout.splitlines():
-        if line.startswith("###"):
-            current = line[3:].strip()
-            sections[current] = []
-        elif current and line.strip():
-            sections[current].append(line.strip())
-
-    live = sections.get("LIVE", [])
-    if live:
-        parts = live[0].split("|")
-        state = parts[3].strip() if len(parts) > 3 else "?"
-        start = sections.get("START", [""])[0] if sections.get("START") else ""
-        registry().set_state(jid, state)
-        return {
-            "ok": True,
-            "job_id": jid,
-            "finished": False,
-            "name": parts[1].strip() if len(parts) > 1 else "",
-            "partition": parts[2].strip() if len(parts) > 2 else "",
-            "state": state,
-            "elapsed": parts[4].strip() if len(parts) > 4 else "",
-            "remaining": parts[5].strip() if len(parts) > 5 else "",
-            "nodes": parts[6].strip() if len(parts) > 6 else "",
-            "reason_or_nodelist": parts[7].strip() if len(parts) > 7 else "",
-            "estimated_start": start or None,
-        }
-
-    past = sections.get("PAST", [])
-    if past:
-        parts = past[0].split("|")
-        state = parts[3].strip() if len(parts) > 3 else "?"
-        registry().set_state(jid, state)
-        return {
-            "ok": True,
-            "job_id": jid,
-            "finished": state.split()[0] in TERMINAL_STATES,
-            "name": parts[1].strip() if len(parts) > 1 else "",
-            "partition": parts[2].strip() if len(parts) > 2 else "",
-            "state": state,
-            "elapsed": parts[4].strip() if len(parts) > 4 else "",
-            "exit_code": parts[5].strip() if len(parts) > 5 else "",
-            "start": parts[6].strip() if len(parts) > 6 else "",
-            "end": parts[7].strip() if len(parts) > 7 else "",
-            "next_step": "Consulte job_log_tail puis job_efficiency.",
-        }
-
-    return _error(
-        "job {} inconnu de SLURM. Verifie l'identifiant, ou l'historique a "
-        "peut-etre ete purge.".format(jid),
-        job_id=jid,
-    )
+        return _error(str(exc), job_id=jid, current_state_observed=False,
+                      last_observation=registry().observation(jid, target),
+                      next_step="Relance job_status pour une lecture ; ne soumets pas un autre job.")
+    observed = parse_status(result.stdout, jid)
+    if observed["ok"]:
+        registry().set_state(jid, observed["state"])
+        observed["observation"] = registry().save_observation(jid, target, observed)
+    return observed
 
 @outil(
     annotations=READ_ONLY,
@@ -481,8 +444,9 @@ def cancel_job(job_id: str) -> dict[str, Any]:
         return _error(str(exc))
     if not result.ok:
         return _error("scancel a echoue : {}".format(result.stdout.strip()))
-    registry().set_state(jid, "CANCELLED")
-    return {"ok": True, "job_id": jid, "cancelled": True}
+    registry().set_state(jid, "CANCEL_REQUESTED")
+    return {"ok": True, "job_id": jid, "cancel_requested": True,
+            "cancellation_observed": False, "next_step": "Consulte job_status pour confirmer l'arret."}
 
 @outil(
     annotations=READ_ONLY,
@@ -712,6 +676,17 @@ def job_resilient_prepare(
     spack_packages: list[str] | None = None,
     stage_archive: str | None = None,
     workdir: str | None = None,
+    nodes: int = 1,
+    ntasks_per_node: int = 1,
+    distributed: str | None = None,
+    cpu_bind: str | None = None,
+    reservation: str | None = None,
+    gpus_per_task: int = 0,
+    gpu_bind: str | None = None,
+    omp_places: str = "cores",
+    omp_proc_bind: str = "close",
+    mpi_environment: dict | None = None,
+    checkpoint_contract: dict | None = None,
 ) -> dict[str, Any]:
     return workload_preparation.job_resilient_prepare(
         name=name, command=command, segment_time=segment_time,
@@ -719,6 +694,10 @@ def job_resilient_prepare(
         cpus_per_task=cpus_per_task, gpus_per_node=gpus_per_node, mem_gb=mem_gb,
         arch=arch, spack_packages=spack_packages, stage_archive=stage_archive,
         workdir=workdir,
+        nodes=nodes, ntasks_per_node=ntasks_per_node, distributed=distributed, cpu_bind=cpu_bind,
+        reservation=reservation, gpus_per_task=gpus_per_task, gpu_bind=gpu_bind,
+        omp_places=omp_places, omp_proc_bind=omp_proc_bind,
+        mpi_environment=mpi_environment, checkpoint_contract=checkpoint_contract,
     )
 
 

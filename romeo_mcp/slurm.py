@@ -92,6 +92,16 @@ class JobSpec:
     secret_env_file: str | None = None
     #: Fichiers explicites empreintes sur le noeud juste avant le calcul.
     data_files: list[str] = field(default_factory=list)
+    reservation: str | None = None
+    gpus_per_task: int = 0
+    gpu_bind: str | None = None
+    omp_places: str = "cores"
+    omp_proc_bind: str = "close"
+    #: Verification demandee du fournisseur MPI et de l'executable sur le noeud.
+    mpi_environment: dict | None = None
+    #: Contrat generique optionnel ; les anciens checkpoints restent explicites.
+    checkpoint_contract: dict | None = None
+    runtime_id: str = ""
 
 
 @dataclass
@@ -145,6 +155,31 @@ def plan_job(spec: JobSpec, scratch: str) -> Plan:
     if seconds < 60:
         raise ClusterError("temps demande trop court : minimum 1 minute.")
 
+    if spec.distributed:
+        spec.distributed = spec.distributed.strip().lower()
+    if spec.mpi_environment is not None and spec.container:
+        raise ClusterError("La verification MPI d'un conteneur exige un adaptateur interne ; la libmpi du noeud ne prouve pas celle du conteneur.")
+    if spec.gpus_per_node < 0 or spec.gpus_per_task < 0:
+        raise ClusterError("Les nombres de GPU doivent etre positifs ou nuls.")
+    if spec.gpus_per_task:
+        requested = spec.ntasks_per_node * spec.gpus_per_task
+        if spec.gpus_per_node and spec.gpus_per_node != requested:
+            raise ClusterError("gpus_per_node doit egaler ntasks_per_node * gpus_per_task.")
+        spec.gpus_per_node = requested
+        if spec.distributed in FAMILLES_PYTORCH:
+            raise ClusterError("GPU par tache : utilise MPI ; les lanceurs PyTorch gerent leurs propres rangs GPU.")
+    if spec.reservation and not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", spec.reservation):
+        raise ClusterError("reservation invalide : utilise le nom exact fourni par ROMEO.")
+    if spec.cpu_bind and not re.fullmatch(r"(?:(?:verbose|quiet),)?(?:none|cores|threads|sockets|ldoms|rank|rank_ldom|map_cpu:[0-9,]+|mask_cpu:[0-9a-fA-Fx,]+)", spec.cpu_bind):
+        raise ClusterError("cpu_bind invalide : cores, threads, sockets, none, rank, map_cpu ou mask_cpu.")
+    if spec.gpu_bind and not re.fullmatch(r"(?:(?:verbose),)?(?:none|closest|single:[1-9][0-9]*|map_gpu:[0-9,]+|mask_gpu:[0-9a-fA-Fx,]+)", spec.gpu_bind):
+        raise ClusterError("gpu_bind invalide : closest, single:N, map_gpu:... ou mask_gpu:....")
+    if spec.gpu_bind and not spec.gpus_per_node:
+        raise ClusterError("gpu_bind exige des GPU alloues.")
+    if spec.omp_places not in {"cores", "threads", "sockets"} or spec.omp_proc_bind not in {"false", "true", "master", "close", "spread"}:
+        raise ClusterError("Placement OpenMP invalide (omp_places ou omp_proc_bind).")
+    if spec.distributed == "openmp" and (spec.nodes != 1 or spec.ntasks_per_node != 1):
+        raise ClusterError("OpenMP seul partage la memoire d'un noeud : nodes=1, ntasks_per_node=1. Pour plusieurs noeuds, utilise MPI + cpus_per_task.")
     arch = resolve_arch(spec.arch, spec.gpus_per_node)
     # Une architecture *deduite* n'est pas une architecture *demandee*. Sur un
     # cluster heterogene, une etape sans GPU d'un enchainement dont les autres
@@ -246,7 +281,7 @@ def plan_job(spec: JobSpec, scratch: str) -> Plan:
         # Chaque famille attend une topologie de taches precise. La corriger
         # ici evite un echec NCCL tardif, difficile a relier a sa cause.
         # MPI laisse l'utilisateur maitre de sa topologie de taches.
-        if spec.distributed == "mpi":
+        if spec.distributed in {"mpi", "openmp"}:
             pass
         elif attend_une_tache_par_noeud(spec.distributed):
             if spec.ntasks_per_node != 1:
@@ -266,6 +301,18 @@ def plan_job(spec: JobSpec, scratch: str) -> Plan:
             )
             spec.ntasks_per_node = spec.gpus_per_node
 
+    if spec.mpi_environment is not None:
+        from .parallel_runtime import validate_mpi_request
+        try:
+            spec.mpi_environment = validate_mpi_request(spec.mpi_environment, arch, spec.distributed)
+        except ValueError as exc:
+            raise ClusterError(str(exc)) from exc
+    if spec.checkpoint_contract is not None:
+        from .checkpoint_jobs import normalize_contract
+        try:
+            spec.checkpoint_contract = normalize_contract(spec.checkpoint_contract, spec, arch)
+        except ValueError as exc:
+            raise ClusterError(str(exc)) from exc
     cpus_per_node = spec.ntasks_per_node * spec.cpus_per_task
     if cpus_per_node > node["cpus_per_node"]:
         raise ClusterError(
@@ -425,6 +472,12 @@ def render_sbatch(
         # (verifie par soumission reelle) mais n'apparait nulle part dans la
         # documentation officielle.
         directives.append(("gpus-per-node", str(spec.gpus_per_node)))
+    if spec.gpus_per_task:
+        directives.append(("gpus-per-task", str(spec.gpus_per_task)))
+    if spec.gpu_bind:
+        directives.append(("gpu-bind", spec.gpu_bind))
+    if spec.reservation:
+        directives.append(("reservation", spec.reservation))
     if spec.mem_gb is not None:
         directives.append(("mem", "{}G".format(spec.mem_gb)))
     if spec.array is not None:
@@ -491,6 +544,9 @@ def render_sbatch(
         lines += [""] + preambule_distribue(
             spec.distributed, spec.gpus_per_node, spec.nccl_debug
         )
+    if spec.distributed in {"mpi", "openmp"}:
+        lines += ["export OMP_PLACES=" + spec.omp_places,
+                  "export OMP_PROC_BIND=" + spec.omp_proc_bind, "export OMP_DYNAMIC=FALSE"]
 
     if spec.stage_archive:
         lines += [""] + preambule_staging_shm(spec.stage_archive)
@@ -514,7 +570,10 @@ def render_sbatch(
         'echo "[romeo-mcp] debut $(date -Is)"',
         "",
     ]
-    if spec.checkpoint_dir:
+    if spec.checkpoint_contract is not None or spec.mpi_environment is not None:
+        from .checkpoint_jobs import runtime_fragment as verified_fragment
+        lines += verified_fragment(spec, workdir, arch)
+    elif spec.checkpoint_dir:
         lines += enveloppe_resiliente(
             commande, spec.checkpoint_dir, spec.signal_before or 300
         )
