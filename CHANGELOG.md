@@ -14,6 +14,11 @@
 
 ## Non publié — intentions et cycles de vie explicites
 
+- Cinq outils de rapports GitHub dans tous les profils : accord automatique
+  persistant, description filtrée, registre local et liens après reconnexion.
+  Création suivie d'une relecture, protection contre les doublons locaux,
+  plafonds d'envoi et absence de deuxième POST après résultat incertain.
+  Connexion GitHub CLI ou jeton privé ; aucun journal ou argument collecté.
 - Mises à jour pilotables par cinq outils MCP dans tous les profils : contrôle
   visible, autorisation automatique persistante, préparation détachée, suivi
   après reconnexion et retour arrière avec écartement de la version annulée.

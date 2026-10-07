@@ -24,6 +24,7 @@ python tests/run_all.py
 python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
 python tests/run_all.py --only terminal
+python tests/run_all.py --only issue-reports
 ```
 
 Sans option, le lanceur exécute les suites hors ligne dans des processus séparés et
@@ -32,6 +33,10 @@ hors ligne utilisent une configuration fictive et ne nécessitent pas d’accès
 SSH au calculateur.
 
 ## Suites hors ligne
+
+La suite `issue-reports` vérifie les appels GitHub simulés, le filtrage avant
+stockage/envoi, les doublons, les coupures et l'accord persistant à travers un
+vrai client MCP stdio. Elle ne crée aucune issue réelle et n'utilise pas SSH.
 
 Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
 tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.

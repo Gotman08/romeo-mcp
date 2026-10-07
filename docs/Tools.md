@@ -11,6 +11,7 @@ Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son rés
 - [Trouver le bon outil](#trouver-le-bon-outil)
 - [Outils exposés](#outils-exposés)
   - [Profil et documentation](#profil-et-documentation)
+  - [Rapports GitHub du MCP](#rapports-github-du-mcp)
   - [Cluster et ordonnancement](#cluster-et-ordonnancement)
   - [Préparation et gestion des jobs](#préparation-et-gestion-des-jobs)
   - [Journaux, mesures et profilage](#journaux-mesures-et-profilage)
@@ -58,6 +59,7 @@ Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son rés
 | Besoin | Catégorie | Guide |
 |---|---|---|
 | Profil et documentation | [4 fiches](#profil-et-documentation) | [Configuration des profils](configuration.md#profils-doutils) |
+| Rapports GitHub du MCP | [5 fiches](#rapports-github-du-mcp) | [Signalements automatiques autorisés](issue-reports.md) |
 | Cluster et ordonnancement | [8 fiches](#cluster-et-ordonnancement) | [État et limites du cluster](#le-modèle-encodé-a-une-date-de-péremption) |
 | Préparation et gestion des jobs | [13 fiches](#préparation-et-gestion-des-jobs) | [Préparer puis soumettre](#préparer-puis-soumettre-le-plan-exact) |
 | Journaux, mesures et profilage | [11 fiches](#journaux-mesures-et-profilage) | [Lire les journaux](#lire-les-journaux) |
@@ -74,9 +76,9 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
-| `essential` | 35 | Documentation, contexte cluster, jobs, reprise, mises à jour et relevés courants. |
-| `full` | 90 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
-| `expert` | 93 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `essential` | 40 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
+| `full` | 95 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
+| `expert` | 98 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -103,6 +105,18 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 | [`mcp_update_rollback`](tools/mcp_update_rollback.md) | Revenir à la version précédente après vérification. | Tous |
 
 Voir le [parcours automatique et les limites de l'activation](updates.md#mise-à-jour-par-le-modèle).
+
+### Rapports GitHub du MCP
+
+| Outil | Rôle | Profils |
+|---|---|---|
+| [`mcp_issue_policy_get`](tools/mcp_issue_policy_get.md) | Lire la politique de publication et la méthode GitHub configurée. | Tous |
+| [`mcp_issue_policy_set`](tools/mcp_issue_policy_set.md) | Enregistrer l'accord automatique initial ou le désactiver. | Tous |
+| [`mcp_issue_report`](tools/mcp_issue_report.md) | Filtrer, conserver et éventuellement publier un défaut observé du MCP. | Tous |
+| [`mcp_issue_publish`](tools/mcp_issue_publish.md) | Publier un rapport local ou réconcilier un envoi interrompu. | Tous |
+| [`mcp_issue_status`](tools/mcp_issue_status.md) | Retrouver les rapports filtrés et les liens GitHub après reconnexion. | Tous |
+
+Voir le [guide des rapports publics et de l'autorisation persistante](issue-reports.md).
 
 ### Cluster et ordonnancement
 

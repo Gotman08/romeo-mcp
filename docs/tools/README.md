@@ -2,7 +2,7 @@
 
 [Accueil](../../README.md) › [Documentation](../README.md) › [Tools](../Tools.md) › Fiches
 
-Ce dossier contient une fiche Markdown par outil MCP : 93 fiches couvrent les profils `essential`, `full` et `expert`.
+Ce dossier contient une fiche Markdown par outil MCP : 98 fiches couvrent les profils `essential`, `full` et `expert`.
 
 Le [catalogue Tools](../Tools.md#outils-exposés) regroupe les outils par usage. Cliquez sur un nom pour lire son rôle, ses paramètres, un exemple JSON, le résultat attendu, les effets et les limites. Chaque fiche propose des liens vers les outils associés et le code correspondant.
 
@@ -16,6 +16,7 @@ Les anciens noms conservés dans la [section de migration](../Tools.md#migration
 |---|---:|---|
 | [Profil et documentation](../Tools.md#profil-et-documentation) | 4 | [`tool_profile_get`](tool_profile_get.md) · [`tool_profile_set`](tool_profile_set.md) |
 | [Mise à jour du MCP](../Tools.md#mise-à-jour-du-mcp) | 5 | [`mcp_update_check`](mcp_update_check.md) · [`mcp_update_policy`](mcp_update_policy.md) |
+| [Rapports GitHub du MCP](../Tools.md#rapports-github-du-mcp) | 5 | [`mcp_issue_report`](mcp_issue_report.md) · [`mcp_issue_policy_set`](mcp_issue_policy_set.md) |
 | [Cluster et ordonnancement](../Tools.md#cluster-et-ordonnancement) | 8 | [`romeo_status`](romeo_status.md) · [`romeo_software`](romeo_software.md) |
 | [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) | 13 | [`plan_get`](plan_get.md) · [`job_prepare`](job_prepare.md) |
 | [Journaux, mesures et profilage](../Tools.md#journaux-mesures-et-profilage) | 11 | [`job_log_tail`](job_log_tail.md) · [`job_log_search`](job_log_search.md) |

@@ -56,6 +56,8 @@ SUITES = [
      "releases, confirmation, activation, retour et isolation des mises a jour", False),
     ("update-tools", "tests/test_update_tools.py",
      "automatisme autorise, workers, interruptions, retour et protocole MCP", False),
+    ("issue-reports", "tests/test_issue_reports.py",
+     "accord persistant, filtrage, GitHub simule, doublons et publication incertaine", False),
     ("terminal", "tests/test_terminal.py",
      "tableau Ratatui optionnel, lecture seule, traces datees et isolation", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
