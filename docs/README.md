@@ -95,6 +95,7 @@ la provenance et les limites de cette copie. Le
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
 - [Mises à jour](updates.md) : outils MCP, accord automatique durable, progression, activation et retour arrière.
+- [Tableau de bord terminal](terminal.md) : interface Ratatui facultative, démonstration et traces locales datées.
 
 ## Lire un résultat dans son contexte
 

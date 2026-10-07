@@ -23,6 +23,7 @@ lancent depuis la **racine du dépôt**, avec le Python du venv activé.
 python tests/run_all.py
 python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
+python tests/run_all.py --only terminal
 ```
 
 Sans option, le lanceur exécute les suites hors ligne dans des processus séparés et
@@ -31,6 +32,10 @@ hors ligne utilisent une configuration fictive et ne nécessitent pas d’accès
 SSH au calculateur.
 
 ## Suites hors ligne
+
+Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
+tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.
+La suite Python `terminal` vérifie le lecteur sans nécessiter Cargo ou le cluster.
 
 | Nom pour `--only` | Fichier | Ce qui est vérifié |
 |---|---|---|

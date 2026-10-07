@@ -43,6 +43,13 @@
 
 ## Non publié
 
+- Première version interne d'un tableau de bord Ratatui facultatif : commande
+  `tui`, compilation explicite, démonstration, aperçu, jobs, transferts et mises
+  à jour en cache. Lecture seule locale, âges des observations, filtre, pause,
+  aide et restauration du terminal ; le serveur MCP stdio reste indépendant.
+- Contrat JSON borné, lecteur Python isolé, nettoyage des caractères de contrôle
+  et vérification des plans de transfert ; tests Python/Rust et CI Windows/Linux.
+
 - Navigation de la documentation : [accès par besoin depuis le README](README.md#navigation-rapide),
   [index des guides](docs/README.md), sommaires, liens vers les fiches d’outils
   et retours vers les pages parentes. Correction des ancres locales de la

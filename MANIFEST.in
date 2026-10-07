@@ -5,4 +5,6 @@ recursive-include tools *.py *.md
 recursive-include tests *.py *.md
 recursive-include .github *.md *.yml
 recursive-include .githooks README.md pre-commit pre-push
+include terminal/Cargo.toml terminal/Cargo.lock
+recursive-include terminal/src *.rs
 recursive-exclude * __pycache__ *.py[cod]

@@ -33,6 +33,9 @@ def main() -> None:
     configure.add_argument("--profile", choices=("essential", "full", "expert"), help="profil d'outils conserve hors du depot")
     serve_parser = sub.add_parser("serve", help="demarrer le serveur stdio")
     serve_parser.add_argument("--profile", choices=("essential", "full", "expert"))
+    terminal = sub.add_parser("tui", help="ouvrir le tableau de bord terminal optionnel Ratatui")
+    from .terminal import add_arguments
+    add_arguments(terminal)
     doctor = sub.add_parser("doctor", help="verifications locales ou distantes en lecture seule")
     doctor.add_argument("--live", action="store_true", help="verifier SSH, projet Slurm, partitions et quotas")
     doctor.add_argument("--timeout", type=int, default=20, help="delai par lecture distante, entre 2 et 60 secondes")
@@ -51,7 +54,10 @@ def main() -> None:
     update.add_argument("--json", action="store_true", help="reponse structuree pour --check uniquement")
     args = parser.parse_args()
     try:
-        if args.action == "update":
+        if args.action == "tui":
+            from .terminal import run
+            raise SystemExit(run(args))
+        elif args.action == "update":
             if args.json and not args.check:
                 parser.error("--json s'utilise avec update --check")
             updates.command(check_only=args.check, revert=args.rollback, yes=args.yes, json_output=args.json)

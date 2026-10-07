@@ -32,9 +32,47 @@ jobs:
       - name: Construire les distributions
         run: python -m build
 
+  terminal:
+    name: Terminal Ratatui (${{ matrix.os }}, ${{ matrix.rust }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        rust: [stable]
+        include:
+          - os: ubuntu-latest
+            rust: '1.88.0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Installer Rust
+        run: rustup toolchain install ${{ matrix.rust }} --profile minimal --component rustfmt --component clippy
+      - name: Verifier le format Rust
+        run: cargo +${{ matrix.rust }} fmt --manifest-path terminal/Cargo.toml -- --check
+      - name: Tester le lecteur Python sans MCP ni cluster
+        run: python tests/test_terminal.py
+      - name: Tester le rendu et la navigation
+        run: cargo +${{ matrix.rust }} test --locked --manifest-path terminal/Cargo.toml
+      - name: Verifier le code Rust
+        run: cargo +${{ matrix.rust }} clippy --locked --manifest-path terminal/Cargo.toml --all-targets -- -D warnings
+      - name: Construire le binaire facultatif
+        run: cargo +${{ matrix.rust }} build --locked --release --manifest-path terminal/Cargo.toml
+      - name: Verifier le pont et les quatre vues Ratatui
+        shell: bash
+        run: |
+          for view in overview jobs transfers updates; do
+            python -m romeo_mcp tui --demo --snapshot --view "$view"
+          done
+      - name: Verifier la restauration du terminal et l'arret du lecteur
+        if: runner.os == 'Linux'
+        run: python tools/check_terminal_session.py --binary terminal/target/release/romeo-tui
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: offline
+    needs: [offline, terminal]
     runs-on: ubuntu-latest
     permissions:
       contents: write
