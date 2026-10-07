@@ -3,8 +3,12 @@ use crate::{model::Snapshot, Options};
 use std::{
     io::{BufRead, BufReader, Read, Write},
     process::{Child, Command, Stdio},
-    sync::mpsc::{self, Receiver, SyncSender},
-    thread,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc::{self, Receiver, SyncSender},
+        Arc,
+    },
+    thread::{self, JoinHandle},
 };
 
 const MAX_LINE: u64 = 2 * 1024 * 1024;
@@ -12,8 +16,10 @@ const BOOTSTRAP: &str = "import sys; sys.path.insert(0, sys.argv.pop(1)); from r
 
 pub struct Reader {
     child: Child,
-    requests: SyncSender<()>,
+    requests: Option<SyncSender<()>>,
     pub responses: Receiver<Result<Snapshot, String>>,
+    stopped: Arc<AtomicBool>,
+    thread: Option<JoinHandle<()>>,
 }
 
 impl Reader {
@@ -51,7 +57,9 @@ impl Reader {
         let mut output = BufReader::new(child.stdout.take().expect("piped stdout"));
         let (requests, receive_request) = mpsc::sync_channel(1);
         let (send_response, responses) = mpsc::sync_channel(1);
-        thread::spawn(move || {
+        let stopped = Arc::new(AtomicBool::new(false));
+        let thread_stopped = Arc::clone(&stopped);
+        let thread = thread::spawn(move || {
             while receive_request.recv().is_ok() {
                 let result = (|| {
                     input
@@ -69,27 +77,42 @@ impl Reader {
                     Snapshot::parse(&line)
                 })();
                 let failed = result.is_err();
-                if send_response.send(result).is_err() || failed {
+                if send_response.try_send(result).is_err() || failed {
                     break;
                 }
             }
+            thread_stopped.store(true, Ordering::Release);
         });
         Ok(Self {
             child,
-            requests,
+            requests: Some(requests),
             responses,
+            stopped,
+            thread: Some(thread),
         })
     }
 
     pub fn refresh(&self) -> bool {
-        self.requests.try_send(()).is_ok()
+        !self.stopped()
+            && self
+                .requests
+                .as_ref()
+                .is_some_and(|requests| requests.try_send(()).is_ok())
+    }
+
+    pub fn stopped(&self) -> bool {
+        self.stopped.load(Ordering::Acquire)
     }
 }
 
 impl Drop for Reader {
     fn drop(&mut self) {
         // A blocked filesystem read cannot keep an orphan alive after q/Ctrl-C.
+        self.requests.take();
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
     }
 }

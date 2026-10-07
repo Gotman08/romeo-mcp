@@ -17,8 +17,9 @@ import time
 
 from . import __version__
 from .config import config_path
+from .terminal_evidence import checkpoint, progress, reports
 
-SCHEMA = 1
+SCHEMA = 2
 MAX_JSON = 1024 * 1024
 MAX_OBSERVATION = 65536
 MAX_DIRECTORIES = 1000
@@ -67,15 +68,20 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
         connection.execute("PRAGMA query_only=ON")
         has_observations = connection.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_observations'").fetchone()
-        observation = ("o.observed_at, substr(o.payload, 1, ?) AS payload" if has_observations
-                       else "NULL AS observed_at, NULL AS payload")
+        observation = ("o.observed_at, substr(o.payload, 1, ?) AS payload, "
+                       "substr(c.payload, 1, ?) AS checkpoint_payload"
+                       if has_observations else "NULL AS observed_at, NULL AS payload, "
+                       "NULL AS checkpoint_payload")
         join = ("LEFT JOIN job_observations o ON o.rowid = "
                 "(SELECT rowid FROM job_observations WHERE job_id=j.job_id AND payload NOT LIKE '%\"service_id\":%' "
+                "ORDER BY observed_at DESC, rowid DESC LIMIT 1) "
+                "LEFT JOIN job_observations c ON c.rowid = "
+                "(SELECT rowid FROM job_observations WHERE job_id=('checkpoint:' || j.job_id) "
                 "ORDER BY observed_at DESC, rowid DESC LIMIT 1)" if has_observations else "")
         rows = connection.execute(
             f"SELECT j.job_id, j.name, j.partition, j.submitted_at, j.last_state, {observation} "
             f"FROM jobs j {join} ORDER BY j.submitted_at DESC, j.job_id DESC LIMIT ?",
-            (MAX_OBSERVATION + 1, limit) if has_observations else (limit,)).fetchall()
+            (MAX_OBSERVATION + 1, MAX_OBSERVATION + 1, limit) if has_observations else (limit,)).fetchall()
         result = []
         for row in rows:
             payload = {}
@@ -90,6 +96,11 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
                 except (ValueError, TypeError):
                     payload = {}
                     warnings.append("Une observation de job est illisible ou ne correspond pas au job.")
+            checkpoint_info = None
+            try:
+                checkpoint_info = checkpoint(row["checkpoint_payload"], row["job_id"])
+            except (ValueError, TypeError, KeyError):
+                warnings.append("Une observation de checkpoint est illisible ou associee a un autre calcul.")
             result.append({
                 "id": text(row["job_id"]), "name": text(row["name"]),
                 "partition": text(row["partition"]),
@@ -99,6 +110,7 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
                 "elapsed": text(payload.get("elapsed")), "remaining": text(payload.get("remaining")),
                 "exit_code": text(payload.get("exit_code")),
                 "result_validated": payload.get("result_validated") is True,
+                "checkpoint": checkpoint_info,
             })
         return result
     finally:
@@ -135,6 +147,7 @@ def read_transfers(root: Path, limit: int, warnings: list[str]) -> list[dict]:
                 "local_path": text(plan.get("local_path")), "remote_path": text(plan.get("remote_path")),
                 "result_validated": status.get("ok") is True and status.get("result_validated") is True,
                 "cancel_requested": (directory / "cancel.json").is_file(),
+                "progress": progress(status),
             })
         except (OSError, ValueError, TypeError, KeyError):
             warnings.append("Un dossier de transfert est incomplet ou illisible.")
@@ -206,10 +219,15 @@ def snapshot(*, db: Path | None = None, limit: int = 40, demo: bool = False) -> 
         profile = "unknown"
         warnings.append("Configuration locale illisible.")
     update = read_updates(warnings)
+    report = {"automatic_enabled": None, "items": []}
+    try:
+        report = reports(limit)
+    except (OSError, ValueError, TypeError, KeyError):
+        warnings.append("Historique local des rapports inaccessible ; consulter mcp_issue_status.")
     return {"schema": SCHEMA, "generated_at": time.time(), "demo": False,
             "runtime": {"version": __version__, "profile": profile, "configured": configured,
                         "registry_present": path.is_file()},
-            "jobs": jobs, "transfers": transfers, "updates": update,
+            "jobs": jobs, "transfers": transfers, "updates": update, "reports": report,
             "warnings": list(dict.fromkeys(warnings))}
 
 
@@ -222,22 +240,36 @@ def demo_snapshot(limit: int = 40) -> dict:
         ("Prétraitement", "COMPLETED", 180), ("Simulation à reprendre", "TIMEOUT", 600))):
         jobs.append({"id": str(42001 + index), "name": name, "partition": "cpu",
                      "state": state, "submitted_at": now - 3600 - index * 600,
-                     "observed_at": now - age, "elapsed": "00:24:10", "remaining": "01:35:50",
-                     "exit_code": "0:0" if state == "COMPLETED" else "", "result_validated": False})
+                     "observed_at": now - age,
+                     "elapsed": "00:24:10" if state in {"RUNNING", "TIMEOUT"} else "00:02:00" if state == "COMPLETED" else "",
+                     "remaining": "01:35:50" if state == "RUNNING" else "",
+                     "exit_code": "0:0" if state == "COMPLETED" else "", "result_validated": False,
+                     "checkpoint": ({"generation": 7, "step": 1200, "world_size": 8,
+                                     "integrity_verified": True, "resume_validated": False,
+                                     "signal_verified": True, "observed_at": now - 600}
+                                    if state == "TIMEOUT" else None)})
     return {"schema": SCHEMA, "generated_at": now, "demo": True,
             "runtime": {"version": __version__, "profile": "full", "configured": True, "registry_present": True},
             "jobs": jobs[:limit], "transfers": [
                 {"id": "a" * 32, "name": "results.tar", "direction": "download", "state": "running",
                  "phase": "transferring", "observed_at": now - 2, "local_path": "results.tar",
-                 "remote_path": "simulation/results.tar", "result_validated": False, "cancel_requested": False},
+                 "remote_path": "simulation/results.tar", "result_validated": False, "cancel_requested": False,
+                 "progress": {"bytes_transferred": 48 * 1024 ** 2, "bytes_total": 120 * 1024 ** 2,
+                              "bytes_per_second": 4 * 1024 ** 2, "eta_seconds": 18, "observed_at": now - 2}},
                 {"id": "b" * 32, "name": "checkpoint.bin", "direction": "upload", "state": "completed",
                  "phase": "", "observed_at": now - 90, "local_path": "checkpoint.bin",
-                 "remote_path": "simulation/checkpoint.bin", "result_validated": True, "cancel_requested": False},
+                 "remote_path": "simulation/checkpoint.bin", "result_validated": True, "cancel_requested": False,
+                 "progress": {"bytes_transferred": 8 * 1024 ** 2, "bytes_total": 8 * 1024 ** 2,
+                              "bytes_per_second": None, "eta_seconds": 0, "observed_at": now - 90}},
             ][:limit],
             "updates": {"version": __version__, "next_version": __version__, "latest_version": "1.4.1",
                         "checked_at": now - 1800, "automatic_enabled": False, "restart_required": False,
                         "state": "idle", "phase": "", "observed_at": None, "update_available": True},
-            "warnings": []}
+            "reports": {"automatic_enabled": True, "items": [
+                {"id": "c" * 32, "summary": "Filtre d'une vue a corriger", "state": "local_only",
+                 "category": "bug", "issue_url": "", "issue_number": None, "observed_at": now - 120,
+                 "occurrences": 2, "result_validated": False, "retry_after": 0},
+            ]}, "warnings": []}
 
 
 def bridge() -> None:

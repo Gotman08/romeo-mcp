@@ -18,8 +18,8 @@ def add_arguments(parser) -> None:
     parser.add_argument("--binary", default="", help="chemin d'un binaire romeo-tui déjà compilé")
     parser.add_argument("--db", type=Path, help="registre local alternatif, ouvert en lecture seule")
     parser.add_argument("--refresh", type=int, default=5, metavar="SECONDES", help="relecture locale toutes les 5 s par défaut")
-    parser.add_argument("--limit", type=int, default=40, help="nombre de jobs/transferts, entre 1 et 100")
-    parser.add_argument("--view", choices=("overview", "jobs", "transfers", "updates"), default="overview")
+    parser.add_argument("--limit", type=int, default=40, help="nombre de jobs/transferts/rapports par vue, entre 1 et 100")
+    parser.add_argument("--view", choices=("overview", "jobs", "transfers", "updates", "reports"), default="overview")
     parser.add_argument("--width", type=int, default=100, help="largeur du rendu --snapshot")
     parser.add_argument("--height", type=int, default=30, help="hauteur du rendu --snapshot")
 

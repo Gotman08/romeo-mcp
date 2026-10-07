@@ -60,10 +60,10 @@ jobs:
         run: cargo +${{ matrix.rust }} clippy --locked --manifest-path terminal/Cargo.toml --all-targets -- -D warnings
       - name: Construire le binaire facultatif
         run: cargo +${{ matrix.rust }} build --locked --release --manifest-path terminal/Cargo.toml
-      - name: Verifier le pont et les quatre vues Ratatui
+      - name: Verifier le pont et les cinq vues Ratatui
         shell: bash
         run: |
-          for view in overview jobs transfers updates; do
+          for view in overview jobs transfers updates reports; do
             python -m romeo_mcp tui --demo --snapshot --view "$view"
           done
       - name: Verifier la restauration du terminal et l'arret du lecteur

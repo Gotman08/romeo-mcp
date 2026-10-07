@@ -17,7 +17,9 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from romeo_mcp import terminal, terminal_data as data, updates
+from romeo_mcp import terminal, terminal_data as data, terminal_evidence as evidence, updates
+from romeo_mcp.issue_store import ReportStore
+from romeo_mcp.transfer_progress import ProgressLog, command, parse
 from romeo_mcp.registry import _SCHEMA
 
 
@@ -56,7 +58,7 @@ class TerminalTests(unittest.TestCase):
 
     def test_empty_snapshot_creates_no_configuration_database_or_update_files(self):
         result = data.snapshot()
-        self.assertEqual(result["schema"], 1)
+        self.assertEqual(result["schema"], 2)
         self.assertEqual(result["jobs"], [])
         self.assertFalse(result["runtime"]["registry_present"])
         self.assertEqual(list(self.root.iterdir()), [])
@@ -65,7 +67,8 @@ class TerminalTests(unittest.TestCase):
 
     def test_demo_is_synthetic_and_never_reads_private_files(self):
         with patch.object(data, "registry_path", side_effect=AssertionError("private read")), \
-                patch.object(data, "read_json", side_effect=AssertionError("private read")):
+                patch.object(data, "read_json", side_effect=AssertionError("private read")), \
+                patch.object(data, "reports", side_effect=AssertionError("private report read")):
             result = data.snapshot(demo=True)
         self.assertTrue(result["demo"])
         self.assertEqual(len(result["jobs"]), 4)
@@ -161,6 +164,93 @@ class TerminalTests(unittest.TestCase):
                  for path in self.root.rglob("*") if path.is_file()}
         self.assertEqual(before, after)
 
+    def test_checkpoint_is_bound_to_the_job_and_keeps_runtime_age(self):
+        self.create_job(observation={"ok": True, "job_id": "101", "state": "TIMEOUT"})
+        runtime = {"schema": "romeo-runtime-observation-v1", "job_id": "101", "run_id": "example",
+                   "world_size": 8, "binding_sha256": "a" * 64, "observed_at": time.time() - 3600,
+                   "binding": {"private-program": "private-inputs"}, "resume_validated": True,
+                   "checkpoint_after_signal_verified": True,
+                   "latest_checkpoint": {"run_id": "example", "world_size": 8, "binding_sha256": "a" * 64,
+                                         "manifest_sha256": "b" * 64, "generation": 7, "step": 1200,
+                                         "integrity_verified": True, "directory": "private-checkpoint-path"}}
+        def save():
+            with closing(sqlite3.connect(self.db)) as db:
+                db.execute("DELETE FROM job_observations WHERE job_id='checkpoint:101'")
+                db.execute("INSERT INTO job_observations VALUES (?,?,?,?)",
+                           ("checkpoint:101", "{}", time.time(), json.dumps(runtime)))
+                db.commit()
+        save()
+        before = self.db.read_bytes()
+        result = data.snapshot()
+        checkpoint = result["jobs"][0]["checkpoint"]
+        self.assertEqual(checkpoint["step"], 1200)
+        self.assertTrue(checkpoint["integrity_verified"])
+        self.assertTrue(checkpoint["resume_validated"])
+        self.assertGreater(time.time() - checkpoint["observed_at"], 3599)
+        self.assertNotIn("private-", json.dumps(checkpoint))
+        self.assertEqual(before, self.db.read_bytes())
+        runtime["latest_checkpoint"]["binding_sha256"] = "c" * 64
+        save()
+        result = data.snapshot()
+        self.assertIsNone(result["jobs"][0]["checkpoint"])
+        self.assertEqual(result["jobs"][0]["state"], "TIMEOUT")
+        self.assertTrue(result["warnings"])
+        runtime["world_size"] = 1
+        runtime["latest_checkpoint"].update(binding_sha256="a" * 64, world_size=True)
+        with self.assertRaises(ValueError):
+            evidence.checkpoint(json.dumps(runtime), "101")
+
+    def test_progress_requires_transport_evidence_not_a_heartbeat(self):
+        self.assertIsNone(evidence.progress({"heartbeat_at": time.time(), "elapsed_seconds": 99}))
+        observed = {"bytes_transferred": 48, "bytes_total": 120, "observed_at": time.time() - 90}
+        self.assertEqual(evidence.progress({"progress": observed})["bytes_total"], 120)
+        for change in ({"bytes_total": 0}, {"bytes_total": 12}, {"bytes_total": True},
+                       {"bytes_transferred": True}, {"observed_at": float("nan")}):
+            self.assertIsNone(evidence.progress({"progress": {**observed, **change}}))
+        reported = {**observed, "source": "rsync_progress2", "bytes_total": None, "percent_reported": 40}
+        result = evidence.progress({"progress": reported})
+        self.assertIsNone(result["bytes_total"])
+        self.assertEqual(result["percent_reported"], 40)
+        self.assertEqual(result["observed_at"], observed["observed_at"])
+        for change in ({"source": "clock"}, {"percent_reported": 101}, {"percent_reported": True}):
+            self.assertIsNone(evidence.progress({"progress": {**reported, **change}}))
+
+    def test_reports_are_read_only_and_export_no_body_credentials_or_foreign_url(self):
+        store = ReportStore()
+        store.configure(True)
+        record = store.save({"schema": 1, "repository": updates.REPOSITORY, "summary": "Exemple fictif",
+                             "category": "bug", "observed": "private-body-not-for-dashboard"})
+        store.update(record["report_id"], "published", issue_number=41,
+                     issue_url=f"https://github.com/{updates.REPOSITORY}/issues/41")
+        before = store.path.read_bytes()
+        with patch("urllib.request.OpenerDirector.open", side_effect=AssertionError("HTTP")), \
+                patch.object(store.__class__, "update", side_effect=AssertionError("write")):
+            result = data.snapshot()["reports"]
+        self.assertEqual(before, store.path.read_bytes())
+        self.assertTrue(result["automatic_enabled"])
+        self.assertTrue(result["items"][0]["result_validated"])
+        self.assertEqual(result["items"][0]["issue_number"], 41)
+        self.assertNotIn("private-body", json.dumps(result))
+        store.update(record["report_id"], "failed", issue_number=41,
+                     issue_url="https://foreign.invalid/secret-query")
+        result = data.snapshot()["reports"]["items"][0]
+        self.assertEqual(result["issue_url"], "")
+        self.assertIsNone(result["issue_number"])
+        self.assertFalse(result["result_validated"])
+        with patch.dict(os.environ, ROMEO_AUTO_ISSUES="0"):
+            self.assertFalse(data.snapshot()["reports"]["automatic_enabled"])
+        self.assertTrue(store.policy()["saved_automatic"])
+
+    def test_corrupt_reports_do_not_prevent_jobs_from_being_read(self):
+        self.create_job()
+        store = ReportStore()
+        store.root.mkdir()
+        store.path.write_bytes(b"invalid reports database")
+        result = data.snapshot()
+        self.assertEqual(result["jobs"][0]["id"], "101")
+        self.assertEqual(result["reports"], {"automatic_enabled": None, "items": []})
+        self.assertTrue(result["warnings"])
+
     def test_controls_large_numbers_and_oversized_local_json_are_safe(self):
         self.assertNotIn("\x1b", data.text("name\x1b[31m\n\u202e"))
         self.assertNotIn("\u202e", data.text("name\x1b[31m\n\u202e"))
@@ -203,6 +293,50 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(command[command.index("--db") + 1], str(self.db))
         self.assertEqual(command[command.index("--python") + 1], sys.executable)
         self.assertNotIn("shell", launch.call_args.kwargs)
+
+
+class ProgressTests(unittest.TestCase):
+    def test_rsync_parser_keeps_reported_percentage_and_distinguishes_elapsed_time(self):
+        line = b" 50331648 40% 4.00MB/s 0:00:18  "
+        result = parse(line, 100.0)
+        self.assertEqual(result["bytes_transferred"], 50331648)
+        self.assertEqual(result["bytes_per_second"], 4 * 1024 ** 2)
+        self.assertEqual(result["eta_seconds"], 18)
+        self.assertIsNone(result["bytes_total"])
+        end = parse(b" 125829120 100% 4.00MB/s 0:00:30 (xfr#1, to-chk=0/1)", 101.0)
+        self.assertIsNone(end["eta_seconds"])
+        for bad in (b"secret-name 40%", b"48 101% 4.00MB/s 0:00:18", b"48 40% 4.00MB/s 0:99:00",
+                    b"48 40% 4.00MB/s 0:00:18 (xfr#1, ir-chk=0/1)", b"48 40% nanMB/s 0:00:18"):
+            self.assertIsNone(parse(bad, 100.0))
+
+    def test_tail_is_bounded_complete_and_does_not_invent_new_measurements(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "transfer.log"
+            observer = ProgressLog(log)
+            log.write_bytes(b"private-log\n\r48 40% 4.00MB/s 0:00:")
+            self.assertIsNone(observer.sample())
+            with log.open("ab") as stream:
+                stream.write(b"18\r")
+            measured = observer.sample()
+            self.assertEqual(measured["percent_reported"], 40)
+            self.assertIsNone(observer.sample())
+            with log.open("ab") as stream:
+                stream.write(b"x" * 20000 + b"\n125 100% 4.00MB/s 0:00:30 (xfr#1, to-chk=0/1)\n")
+            self.assertEqual(observer.sample()["percent_reported"], 100)
+            self.assertLessEqual(len(observer.pending), 512)
+
+    def test_old_rsync_and_other_transports_are_left_usable(self):
+        argv = ["rsync", "-az", "--partial", "source with spaces", "target"]
+        for version, enabled in ((b"rsync version 2.6.9", False), (b"rsync version 3.2.7", True)):
+            with patch("romeo_mcp.transfer_progress.subprocess.run",
+                       return_value=SimpleNamespace(returncode=0, stdout=version)) as run:
+                result, measured = command(argv, {})
+            self.assertEqual(measured, enabled)
+            self.assertEqual(result[-2:], argv[-2:])
+            self.assertNotIn("shell", run.call_args.kwargs)
+        with patch("romeo_mcp.transfer_progress.subprocess.run", side_effect=AssertionError("spawn")):
+            self.assertEqual(command(["scp", "-q", "source", "target"], {}),
+                             (["scp", "-q", "source", "target"], False))
 
 
 if __name__ == "__main__":

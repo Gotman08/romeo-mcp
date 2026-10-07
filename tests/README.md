@@ -41,6 +41,11 @@ vrai client MCP stdio. Elle ne crée aucune issue réelle et n'utilise pas SSH.
 Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
 tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.
 La suite Python `terminal` vérifie le lecteur sans nécessiter Cargo ou le cluster.
+Elle vérifie aussi l'association et l'âge des checkpoints, les mesures rsync
+bornées, la lecture seule des rapports et l'absence de publication réseau.
+Les tests Rust couvrent les filtres propres à chaque vue, les pages, les détails
+défilants et le format compact. Le test PTY Linux simule un lecteur interrompu
+puis bloqué pour vérifier sa récupération et son arrêt après le délai.
 
 | Nom pour `--only` | Fichier | Ce qui est vérifié |
 |---|---|---|
@@ -129,6 +134,6 @@ personnels restent hors du dépôt.
 
 ## Fraicheur et operations persistantes
 
-`python tests/run_all.py --only observability` verifie les caches expires, les ecritures SSH ambigues, les observations persistantes, les transferts consommables une fois et l annulation de processus locaux jetables. Cette suite est incluse dans la commande hors ligne par defaut.
+`python tests/run_all.py --only observability` verifie les caches expires, les ecritures SSH ambigues, les observations persistantes, les transferts consommables une fois et l annulation de processus locaux jetables. Si rsync est installe, elle copie aussi un fichier local reel pour verifier les mesures de progression en cours et en fin de copie, sans affirmer une verification d'integrite. Cette suite est incluse dans la commande hors ligne par defaut.
 
 La suite `checkpoints` verifie les fichiers reels, les preuves par rang, les quotas et exports. Les tests POSIX utilisent de vrais processus avec un lanceur srun de test ; les contrats purs passent aussi sous Windows. Aucun job ROMEO ne tourne dans cette suite.

@@ -33,7 +33,7 @@ pub struct Options {
     refresh: u64,
     #[arg(long, default_value_t = 40, value_parser = clap::value_parser!(u16).range(1..=100))]
     limit: u16,
-    #[arg(long, default_value = "overview", value_parser = ["overview", "jobs", "transfers", "updates"])]
+    #[arg(long, default_value = "overview", value_parser = ["overview", "jobs", "transfers", "updates", "reports"])]
     view: String,
     #[arg(long)]
     snapshot: bool,
@@ -54,14 +54,19 @@ fn run() -> io::Result<()> {
         "jobs" => View::Jobs,
         "transfers" => View::Transfers,
         "updates" => View::Updates,
+        "reports" => View::Reports,
         _ => View::Overview,
     };
     let mut app = App::new(view);
     app.data.demo = options.demo;
-    let reader = Reader::start(&options)?;
-    reader.refresh();
+    app.refresh_seconds = options.refresh;
+    let mut reader = None;
+    let mut last_refresh = Instant::now();
+    request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
     if options.snapshot {
         let data = reader
+            .as_ref()
+            .ok_or_else(|| io::Error::other("Le lecteur local n'a pas pu demarrer."))?
             .responses
             .recv_timeout(Duration::from_secs(10))
             .map_err(|_| io::Error::other("Le lecteur local ne répond pas."))?
@@ -79,26 +84,39 @@ fn run() -> io::Result<()> {
         return Ok(());
     }
     ratatui::run(|terminal| {
-        let mut last_refresh = Instant::now();
         let mut last_draw = Instant::now();
         let mut dirty = true;
         loop {
-            while let Ok(result) = reader.responses.try_recv() {
+            let mut reader_failed = false;
+            while let Some(result) = reader
+                .as_ref()
+                .and_then(|reader| reader.responses.try_recv().ok())
+            {
                 match result {
                     Ok(data) => app.apply(data),
                     Err(message) => {
                         app.error = Some(message);
                         app.loading = false;
+                        reader_failed = true;
                     }
                 }
                 dirty = true;
             }
+            if reader_failed {
+                reader.take();
+            }
+            if app.loading && last_refresh.elapsed() >= Duration::from_secs(10) {
+                reader.take();
+                app.loading = false;
+                app.error = Some("Le lecteur local ne répond pas (10 s).".into());
+                dirty = true;
+            }
             if !app.paused
                 && !app.loading
+                && app.error.is_none()
                 && last_refresh.elapsed() >= Duration::from_secs(options.refresh)
             {
-                app.loading = reader.refresh();
-                last_refresh = Instant::now();
+                request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
             }
             if dirty || last_draw.elapsed() >= Duration::from_secs(1) {
                 terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -111,10 +129,14 @@ fn run() -> io::Result<()> {
                         match app.key(key) {
                             Action::Quit => break,
                             Action::Refresh => {
-                                if reader.refresh() {
-                                    app.loading = true;
+                                if !app.loading {
+                                    request_refresh(
+                                        &mut reader,
+                                        &options,
+                                        &mut app,
+                                        &mut last_refresh,
+                                    );
                                 }
-                                last_refresh = Instant::now();
                             }
                             Action::None => {}
                         }
@@ -127,6 +149,31 @@ fn run() -> io::Result<()> {
         }
         Ok(())
     })
+}
+
+fn request_refresh(
+    reader: &mut Option<Reader>,
+    options: &Options,
+    app: &mut App,
+    started: &mut Instant,
+) {
+    if reader.as_ref().is_none_or(Reader::stopped) {
+        reader.take();
+        match Reader::start(options) {
+            Ok(new_reader) => *reader = Some(new_reader),
+            Err(_) => {
+                app.loading = false;
+                app.error = Some("Impossible de démarrer le lecteur local.".into());
+                return;
+            }
+        }
+    }
+    app.loading = reader.as_ref().is_some_and(Reader::refresh);
+    if app.loading {
+        *started = Instant::now();
+    } else {
+        app.error = Some("Lecteur local indisponible ; r pour reconnecter.".into());
+    }
 }
 
 fn main() {

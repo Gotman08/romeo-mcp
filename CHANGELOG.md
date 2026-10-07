@@ -48,6 +48,16 @@
 
 ## Non publié
 
+- Interface terminal interne 0.2 : filtres indépendants et visibles, effacement
+  en un Échap, pagination, palette sombre et détails complets défilants. Les
+  listes restent utilisables dès 48 × 16 et l'aperçu priorise les calculs à examiner.
+- Relecture locale explicitement datée, récupération du lecteur avec `r`, délai
+  de 10 secondes et conservation du dernier relevé en erreur. Tests de sessions
+  PTY avec interruption, blocage, restauration et arrêt des processus détenus.
+- Progression mesurée des nouveaux transferts rsync détachés, preuves compactes
+  des checkpoints et vue Rapports avec autorisation, occurrences et publication
+  enregistrées. Contrat JSON 2 et rendu séparé en modules par vue.
+
 - Première version interne d'un tableau de bord Ratatui facultatif : commande
   `tui`, compilation explicite, démonstration, aperçu, jobs, transferts et mises
   à jour en cache. Lecture seule locale, âges des observations, filtre, pause,
