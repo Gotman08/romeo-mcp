@@ -294,6 +294,25 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(command[command.index("--python") + 1], sys.executable)
         self.assertNotIn("shell", launch.call_args.kwargs)
 
+    def test_installed_viewer_next_to_python_works_without_activating_the_venv(self):
+        package = self.root / "installed/romeo_mcp/terminal.py"
+        package.parent.mkdir(parents=True)
+        scripts = self.root / "venv with spaces/Scripts"
+        scripts.mkdir(parents=True)
+        executable = scripts / ("python.exe" if os.name == "nt" else "python")
+        binary = scripts / ("romeo-tui.exe" if os.name == "nt" else "romeo-tui")
+        binary.touch()
+        args = SimpleNamespace(refresh=5, limit=40, width=100, height=30, json=False, snapshot=True,
+                               build=False, binary="", view="reports", demo=True, db=None)
+        with patch.object(terminal, "__file__", str(package)), \
+                patch.object(terminal.sys, "executable", str(executable)), \
+                patch.object(terminal.shutil, "which", return_value=None) as path_lookup, \
+                patch.object(terminal.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as launch:
+            self.assertEqual(terminal.run(args), 0)
+        self.assertEqual(launch.call_args.args[0][0], str(binary))
+        self.assertEqual(launch.call_args.args[0][2], str(executable))
+        path_lookup.assert_not_called()
+
 
 class ProgressTests(unittest.TestCase):
     def test_rsync_parser_keeps_reported_percentage_and_distinguishes_elapsed_time(self):

@@ -36,8 +36,9 @@ La commande courte `romeo-mcp tui` fonctionne aussi lorsque cette version du
 paquet est installée. Le wheel Python reste indépendant de Rust et ne contient
 pas de binaire natif : compiler celui-ci depuis le dépôt ou une archive source,
 puis passer `--binary CHEMIN` à la commande. `ROMEO_TUI_BINARY` accepte également
-un chemin explicite ; un binaire `romeo-tui` présent dans `PATH` peut être utilisé.
-Le binaire compilé dans le dépôt est choisi en priorité, après le chemin explicite.
+un chemin explicite. Le lanceur cherche ensuite le binaire compilé dans le dépôt,
+puis un binaire `romeo-tui` à côté du Python utilisé, puis dans `PATH`.
+Le binaire voisin fonctionne aussi sans activation préalable du venv.
 Relancer `--build` après une modification des sources Rust. Le lecteur et le
 binaire doivent utiliser le même contrat : cette version utilise le schéma 2.
 Une incompatibilité est signalée dans les alertes ; recompiler puis relancer.

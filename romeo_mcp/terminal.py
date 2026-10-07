@@ -56,8 +56,15 @@ def run(args) -> int:
         if compiled.returncode:
             raise ValueError("Compilation de l'interface échouée ; consulter les messages Cargo ci-dessus.")
     explicit = args.binary or os.environ.get("ROMEO_TUI_BINARY", "")
-    binary = str(Path(explicit).expanduser().absolute()) if explicit else (
-        str(built) if built.is_file() else shutil.which("romeo-tui"))
+    sibling = Path(sys.executable).with_name(executable)
+    if explicit:
+        binary = str(Path(explicit).expanduser().absolute())
+    elif built.is_file():
+        binary = str(built)
+    elif sibling.is_file():
+        binary = str(sibling)
+    else:
+        binary = shutil.which("romeo-tui")
     if not binary or not Path(binary).is_file():
         raise ValueError("Interface optionnelle non compilée. Depuis le dépôt : python -m romeo_mcp tui --build --demo")
     command = [binary, "--python", sys.executable, "--package-root", str(root),
