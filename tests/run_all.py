@@ -40,6 +40,8 @@ SUITES = [
      "effets MCP, plans persistants, soumission exacte et recherches bornees", False),
     ("lifecycles", "tests/test_lifecycles.py",
      "services, configurations typees, fichiers atomiques et releves immuables", False),
+    ("observability", "tests/test_observable_operations.py",
+     "fraicheur, coupures SSH, operations persistantes, transferts et annulation", False),
     ("ajouts", "tests/test_ajouts.py",
      "enchainements de jobs, controle de derive du modele", False),
     ("docs", "tests/test_docs.py",

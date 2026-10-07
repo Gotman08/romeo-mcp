@@ -115,3 +115,7 @@ personnels restent hors du dépôt.
 ---
 
 [↑ Haut de page](#tests-et-niveaux-de-vérification) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)
+
+## Fraicheur et operations persistantes
+
+`python tests/run_all.py --only observability` verifie les caches expires, les ecritures SSH ambigues, les observations persistantes, les transferts consommables une fois et l annulation de processus locaux jetables. Cette suite est incluse dans la commande hors ligne par defaut.

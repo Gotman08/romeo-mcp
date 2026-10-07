@@ -1,5 +1,7 @@
 # Documentation du MCP ROMEO
 
+[Observations et performances](observability.md)
+
 [Accueil du projet](../README.md) › Documentation
 
 Ce dossier explique comment utiliser le MCP et comprendre ses résultats.
@@ -33,7 +35,7 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **71 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **78 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 
@@ -87,7 +89,7 @@ la provenance et les limites de cette copie. Le
 
 - [Configuration](configuration.md) : accès personnels, priorités des réglages,
   profils `essential`, `full` et `expert`, clients stdio, `doctor --live`, déplacement et WSL.
-- [Tools](Tools.md) : catalogue cliquable de 71 outils MCP, fiches par outil, MPI et GPU, logiciels,
+- [Tools](Tools.md) : catalogue cliquable de 78 outils MCP, fiches par outil, MPI et GPU, logiciels,
   stockage, diagnostics, mesures et limites de conception.
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,
   empreintes des entrées, export privé, dates d’observation et données manquantes.

@@ -2,7 +2,7 @@
 
 [Accueil](../README.md) › [Documentation](README.md) › Tools
 
-Catalogue des **71 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
+Catalogue des **78 outils MCP** du dépôt : cliquez sur le nom d’un outil pour ouvrir sa fiche Markdown.
 Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son résultat, ses effets et ses limites.
 
 <details>
@@ -775,3 +775,17 @@ d'intégrité conservent leur intention unique.
 ---
 
 [↑ Haut de page](#tools) · [Accueil](../README.md) · [Documentation](README.md)
+
+## Diagnostics et transferts detaches
+
+[Parcours, mesures et limites](observability.md)
+
+| Outil | Fonction |
+|---|---|
+| [`mcp_diagnostics`](tools/mcp_diagnostics.md) | Lecture locale des compteurs ; aucune connexion SSH ouverte. |
+| [`romeo_capabilities`](tools/romeo_capabilities.md) | Lecture locale de la configuration et du profil ; la disponibilite du cluster reste a observer. |
+| [`job_observation_get`](tools/job_observation_get.md) | Dernier etat conserve, avec son age. Ne certifie pas la cible ou l etat actuel. |
+| [`transfer_prepare`](tools/transfer_prepare.md) | Ecrit uniquement un plan local. Verifie les chemins avec les racines SSH configurees. |
+| [`transfer_start`](tools/transfer_start.md) | Lance la copie apres confirmation, une seule fois par plan. |
+| [`transfer_status`](tools/transfer_status.md) | Relit les traces locales, sans attendre ni relancer une copie. |
+| [`transfer_cancel`](tools/transfer_cancel.md) | Demande l annulation ; seul le worker peut en confirmer l observation. |

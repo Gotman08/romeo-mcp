@@ -13,6 +13,7 @@ ESSENTIAL_TOOLS = frozenset({
     "romeo_software", "job_prepare", "job_submit", "job_status", "job_log_tail", "job_log_search", "list_jobs",
     "cancel_job", "diagnose_job", "job_efficiency", "list_dir",
     "upload_to_romeo", "download_from_romeo", "job_report_collect", "job_report_export", "plan_get",
+    "mcp_diagnostics", "romeo_capabilities", "job_observation_get",
 })
 
 

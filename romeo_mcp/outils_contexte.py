@@ -7,6 +7,9 @@ ressources MCP et prompts. Aucun de ces outils ne modifie quoi que ce soit.
 from __future__ import annotations
 
 import shlex
+import time
+import threading
+from .observability import ReadCache
 from typing import Any
 from .cluster import (
     ARCHS,
@@ -43,25 +46,36 @@ from .noyau import (
         "dimensionner un job."
     ),
 )
-def romeo_status(include_queue: bool = True) -> dict[str, Any]:
+def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[str, Any]:
     """Situation complete du cluster en une seule aller-retour SSH."""
     s = session()
+    if not 0 <= max_age_seconds <= 60:
+        return _error("max_age_seconds doit etre compris entre 0 et 60 ; 0 force une lecture actuelle.")
+    cache_key = (s.host, s.user, DEFAULT_ACCOUNT, include_queue)
+    cached = _STATUS_CACHE.get(cache_key, max_age_seconds)
+    if cached is not None:
+        value, age = cached
+        value["observation"].update(cached=True, age_seconds=age, current_state_observed=False)
+        return value
     # `sinfo -N` liste un noeud par partition d'appartenance : le dedoublonnage
     # se fait plus bas, par nom. S'appuyer sur une partition supposee couvrir
     # tout le parc etait fragile : la creation d'une partition, ou le retrait
     # d'un noeud de `instant`, l'aurait rendu faux en silence.
     command = (
-        "echo '###NODES'; sinfo -h -N -o '%n|%T|%f'; "
-        "echo '###PART'; sinfo -h -o '%P|%a|%l'; "
-        "echo '###SHARE'; sshare -U -n -P -o Account,EffectvUsage,FairShare 2>/dev/null"
+        "echo '###NODES'; sinfo -h -N -o '%n|%T|%f' || exit $?; "
+        "echo '###PART'; sinfo -h -o '%P|%a|%l' || exit $?; "
+        "echo '###SHARE'; sshare -U -n -P -o Account,EffectvUsage,FairShare || exit $?"
     )
     if include_queue:
-        command += "; echo '###QUEUE'; squeue -h -u $USER -o '%i|%j|%P|%T|%M|%L|%R'"
+        command += "; echo '###QUEUE'; squeue -h -u $USER -o '%i|%j|%P|%T|%M|%L|%R' || exit $?"
 
     try:
-        result = _sh(s, command, timeout=45, max_chars=60_000)
+        result = _sh(s, command, timeout=45, max_chars=60_000, read_only=True)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
+
+    if not result.ok or result.truncated:
+        return _error("Etat du cluster incomplet ; aucune absence de ressources n'est deduite.", truncated=result.truncated)
 
     sections: dict[str, list[str]] = {}
     current = None
@@ -144,7 +158,7 @@ def romeo_status(include_queue: bool = True) -> dict[str, Any]:
                 }
             )
 
-    return {
+    value = {
         "ok": True,
         "host": s.host,
         "user": s.user,
@@ -153,11 +167,14 @@ def romeo_status(include_queue: bool = True) -> dict[str, Any]:
         "partitions": partitions,
         "fairshare": fairshare,
         "my_jobs": queue if include_queue else None,
+        "observation": {"observed_at": time.time(), "age_seconds": 0, "cached": False, "current_state_observed": True},
         "note": (
             "gpus_idle et cpus_idle ne comptent que les noeuds entierement "
             "libres ; les noeuds en etat `mixed` offrent encore des ressources."
         ),
     }
+    _STATUS_CACHE.put(cache_key, value)
+    return value
 
 @outil(
     annotations=READ_ONLY,
@@ -188,9 +205,10 @@ def romeo_modules(search: str = "") -> dict[str, Any]:
 
     return {"ok": True, "count": len(names), "modules": sorted(set(names))}
 
-#: `spack find` coute une dizaine de secondes : on garde le catalogue en memoire
-#: pour la duree du processus serveur.
-_SPACK_CACHE: dict[str, list[str]] = {}
+#: Catalogue Spack borne, avec duree de vie explicite et isolation par cible.
+_SPACK_CACHE = ReadCache(capacity=8)
+_STATUS_CACHE = ReadCache(capacity=8)
+_SPACK_LOCK = threading.RLock()
 
 @outil(
     annotations=READ_ONLY,
@@ -204,7 +222,8 @@ _SPACK_CACHE: dict[str, list[str]] = {}
         "`spack_packages`."
     ),
 )
-def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> dict[str, Any]:
+def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40,
+                   max_age_seconds: int = 300, refresh: bool = False) -> dict[str, Any]:
     """Interroge le catalogue Spack de l'architecture demandee."""
     s = session()
     key = str(arch).strip().lower()
@@ -213,8 +232,17 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
             "architecture inconnue : {!r}. Valeurs : x64cpu, armgpu.".format(arch)
         )
     node = ARCHS[key]
+    if not 0 <= max_age_seconds <= 3600:
+        return _error("max_age_seconds doit etre compris entre 0 et 3600.")
+    cache_key = (s.host, s.user, key)
+    with _SPACK_LOCK:
+        return _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, refresh)
 
-    if key not in _SPACK_CACHE:
+
+def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, refresh):
+    cached = _SPACK_CACHE.get(cache_key, 0 if refresh else max_age_seconds)
+
+    if cached is None:
         try:
             # Le `2>/dev/null` d'origine masquait l'echec du chargement
             # d'environnement : `spack` restait absent du PATH, la sortie etait
@@ -225,9 +253,10 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
             # bruit.
             result = _sh(
                 s,
-                "{} >/dev/null; spack find --no-groups".format(node["env_loader"]),
+                "{} >/dev/null || exit $?; spack find --no-groups".format(node["env_loader"]),
                 timeout=180,
                 max_chars=300_000,
+                read_only=True,
             )
         except (SSHError, SSHTimeout) as exc:
             return _error(str(exc))
@@ -239,7 +268,7 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
                 if line.strip() and "@" in line and not line.startswith("-")
             }
         )
-        if not result.ok:
+        if not result.ok or result.truncated:
             return _error(
                 "`spack find` a echoue sur {} (code {}). Le catalogue n'est pas "
                 "mis en cache : corrige la cause puis relance.".format(
@@ -254,9 +283,13 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
                 detail=result.stdout.strip()[:300],
             )
         # On ne memorise qu'un catalogue reellement obtenu.
-        _SPACK_CACHE[key] = catalogue
+        observation = {"packages": catalogue, "observed_at": time.time()}
+        _SPACK_CACHE.put(cache_key, observation)
+        age = 0
+    else:
+        observation, age = cached
 
-    packages = _SPACK_CACHE[key]
+    packages = observation["packages"]
     needle = (search or "").strip().lower()
     if needle:
         packages = [p for p in packages if needle in p.lower()]
@@ -268,7 +301,8 @@ def romeo_software(search: str = "", arch: str = "armgpu", limit: int = 40) -> d
         "arch": key,
         "env_loader": node["env_loader"],
         "search": search,
-        "total_in_catalog": len(_SPACK_CACHE[key]),
+        "total_in_catalog": len(observation["packages"]),
+        "observation": {"observed_at": observation["observed_at"], "age_seconds": age, "cached": cached is not None},
         "count": len(packages),
         "truncated": len(packages) > limit,
         "packages": shown,

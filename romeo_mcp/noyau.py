@@ -16,6 +16,7 @@ import inspect
 import os
 import re
 import shlex
+import time
 from pathlib import Path
 from .profiles import ProfiledServer
 # Reexports des appuis historiques ; leur implementation ne depend plus du MCP.
@@ -29,6 +30,7 @@ from .guard import GuardError
 from .registry import registry
 from .ssh import SSHError, SSHTimeout, session
 from . import __version__
+from .observability import TIMINGS
 
 
 """Serveur MCP pour le supercalculateur ROMEO (URCA).
@@ -103,8 +105,12 @@ def outil(**options):
     def decorateur(fonction):
         @functools.wraps(fonction)
         def enveloppe(*args, **kwargs):
+            started = time.monotonic()
+            failed = True
             try:
-                return fonction(*args, **kwargs)
+                result = fonction(*args, **kwargs)
+                failed = result.get("ok", True) is False
+                return result
             except (SSHError, SSHTimeout, ClusterError, GuardError, ValueError) as exc:
                 # Erreurs du domaine : leur message est deja redige pour le
                 # modele, inutile de le maquiller.
@@ -116,16 +122,24 @@ def outil(**options):
                     ),
                     inattendu=True,
                 )
+            finally:
+                TIMINGS.record(fonction.__name__, time.monotonic() - started, failed)
         if inspect.iscoroutinefunction(fonction):
             @functools.wraps(fonction)
             async def enveloppe(*args, **kwargs):
+                started = time.monotonic()
+                failed = True
                 try:
-                    return await fonction(*args, **kwargs)
+                    result = await fonction(*args, **kwargs)
+                    failed = result.get("ok", True) is False
+                    return result
                 except (SSHError, SSHTimeout, ClusterError, GuardError, ValueError) as exc:
                     return _error(str(exc))
                 except Exception as exc:
                     return _error("erreur inattendue dans {} : {}".format(
                         fonction.__name__, type(exc).__name__), inattendu=True)
+                finally:
+                    TIMINGS.record(fonction.__name__, time.monotonic() - started, failed)
         # `structured_output` fait remplir `structuredContent` cote client :
         # sans lui, mcp 2.0 ne rend que du JSON dans du texte, que chaque
         # client doit reparser. Le schema derive de `dict[str, Any]` ne promet

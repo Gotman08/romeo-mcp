@@ -102,3 +102,7 @@ Continuer avec le [guide des tests](../tests/README.md) et les
 ---
 
 [↑ Haut de page](#code-du-serveur-mcp) · [Accueil](../README.md) · [Documentation](../docs/README.md) · [Catalogue Tools](../docs/Tools.md)
+
+## Observations et transferts detaches
+
+Le [parcours](../docs/observability.md) explique les garanties et limites. `job_observation.py` separe les observations Slurm du protocole MCP ; `observability.py` porte les caches bornes et compteurs sans contenu. `transfers.py` conserve les plans et statuts ; `transfer_worker.py` supervise les copies sans retenir le processus MCP. Les outils sont assembles depuis `outils_diagnostics.py` et `outils_transferts.py`.

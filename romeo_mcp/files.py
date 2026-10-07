@@ -14,11 +14,24 @@ import hashlib
 import shlex
 import shutil
 import subprocess
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from .ssh import SSHError
 
 _TRANSFER_TIMEOUT = 900  # 15 min : un resultat de simulation peut etre lourd.
+_RUNNER = ContextVar("romeo_transfer_runner", default=None)
+
+
+@contextmanager
+def transfer_runner(executor):
+    """Inject supervision in a detached worker without changing synchronous callers."""
+    token = _RUNNER.set(executor)
+    try:
+        yield
+    finally:
+        _RUNNER.reset(token)
 
 
 def _has_rsync() -> bool:
@@ -26,6 +39,9 @@ def _has_rsync() -> bool:
 
 
 def _run(argv: list[str], what: str) -> str:
+    executor = _RUNNER.get()
+    if executor is not None:
+        return executor(argv, what)
     try:
         proc = subprocess.run(
             argv,

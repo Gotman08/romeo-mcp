@@ -120,7 +120,8 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
                 store.update_submission(plan_id, "submitting", {"submitted_stages": submitted})
         else:
             preview = payload["preview"]
-            result = {"ok": True, "submitted": True, "warnings": preview["warnings"],
+            result = {"ok": True, "submitted": True, "submission_observed": True,
+                      "scheduler_completed": False, "result_validated": False, "warnings": preview["warnings"],
                       "next_step": "Consulte job_status, job_log_tail puis job_efficiency."}
             if kind in {"pipeline", "resilient"}:
                 result.update(pipeline=preview.get("pipeline", "resilient"), stages=submitted,
@@ -138,9 +139,11 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
         # La tentative reste consommee : apres une coupure reseau, l'absence
         # d'accuse de reception n'est pas une preuve d'absence du job.
         result = _error("Soumission interrompue : {}. Verifie list_jobs avant toute nouvelle tentative."
-                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()))
+                        .format(exc), submitted_stages=submitted, job_ids=list(identifiers.values()),
+                        submission_outcome="unknown", retry_safe=False)
     result.update(plan_id=plan_id, plan_sha256=saved["sha256"])
-    store.update_submission(plan_id, "submitted" if result["ok"] else "failed", result)
+    state = "submitted" if result["ok"] else "uncertain" if result.get("submission_outcome") == "unknown" else "failed"
+    store.update_submission(plan_id, state, result)
     return result
 
 

@@ -14,6 +14,13 @@
 
 ## Non publié — intentions et cycles de vie explicites
 
+- Expiration et cloisonnement du cache Spack, cache de statut opt-in avec âge explicite.
+- Mesures agrégées du démarrage, des outils et du transport ; guide de choix des outils sans sonde distante.
+- Observations Slurm/services persistantes ; distinction soumission, fin ordonnanceur, résultat validé et demande d'annulation.
+- Reconnexion réservée aux lectures explicites ; aucune réexécution automatique après envoi SSH ambigu.
+- Plans de transfert consommables une seule fois, workers détachés, statuts et journaux relisibles et annulation observée.
+- Remplacement atomique tolérant les ouvertures concurrentes Windows et fermeture du registre à la sortie.
+
 - La préparation d'un environnement Python refuse une sélection Spack absente
   ou le nom ambigu `python` avant de créer un plan. Le test réel sur ROMEO a
   montré que ce défaut provoquait un échec Slurm au chargement de Spack.

@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from .cluster import DEFAULT_HOST
+from .observability import Measurements
 
 # Le shell distant est un shell de login (-l) : indispensable pour que la
 # fonction `module` existe. La banniere MOTD est emise avant la premiere
@@ -202,9 +203,12 @@ class RomeoSession:
         self._err: deque[str] = deque(maxlen=50)
         self._lock = threading.RLock()
         self._cache: dict[str, str] = {}
+        self.timings = Measurements()
+        self.connections = 0
 
     # -- cycle de vie --------------------------------------------------------
     def _spawn(self) -> None:
+        self._cache.clear()
         argv = ["ssh", *_SSH_OPTIONS, self.host, _REMOTE_SHELL]
         try:
             # Tuyaux en binaire volontairement : en mode texte, Windows traduit
@@ -222,6 +226,7 @@ class RomeoSession:
             raise SSHError("client `ssh` introuvable dans le PATH") from exc
 
         self._proc = proc
+        self.connections += 1
         self._out = queue.Queue()
         self._err.clear()
 
@@ -261,6 +266,7 @@ class RomeoSession:
 
     def close(self) -> None:
         with self._lock:
+            self._cache.clear()
             proc = self._proc
             self._proc = None
         if proc and proc.poll() is None:
@@ -274,6 +280,7 @@ class RomeoSession:
     def _reset(self) -> None:
         """Tue la session : utilise apres un delai depasse, l'etat est douteux."""
         proc, self._proc = self._proc, None
+        self._cache.clear()
         if proc and proc.poll() is None:
             proc.kill()
 
@@ -311,7 +318,28 @@ class RomeoSession:
         return "\n".join(lignes) or "aucun message"
 
     # -- execution -----------------------------------------------------------
-    def run(
+    def run(self, command: str, timeout: float = 30.0, cwd: str | None = None,
+            max_chars: int = DEFAULT_MAX_CHARS) -> Result:
+        """Measure the whole call, including transport lock and connection startup."""
+        with self.timings.measure("ssh_command"):
+            result = self._run(command, timeout, cwd, max_chars)
+        if not result.ok:
+            # Transport completed, but the remote command itself failed.
+            self.timings.record("remote_command_failure", result.duration, True)
+        return result
+
+    def read(self, command: str, **kwargs) -> Result:
+        """One reconnect/retry for explicitly read-only probes; never replay a write."""
+        try:
+            return self.run(command, **kwargs)
+        except SSHTimeout:
+            raise
+        except SSHError:
+            with self._lock:
+                self._reset()
+            return self.run(command, **kwargs)
+
+    def _run(
         self,
         command: str,
         timeout: float = 30.0,
@@ -337,22 +365,24 @@ class RomeoSession:
         ).format(begin=shlex.quote(begin), body=body, end=end)
 
         encoded = payload.encode("utf-8")
+        waiting = time.monotonic()
         with self._lock:
+            self.timings.record("ssh_lock_wait", time.monotonic() - waiting)
             proc = self._ensure()
             try:
                 proc.stdin.write(encoded)  # type: ignore[union-attr]
                 proc.stdin.flush()  # type: ignore[union-attr]
-            except (BrokenPipeError, OSError):
-                # Session tombee entre deux appels : on retente une fois a neuf.
+            except (BrokenPipeError, OSError) as exc:
+                # Some bytes may already have reached the remote shell. Replaying
+                # sbatch or a file write here could execute it twice.
                 self._reset()
-                proc = self._ensure()
-                proc.stdin.write(encoded)  # type: ignore[union-attr]
-                proc.stdin.flush()  # type: ignore[union-attr]
+                raise SSHError("Envoi SSH interrompu ; resultat distant inconnu. La commande n'est pas rejouee automatiquement.") from exc
 
             started = time.monotonic()
             rc, lines = self._collect(begin, end, started, timeout)
 
         text, truncated = clamp("".join(lines).rstrip("\n"), max_chars)
+        self.timings.record("ssh_response_wait", time.monotonic() - started, rc != 0)
         return Result(
             rc=rc, stdout=text, duration=time.monotonic() - started, truncated=truncated
         )
@@ -393,9 +423,13 @@ class RomeoSession:
     # -- commodites ----------------------------------------------------------
     def cached(self, key: str, command: str) -> str:
         """Memorise le resultat d'une commande invariante (user, home...)."""
-        if key not in self._cache:
-            self._cache[key] = self.run(command, timeout=25).check(key).stdout.strip()
-        return self._cache[key]
+        with self._lock:
+            if key not in self._cache:
+                result = self.read(command, timeout=25).check(key)
+                if result.truncated or not result.stdout.strip():
+                    raise SSHError("Observation incomplete : " + key)
+                self._cache[key] = result.stdout.strip()
+            return self._cache[key]
 
     @property
     def user(self) -> str:

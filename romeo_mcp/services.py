@@ -7,6 +7,7 @@ import uuid
 from urllib.parse import quote
 
 from .cluster import require_account
+from .ssh import SSHError
 from .execution_backend import _contexte_chemins
 from .guard import check_path
 from .plans import prepare_spec, _submission_target
@@ -116,7 +117,30 @@ with urllib.request.urlopen(request, timeout=3) as response:
 
 
 def service_status(service_id: str) -> dict:
-    s, job_id, config = _service(service_id)
+    saved = registry().prepared_submission(service_id)
+    target = saved["payload"]["target"] if saved else None
+    job_id = (saved["result"] or {}).get("job_id") if saved else None
+    target_checked = False
+    try:
+        s, job_id, config = _service(service_id)
+        # _service compared this target to the current host/account/roots.
+        # Reuse that evidence instead of another remote identity lookup.
+        target_checked = True
+        state = _observe_service(s, job_id, config, service_id)
+    except SSHError as exc:
+        state = {"ok": False, "state": "unknown", "service_id": service_id, "job_id": job_id,
+                 "error": str(exc)}
+    state["target_checked"] = target_checked
+    state["current_state_observed"] = state["ok"] and state["state"] != "unknown"
+    if state["ok"] and state["state"] != "unknown":
+        state["observation"] = registry().save_observation(job_id, target, state)
+    else:
+        state["last_observation"] = registry().observation(job_id, target)
+    state["service_readiness_observed"] = state["state"] == "ready"
+    return state
+
+
+def _observe_service(s, job_id, config, service_id):
     state = {**allocation_state(s, job_id), 'service_id': service_id}
     if state['state'] == 'starting' and state.get('node'):
         url = 'http://{}:{}{}'.format(state['node'], config['port'], config['health_path'])
