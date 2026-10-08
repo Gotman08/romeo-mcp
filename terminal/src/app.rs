@@ -1,5 +1,6 @@
 //! View-local state, identity preservation and cached records.
 mod interaction;
+mod note;
 use crate::{
     color::Palette,
     model::{now, Job, Report, Snapshot, Transfer},
@@ -158,6 +159,7 @@ pub struct App {
     pub id_width: u16,
     pub note_edit: String,
     pub note_target: Option<String>,
+    pub note_cursor: usize,
     pub menu_selected: usize,
     pub collect_read: bool,
     pub debounce_until: Option<std::time::Instant>,
@@ -226,6 +228,7 @@ impl App {
             id_width: 8,
             note_edit: String::new(),
             note_target: None,
+            note_cursor: 0,
             menu_selected: 0,
             collect_read: true,
             debounce_until: None,
@@ -945,6 +948,7 @@ impl App {
         if self.overlay == Overlay::Note {
             self.note_target = None;
             self.note_edit.clear();
+            self.note_cursor = 0;
         }
         self.overlay = Overlay::None;
         (self.scroll, self.scroll_max, self.scroll_page) = self.saved_scroll;

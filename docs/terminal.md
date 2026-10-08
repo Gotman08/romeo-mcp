@@ -63,8 +63,8 @@ les alertes : recompiler le binaire et relancer.
 | `[` / `]` | Réduire / augmenter la largeur du détail par pas de 5 %, entre 25 et 65 % |
 | `c` / `C` | Copier l'identifiant / le chemin local d'un transfert dans le presse-papiers |
 | `e` | Exporter un résumé UTF-8 dans le dossier local du tableau ; `!` montre le chemin complet |
-| `a` | Ouvrir le menu contextuel, dont les lectures distantes explicites |
-| `*`, `f`, `N` | Épingler un job, ouvrir les favoris, éditer une note locale (Entrée enregistre, Échap annule) |
+| `a` | Ouvrir les actions disponibles pour la sélection, dont les lectures distantes explicites |
+| `*`, `f`, `N` | Épingler un job, ouvrir les favoris, éditer une note locale (F2 ou Ctrl-S enregistre, Échap annule) |
 | `P` | Activer/désactiver la présentation anonymisée |
 | `w` / `W` | Réduire/augmenter la colonne des identifiants ; le nom utilise l'espace restant |
 | `X` | Arrêter une copie, un export ou une lecture distante en cours ; aucun job n'est annulé |
@@ -74,6 +74,24 @@ les alertes : recompiler le binaire et relancer.
 | `?` | Ouvrir/fermer l'aide |
 | `!` | Lire le détail des erreurs, avertissements et notifications locales |
 | `q`, Ctrl-C | Quitter et restaurer le terminal |
+
+Depuis une session, les actions Dossier, Reprise et Groupes ouvrent le calcul
+associé à son allocation, y compris lorsqu'il faut charger une autre page.
+Les actions Favori et Note sont proposées pour les calculs sélectionnés.
+Les menus et favoris gardent leur sélection visible dans les deux sens,
+y compris après redimensionnement ; Début/Fin et les touches de page y fonctionnent.
+
+Dans une note, `←`/`→`, Début/Fin déplacent le curseur ; Retour arrière et Suppr
+effacent autour de sa position. Le texte défile pour garder le curseur visible.
+Entrée ajoute un espace ; **F2 ou Ctrl-S enregistre explicitement**. Ainsi, coller
+une note sur plusieurs lignes ne l'enregistre pas après la première ligne et
+les lettres suivantes restent dans la note, y compris sous Windows.
+Sur Unix, le collage encadré traite également le bloc collé comme du texte,
+normalise les caractères de contrôle et protège la saisie d'une recherche.
+Ce mode est désactivé lors de la fermeture. Le backend console Windows ne
+fournit pas ces délimiteurs ; la validation des notes utilise donc une touche
+distincte d'Entrée sur tous les systèmes. Les notes restent limitées à
+500 caractères et les recherches à 80 caractères.
 
 Un format de 100 colonnes sur 30 lignes est confortable. En dessous de 48 × 16,
 un message invite à agrandir le terminal. Le mode compact réserve l'espace à la

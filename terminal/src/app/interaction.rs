@@ -2,21 +2,53 @@
 use super::{Action, App, KeyCode, KeyEvent, KeyModifiers, LayoutMode, Overlay, Panel, View};
 
 impl App {
+    fn job_view(&self) -> bool {
+        matches!(
+            self.view,
+            View::Jobs | View::Dossier | View::Recovery | View::Groups
+        )
+    }
+
+    fn context_job_id(&self) -> Option<String> {
+        if self.job_view() {
+            self.selected_job().map(|job| job.id.clone())
+        } else if self.view == View::Sessions {
+            self.data
+                .sessions
+                .get(self.sessions_table.selected().unwrap_or(0))
+                .filter(|session| !session.job_id.is_empty())
+                .map(|session| session.job_id.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn menu_items(&self) -> Vec<(&'static str, &'static str)> {
-        let mut items = vec![
-            ("Dossier du calcul", "dossier"),
-            ("Reprise vérifiée", "recovery"),
-            ("Groupes et dépendances", "groups"),
-            ("Services et sessions", "sessions"),
-            ("Copier l'identifiant", "copy"),
-            ("Exporter le résumé", "export"),
-            ("Épingler / retirer des favoris", "favorite"),
-            ("Modifier la note locale", "note"),
+        let mut items = Vec::new();
+        if self.context_job_id().is_some() {
+            items.extend([
+                ("Dossier du calcul", "dossier"),
+                ("Reprise vérifiée", "recovery"),
+                ("Groupes et dépendances", "groups"),
+            ]);
+        }
+        items.push(("Services et sessions", "sessions"));
+        if self.copy_value(false).is_some() {
+            items.push(("Copier l'identifiant", "copy"));
+        }
+        items.push(("Exporter le résumé", "export"));
+        if self.job_view() && self.selected_job().is_some() {
+            items.extend([
+                ("Épingler / retirer des favoris", "favorite"),
+                ("Modifier la note locale", "note"),
+            ]);
+        }
+        items.extend([
             ("Ouvrir les favoris", "favorites"),
             ("Mode présentation : activer / désactiver", "anonymize"),
             ("Notifications : activer / désactiver", "notifications"),
             ("Souris : activer / désactiver", "mouse"),
-        ];
+        ]);
         if self.selected_job().is_some()
             && matches!(
                 self.view,
@@ -57,9 +89,9 @@ impl App {
             .unwrap_or("");
         self.close_overlay();
         match key {
-            "dossier" => self.switch_view(View::Dossier),
-            "recovery" => self.switch_view(View::Recovery),
-            "groups" => self.switch_view(View::Groups),
+            "dossier" => self.open_context_job(View::Dossier),
+            "recovery" => self.open_context_job(View::Recovery),
+            "groups" => self.open_context_job(View::Groups),
             "sessions" => self.switch_view(View::Sessions),
             "copy" => return Action::Copy(false),
             "export" => return Action::Export,
@@ -83,6 +115,33 @@ impl App {
             _ => {}
         }
         Action::None
+    }
+
+    fn open_context_job(&mut self, view: View) {
+        if let Some(id) = self.context_job_id() {
+            let from_session = self.view == View::Sessions;
+            self.switch_view(view);
+            if from_session {
+                self.set_query(id.chars().take(80).collect());
+                self.pending_detail = Some((view, id));
+            }
+        } else {
+            self.confirm("Aucun calcul associé à la sélection.");
+        }
+    }
+
+    fn menu_key(&mut self, key: KeyCode, count: usize) {
+        let last = count.saturating_sub(1);
+        self.menu_selected = match key {
+            KeyCode::Up => self.menu_selected.saturating_sub(1),
+            KeyCode::Down => self.menu_selected.saturating_add(1),
+            KeyCode::PageUp => self.menu_selected.saturating_sub(self.scroll_page as usize),
+            KeyCode::PageDown => self.menu_selected.saturating_add(self.scroll_page as usize),
+            KeyCode::Home => 0,
+            KeyCode::End => last,
+            _ => self.menu_selected,
+        }
+        .min(last);
     }
     pub fn toggle_favorite(&mut self) {
         if !matches!(
@@ -110,6 +169,7 @@ impl App {
         }
         if let Some(id) = self.selected_job().map(|row| row.id.clone()) {
             self.note_edit = self.notes.get(&id).cloned().unwrap_or_default();
+            self.note_cursor = self.note_edit.chars().count();
             self.note_target = Some(id);
             self.open(Overlay::Note);
         }
@@ -172,67 +232,20 @@ impl App {
             return Action::Quit;
         }
         if self.overlay == Overlay::Note {
-            match key.code {
-                KeyCode::Esc => self.close_overlay(),
-                KeyCode::Enter => {
-                    if let Some(id) = self.note_target.take() {
-                        if self.note_edit.is_empty() {
-                            self.notes.remove(&id);
-                        } else if (self.notes.len() < 1000 || self.notes.contains_key(&id))
-                            && self.notes.values().map(String::len).sum::<usize>()
-                                - self.notes.get(&id).map_or(0, String::len)
-                                + self.note_edit.len()
-                                <= 256000
-                        {
-                            self.notes.insert(id, self.note_edit.clone());
-                        } else {
-                            self.close_overlay();
-                            self.confirm("Limite des notes locales atteinte ; note conservée sans modification.");
-                            return Action::None;
-                        }
-                    }
-                    self.close_overlay();
-                    self.confirm("Note locale enregistrée.");
-                }
-                KeyCode::Backspace => {
-                    self.note_edit.pop();
-                }
-                KeyCode::Char(c) if !c.is_control() && self.note_edit.chars().count() < 500 => {
-                    self.note_edit.push(c)
-                }
-                _ => {}
-            }
+            self.note_key(key);
             return Action::None;
         }
         if self.overlay == Overlay::Actions {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('a') => self.close_overlay(),
-                KeyCode::Up => self.menu_selected = self.menu_selected.saturating_sub(1),
-                KeyCode::Down => {
-                    self.menu_selected =
-                        (self.menu_selected + 1).min(self.menu_items().len().saturating_sub(1));
-                    self.scroll = self
-                        .menu_selected
-                        .saturating_sub(self.scroll_page as usize / 2)
-                        as u16;
-                }
                 KeyCode::Enter => return self.menu_action(),
-                _ => {}
+                code => self.menu_key(code, self.menu_items().len()),
             }
             return Action::None;
         }
         if self.overlay == Overlay::Favorites {
             match key.code {
                 KeyCode::Esc => self.close_overlay(),
-                KeyCode::Up => self.menu_selected = self.menu_selected.saturating_sub(1),
-                KeyCode::Down => {
-                    self.menu_selected =
-                        (self.menu_selected + 1).min(self.favorites.len().saturating_sub(1));
-                    self.scroll = self
-                        .menu_selected
-                        .saturating_sub(self.scroll_page as usize / 2)
-                        as u16;
-                }
                 KeyCode::Enter => {
                     if let Some(id) = self.favorites.iter().nth(self.menu_selected).cloned() {
                         self.close_overlay();
@@ -241,7 +254,7 @@ impl App {
                         self.pending_detail = Some((View::Dossier, id));
                     }
                 }
-                _ => {}
+                code => self.menu_key(code, self.favorites.len()),
             }
             return Action::None;
         }
@@ -482,7 +495,7 @@ mod tests {
         assert!(app.notes.is_empty());
         app.key(key(KeyCode::Char('N')));
         app.key(key(KeyCode::Char('é')));
-        app.key(key(KeyCode::Enter));
+        app.key(key(KeyCode::F(2)));
         assert_eq!(app.notes["42"], "é");
         app.key(key(KeyCode::Char('P')));
         app.key(key(KeyCode::Char('N')));
@@ -505,7 +518,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(app.selected_job().unwrap().id, "43");
-        app.key(key(KeyCode::Enter));
+        app.key(key(KeyCode::F(2)));
         assert_eq!(app.notes["42"], "Original job annotation");
         assert!(!app.notes.contains_key("43"));
         assert!(app.note_target.is_none());
@@ -556,6 +569,51 @@ mod tests {
         }];
         assert!(app.menu_items().iter().any(|item| item.1 == "allocation"));
         assert!(!app.menu_items().iter().any(|item| item.1 == "service"));
+    }
+
+    #[test]
+    fn job_links_from_sessions_target_the_registered_allocation() {
+        for (action, view) in [
+            ("dossier", View::Dossier),
+            ("recovery", View::Recovery),
+            ("groups", View::Groups),
+        ] {
+            let mut app = sample();
+            app.switch_view(View::Sessions);
+            app.data.sessions = vec![Session {
+                job_id: "43".into(),
+                ..Default::default()
+            }];
+            app.key(key(KeyCode::Char('a')));
+            app.menu_selected = app
+                .menu_items()
+                .iter()
+                .position(|item| item.1 == action)
+                .unwrap();
+            app.key(key(KeyCode::Enter));
+            assert_eq!(app.view, view);
+            assert_eq!(app.read_request().detail_job, "43");
+            assert_eq!(app.read_request().queries["jobs"], "43");
+            assert_eq!(app.read_request().anchors["jobs"], "43");
+        }
+    }
+
+    #[test]
+    fn menus_omit_actions_without_a_supported_target() {
+        let mut app = sample();
+        for view in [
+            View::Transfers,
+            View::Reports,
+            View::Sessions,
+            View::Updates,
+            View::Overview,
+        ] {
+            app.switch_view(view);
+            assert!(!app.menu_items().iter().any(|item| matches!(
+                item.1,
+                "favorite" | "note" | "dossier" | "recovery" | "groups"
+            )));
+        }
     }
 
     #[test]

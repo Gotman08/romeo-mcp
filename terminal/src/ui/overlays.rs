@@ -7,8 +7,8 @@ use crate::{
 use ratatui::{
     layout::Rect,
     style::Style,
-    text::Line,
-    widgets::{Block, Clear},
+    text::{Line, Span},
+    widgets::{Block, Clear, Paragraph, Wrap},
     Frame,
 };
 
@@ -26,6 +26,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         Block::default().style(Style::default().fg(TEXT).bg(BACKGROUND)),
         popup,
     );
+    let mut cursor_line = None;
     let (title, lines) = match app.overlay {
         Overlay::Help => (
             " Aide · ↑↓ défiler · Échap fermer ",
@@ -58,6 +59,8 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 Line::from(app.palette.description()),
                 Line::from("6 Dossier / 7 Reprise / 8 Groupes / 9 Sessions"),
                 Line::from("a : menu contextuel ; * : favori ; N : note locale"),
+                Line::from("Note : F2/Ctrl-S enregistrer ; ←→ Début/Fin déplacer"),
+                Line::from("Le collage reste du texte ; les retours deviennent des espaces."),
                 Line::from("P : présentation anonymisée ; w/W : largeur identifiant"),
                 Line::from("Filtres combinés : etat:COMPLETED validation:check gpu:oui"),
                 Line::from("partition:gpu depuis:2026-10-01 avant:2026-10-09 cpu:>=8"),
@@ -75,20 +78,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             " Journaux enregistrés · Échap fermer ",
             super::workspace::log_lines(app),
         ),
-        Overlay::Note => (
-            " Note locale · Entrée enregistrer · Échap annuler ",
-            vec![
-                Line::from(format!(
-                    "Calcul : {}",
-                    app.note_target.as_deref().unwrap_or("—")
-                )),
-                Line::from(format!(
-                    "{} / 500 caractères",
-                    app.note_edit.chars().count()
-                )),
-                Line::from(format!("{}▏", app.note_edit)),
-            ],
-        ),
+        Overlay::Note => {
+            let (lines, cursor) = note_lines(app, popup.width.saturating_sub(2));
+            cursor_line = Some(cursor);
+            (" Note locale · F2 enregistrer · Échap annuler ", lines)
+        }
         Overlay::Actions => (
             " Actions · ↑↓ choisir · Entrée · Échap ",
             app.menu_items()
@@ -178,5 +172,152 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             (" Alertes · ↑↓ défiler · Échap fermer ", lines)
         }
     };
+    let visible = popup.height.saturating_sub(2).max(1) as usize;
+    if let Some(cursor) = cursor_line {
+        keep_visible(app, cursor, cursor + 1, visible);
+    } else if matches!(app.overlay, Overlay::Actions | Overlay::Favorites) {
+        // Menu entries can occupy several rendered lines on narrow terminals.
+        let heights: Vec<_> = lines
+            .iter()
+            .map(|line| {
+                Paragraph::new(line.clone())
+                    .wrap(Wrap { trim: false })
+                    .line_count(popup.width.saturating_sub(2))
+            })
+            .collect();
+        let selected = app.menu_selected.min(heights.len().saturating_sub(1));
+        let start = heights.iter().take(selected).sum();
+        let end = start + heights.get(selected).copied().unwrap_or(1);
+        keep_visible(app, start, end, visible);
+    }
     scrollable(frame, popup, title, lines, app);
+}
+
+fn keep_visible(app: &mut App, start: usize, end: usize, visible: usize) {
+    let offset = app.scroll as usize;
+    let scroll = if start < offset {
+        start
+    } else if end > offset + visible {
+        end.min(start + visible).saturating_sub(visible)
+    } else {
+        offset
+    };
+    app.scroll = scroll.min(u16::MAX as usize) as u16;
+}
+
+/// Hard-wrap note text so the cursor's rendered line remains unambiguous.
+fn note_lines(app: &App, width: u16) -> (Vec<Line<'static>>, usize) {
+    let mut lines = vec![
+        Line::from(format!(
+            "Calcul : {}",
+            app.note_target.as_deref().unwrap_or("—")
+        )),
+        Line::from(format!(
+            "{} / 500 caractères · ←→ Début/Fin",
+            app.note_edit.chars().count()
+        )),
+    ];
+    let prefix = Paragraph::new(lines.clone())
+        .wrap(Wrap { trim: false })
+        .line_count(width);
+    let mut body = Vec::new();
+    let mut row = Vec::new();
+    let mut used = 0;
+    let mut cursor = prefix;
+    let note: Vec<_> = app.note_edit.chars().collect();
+    for index in 0..=note.len() {
+        let symbols = (index == app.note_cursor.min(note.len()))
+            .then_some(Span::styled("▏", Style::default().fg(super::ACCENT)))
+            .into_iter()
+            .chain(note.get(index).map(|c| Span::raw(c.to_string())));
+        for span in symbols {
+            if used + span.width() > width.max(1) as usize && !row.is_empty() {
+                body.push(Line::from(std::mem::take(&mut row)));
+                used = 0;
+            }
+            if span.content == "▏" && span.style.fg.is_some() {
+                cursor = prefix + body.len();
+            }
+            used += span.width();
+            row.push(span);
+        }
+    }
+    body.push(Line::from(row));
+    lines.extend(body);
+    (lines, cursor)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        app::View,
+        model::{Job, Snapshot},
+    };
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn render(app: &mut App, width: u16, height: u16) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| crate::ui::draw(frame, app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        (0..height)
+            .map(|y| {
+                (0..width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn press(app: &mut App, code: KeyCode) {
+        app.key(KeyEvent::new(code, KeyModifiers::NONE));
+    }
+    fn sample() -> App {
+        let mut app = App::new(View::Jobs);
+        app.apply(Snapshot {
+            jobs: vec![Job {
+                id: "42".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        app
+    }
+
+    #[test]
+    fn menus_keep_selection_visible_when_moving_up_or_resizing() {
+        for (width, height) in [(100, 18), (48, 16)] {
+            let mut app = sample();
+            press(&mut app, KeyCode::Char('a'));
+            press(&mut app, KeyCode::End);
+            assert!(render(&mut app, width, height).contains("› Interroger ROMEO : reprise"));
+            press(&mut app, KeyCode::Home);
+            assert!(render(&mut app, width, height).contains("› Dossier du calcul"));
+            assert_eq!(app.scroll, 0);
+            press(&mut app, KeyCode::Esc);
+            app.favorites.extend((0..30).map(|i| format!("{i:03}")));
+            press(&mut app, KeyCode::Char('f'));
+            press(&mut app, KeyCode::End);
+            assert!(render(&mut app, width, height).contains("› Calcul 029"));
+            press(&mut app, KeyCode::Home);
+            assert!(render(&mut app, width, height).contains("› Calcul 000"));
+        }
+    }
+
+    #[test]
+    fn long_notes_follow_the_cursor_in_both_directions() {
+        let mut app = sample();
+        press(&mut app, KeyCode::Char('N'));
+        app.paste(&format!("{}FIN-DE-NOTE", "x".repeat(480)));
+        let tail = render(&mut app, 48, 16);
+        assert!(tail.contains("NOTE▏"));
+        assert!(app.scroll > 0);
+        press(&mut app, KeyCode::Home);
+        assert!(render(&mut app, 48, 16).contains("▏xxxx"));
+        press(&mut app, KeyCode::End);
+        assert!(render(&mut app, 48, 16).contains("NOTE▏"));
+        assert!(render(&mut app, 160, 40).contains("FIN-DE-NOTE▏"));
+    }
 }

@@ -92,6 +92,30 @@ fn query_argument(value: &str) -> Result<String, String> {
     }
 }
 
+/// Disable bracketed paste before Ratatui restores the terminal, including IO errors.
+struct PasteCapture(bool);
+
+impl PasteCapture {
+    fn enable() -> io::Result<Self> {
+        if cfg!(windows) {
+            // ReadConsoleInput consumes the paste boundaries on Windows.
+            // Explicit F2 note saving keeps multiline text inside the editor.
+            return Ok(Self(false));
+        }
+        let guard = Self(true);
+        crossterm::execute!(io::stdout(), event::EnableBracketedPaste)?;
+        Ok(guard)
+    }
+}
+
+impl Drop for PasteCapture {
+    fn drop(&mut self) {
+        if self.0 {
+            let _ = crossterm::execute!(io::stdout(), event::DisableBracketedPaste);
+        }
+    }
+}
+
 fn run() -> io::Result<()> {
     let options = Options::parse();
     if let Some(kind) = &options.helper {
@@ -219,6 +243,7 @@ fn run() -> io::Result<()> {
         return Ok(());
     }
     ratatui::run(|terminal| {
+        let _paste_capture = PasteCapture::enable()?;
         let mut last_draw = Instant::now();
         let mut dirty = true;
         let mut last_contact = Instant::now();
@@ -333,6 +358,10 @@ fn run() -> io::Result<()> {
                     Event::Resize(_, _) => dirty = true,
                     Event::Mouse(event) => {
                         app.mouse(event);
+                        dirty = true;
+                    }
+                    Event::Paste(text) => {
+                        app.paste(&text);
                         dirty = true;
                     }
                     _ => {}

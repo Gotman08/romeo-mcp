@@ -70,6 +70,8 @@ def session(binary: Path, exit_key: bytes) -> dict:
 
         expect("DÉMONSTRATION")
         expect("Simulation à reprendre")
+        if b"\x1b[?2004h" not in output:
+            raise AssertionError("Le collage encadre n'a pas ete active")
         children = Path(f"/proc/{process.pid}/task/{process.pid}/children")
         if children.is_file():
             reader_ids = [int(value) for value in children.read_text().split()]
@@ -78,6 +80,17 @@ def session(binary: Path, exit_key: bytes) -> dict:
         os.write(master, b"2")
         expect("Jobs")
         expect("Simulation MPI")
+        os.write(master, b"N")
+        expect("Note locale")
+        output.clear()
+        os.write(master, b"\x1b[200~" + "collage vérifié\rq".encode() + b"\x1b[201~")
+        expect("collage vérifié q")
+        if process.poll() is not None:
+            raise AssertionError("Le collage a declenche un raccourci")
+        output.clear()
+        os.write(master, b"\x1b")
+        expect("Jobs 4/4")
+        output.clear()
         os.write(master, b"/x\r")
         expect("Aucun job ne correspond")
         os.write(master, b"p")
@@ -132,8 +145,13 @@ def session(binary: Path, exit_key: bytes) -> dict:
             raise AssertionError("Le terminal n'a pas retrouvé ses attributs initiaux")
         if any(Path(f"/proc/{pid}").exists() for pid in reader_ids):
             raise AssertionError("Un lecteur Python subsiste après la fermeture")
+        while select.select([master], [], [], 0)[0]:
+            output.extend(os.read(master, 65536))
+        if b"\x1b[?2004l" not in output:
+            raise AssertionError("Le collage encadre n'a pas ete desactive")
         return {"exit": "q" if exit_key == b"q" else "Ctrl-C", "code": code,
                 "terminal_restored": True, "reader_stopped": True, "navigation_verified": True,
+                "paste_verified": True,
                 "reader_recovered": recovered, "reader_timeout_cleaned": timeout_observed}
     finally:
         for pid in reader_ids:
