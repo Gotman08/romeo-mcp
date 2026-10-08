@@ -43,6 +43,8 @@ class LocalSession:
 
     def __init__(self, root):
         self.root = root
+        self.host = "synthetic.example"
+        self.user = "tester"
         self.scratch = self.shell("pwd -P").stdout.strip()
         self.home = self.scratch
         self.path_aliases = []

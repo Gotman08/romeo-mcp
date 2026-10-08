@@ -10,6 +10,7 @@ from . import files
 from .cluster import DEFAULT_ACCOUNT
 from .ssh import SSHError, session, _environnement_ssh
 from .transfers import atomic, read, seal
+from .transfer_progress import ProgressLog, command as progress_command
 
 
 class TransferCancelled(Exception):
@@ -37,14 +38,26 @@ def run(plan_path):
         return True
 
     def execute(argv, what):
+        environment = dict(_environnement_ssh() or os.environ)
+        environment["LC_ALL"] = "C"
+        argv, measured = progress_command(argv, environment)
+        log = directory / "transfer.log"
+        observer = ProgressLog(log) if measured else None
+
+        def observe():
+            if observer is not None:
+                sample = observer.sample()
+                if sample is not None:
+                    result["progress"] = sample
+
         result["phase"] = "transferring"
         publish()
         child = None
         try:
-            with (directory / "transfer.log").open("ab") as stream:
+            with log.open("ab") as stream:
                 options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
                 child = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=stream, stderr=stream,
-                                         env=_environnement_ssh(), **options)
+                                         env=environment, **options)
                 deadline = time.monotonic() + files._TRANSFER_TIMEOUT
                 last = 0
                 while child.poll() is None:
@@ -53,10 +66,12 @@ def run(plan_path):
                     if time.monotonic() >= deadline:
                         raise SSHError(what + " : delai depasse")
                     if time.monotonic() - last >= 1:
+                        observe()
                         publish()
                         last = time.monotonic()
                     time.sleep(0.1)
                 result["transfer_return_code"] = child.wait()
+                observe()
                 if child.returncode:
                     raise SSHError(what + " : echec du processus de transfert")
         finally:

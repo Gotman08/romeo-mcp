@@ -50,6 +50,11 @@ Les dépendances Python sont déclarées dans `pyproject.toml`. Elles sont
 installées séparément et conservent leurs licences respectives. Aucun client
 IA, système Slurm ou binaire SSH n’est redistribué avec ce projet.
 
+L'interface terminal facultative dépend de [Ratatui](https://ratatui.rs/)
+(licence MIT), de Crossterm et des crates listées dans `terminal/Cargo.toml`
+et `terminal/Cargo.lock`. Cargo les installe séparément avec leurs licences
+respectives. Les distributions Python ne contiennent pas le binaire natif.
+
 ---
 
 [↑ Haut de page](#contenus-tiers) · [Accueil](README.md) · [Documentation](docs/README.md) · [Catalogue Tools](docs/Tools.md)

@@ -14,6 +14,11 @@
 
 ## Non publié — intentions et cycles de vie explicites
 
+- Cinq outils de rapports GitHub dans tous les profils : accord automatique
+  persistant, description filtrée, registre local et liens après reconnexion.
+  Création suivie d'une relecture, protection contre les doublons locaux,
+  plafonds d'envoi et absence de deuxième POST après résultat incertain.
+  Connexion GitHub CLI ou jeton privé ; aucun journal ou argument collecté.
 - Mises à jour pilotables par cinq outils MCP dans tous les profils : contrôle
   visible, autorisation automatique persistante, préparation détachée, suivi
   après reconnexion et retour arrière avec écartement de la version annulée.
@@ -42,6 +47,53 @@
 
 
 ## Non publié
+
+- Interface terminal interne 0.5 : dossiers liés, reprise avec preuves séparées,
+  efficacité demandée/mesurée, groupes Slurm et sessions datées. Favoris et notes
+  privés, notifications facultatives sans répétition, présentation anonymisée
+  dans les écrans/exports. Filtres combinés et saisie regroupée, recherche sans
+  collecte de fichiers, inventaire initial progressif avec compteurs partiels.
+  Copie/export en arrière-plan et confirmations visibles malgré les avertissements,
+  souris facultative et largeur d'identifiants réglable. Lecture distante uniquement
+  par action explicite ; arrêt des helpers détenus lors de la fermeture. Nouvel
+  outil local `job_link_artifact`, historique borné des observations, mesures et
+  journaux persistés ; dépendances restantes observées et sous-jobs réellement
+  enregistrés. Traces anciennes terminées/vérifiées neutres. Compatibilité des
+  anciennes préférences et des tableaux 0.4/contrat 2.
+
+- Interface terminal interne 0.4 : recherche et pagination dans tout l'historique,
+  jobs actifs prioritaires et compteurs globaux explicites. Alertes ouvrant la
+  trace concernée, intégrité des transferts séparée du pourcentage dans la liste.
+  Panneau actif défilant, choix liste/détail et largeur réglable ; dates UTC,
+  badges et seuils de fraîcheur distincts. Ressources HPC demandées/observées
+  séparées, préférences locales, copie et export UTF-8. Index privé en mémoire,
+  cache invalidé par fichiers/WAL, transferts modifiés relus individuellement,
+  progression d'inventaire et requêtes obsolètes écartées. Mesures reproductibles
+  de lecture, rendu, CPU et mémoire ; contrat 3 avec compatibilité du lecteur 2.
+
+- Interface terminal interne 0.3 : recherche française tolérant les accents,
+  états et validations harmonisés, transferts à examiner dans l'aperçu, détails
+  structurés et panneaux adaptés au contenu. Tris indépendants par date, état
+  ou priorité avec sélection conservée, barres de défilement et copie mesurée.
+  Modes `--color auto/always/never`, indication du mode monochrome et vérification
+  des couleurs réellement produites dans un terminal interactif.
+
+- Interface terminal interne 0.2 : filtres indépendants et visibles, effacement
+  en un Échap, pagination, palette sombre et détails complets défilants. Les
+  listes restent utilisables dès 48 × 16 et l'aperçu priorise les calculs à examiner.
+- Relecture locale explicitement datée, récupération du lecteur avec `r`, délai
+  de 10 secondes et conservation du dernier relevé en erreur. Tests de sessions
+  PTY avec interruption, blocage, restauration et arrêt des processus détenus.
+- Progression mesurée des nouveaux transferts rsync détachés, preuves compactes
+  des checkpoints et vue Rapports avec autorisation, occurrences et publication
+  enregistrées. Contrat JSON 2 et rendu séparé en modules par vue.
+
+- Première version interne d'un tableau de bord Ratatui facultatif : commande
+  `tui`, compilation explicite, démonstration, aperçu, jobs, transferts et mises
+  à jour en cache. Lecture seule locale, âges des observations, filtre, pause,
+  aide et restauration du terminal ; le serveur MCP stdio reste indépendant.
+- Contrat JSON borné, lecteur Python isolé, nettoyage des caractères de contrôle
+  et vérification des plans de transfert ; tests Python/Rust et CI Windows/Linux.
 
 - Navigation de la documentation : [accès par besoin depuis le README](README.md#navigation-rapide),
   [index des guides](docs/README.md), sommaires, liens vers les fiches d’outils

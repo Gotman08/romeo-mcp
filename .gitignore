@@ -50,3 +50,6 @@ id_ecdsa*
 .coverage
 htmlcov/
 .codegraph/
+
+# Interface terminal Rust optionnelle (sources et Cargo.lock versionnes)
+terminal/target/

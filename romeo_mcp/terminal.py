@@ -1,0 +1,129 @@
+"""Explicit launcher for Ratatui; importing the MCP never loads this module."""
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+
+def add_arguments(parser) -> None:
+    parser.add_argument("--demo", action="store_true", help="données fictives, sans lire votre configuration")
+    parser.add_argument("--color", choices=("auto", "always", "never"), default="auto",
+                        help="couleurs : auto respecte NO_COLOR, always les active, never les désactive")
+    parser.add_argument("--build", action="store_true", help="compiler explicitement le binaire optionnel avec Cargo")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", help="exporter un relevé local sans ouvrir de terminal")
+    output.add_argument("--snapshot", action="store_true", help="rendu Ratatui en texte, sans terminal interactif")
+    output.add_argument("--export", type=Path, help="écrire un résumé UTF-8 local sans écraser de fichier")
+    parser.add_argument("--binary", default="", help="chemin d'un binaire romeo-tui déjà compilé")
+    parser.add_argument("--db", type=Path, help="registre local alternatif, ouvert en lecture seule")
+    parser.add_argument("--refresh", type=int, default=5, metavar="SECONDES", help="relecture locale toutes les 5 s par défaut")
+    parser.add_argument("--limit", type=int, default=40, help="nombre de jobs/transferts/rapports par vue, entre 1 et 100")
+    parser.add_argument("--view", choices=("overview", "jobs", "transfers", "updates", "reports", "dossier", "recovery", "groups", "sessions"),
+                        help="vue initiale ; dernière vue mémorisée par défaut")
+    parser.add_argument("--query", default="", help="recherche globale dans la vue choisie, accents ignorés")
+    parser.add_argument("--page", type=int, default=1, help="page de données initiale, à partir de 1")
+    parser.add_argument("--sort", choices=("activity", "date", "state", "priority"), help="tri de la vue initiale")
+    parser.add_argument("--layout", choices=("split", "list"), help="liste et détail, ou liste seule")
+    parser.add_argument("--detail-width", type=int, help="largeur des détails en pourcentage : 25 à 65")
+    parser.add_argument("--job-stale-after", type=int, metavar="SECONDES", help="seuil des observations de jobs, 300 s par défaut")
+    parser.add_argument("--transfer-stale-after", type=int, metavar="SECONDES", help="seuil des transferts, 60 s par défaut")
+    preferences = parser.add_mutually_exclusive_group()
+    preferences.add_argument("--preferences", type=Path, help="fichier local de préférences du lecteur")
+    preferences.add_argument("--no-preferences", action="store_true", help="ignorer les préférences et ne rien mémoriser")
+    parser.add_argument("--width", type=int, default=100, help="largeur du rendu --snapshot")
+    parser.add_argument("--height", type=int, default=30, help="hauteur du rendu --snapshot")
+    parser.add_argument("--notifications", action="store_true", help="notifications locales des changements observés")
+    parser.add_argument("--mouse", action="store_true", help="navigation à la souris facultative")
+    parser.add_argument("--anonymize", action="store_true", help="masquer noms, chemins et journaux dans les écrans et exports")
+
+
+def run(args) -> int:
+    if not 1 <= args.refresh <= 300 or not 1 <= args.limit <= 100:
+        raise ValueError("--refresh : 1 à 300 secondes ; --limit : 1 à 100")
+    if not 40 <= args.width <= 240 or not 10 <= args.height <= 80:
+        raise ValueError("--width : 40 à 240 ; --height : 10 à 80")
+    page = getattr(args, "page", 1)
+    query = getattr(args, "query", "")
+    if not 1 <= page <= 2**31 or len(query) > 80 or any(not c.isprintable() for c in query):
+        raise ValueError("--page : 1 à 2147483648 ; --query : 80 caractères imprimables maximum")
+    for name in ("job_stale_after", "transfer_stale_after"):
+        value = getattr(args, name, None)
+        if value is not None and not 1 <= value <= 86400:
+            raise ValueError("Les seuils de fraîcheur doivent être compris entre 1 et 86400 secondes")
+    if getattr(args, "detail_width", None) is not None and not 25 <= args.detail_width <= 65:
+        raise ValueError("--detail-width : 25 à 65 pour cent")
+    if args.json:
+        if args.build:
+            raise ValueError("--json ne nécessite pas de compilation ; retirer --build")
+        from .terminal_catalog import snapshot
+        view = args.view or "overview"
+        collection = "alerts" if view in {"overview", "updates"} else "jobs" if view in {"dossier", "recovery", "groups"} else view
+        parameters = {"queries": {collection: query}, "pages": {collection: page-1}}
+        if getattr(args, "sort", None):
+            parameters["sorts"] = {collection: args.sort}
+        for name in ("job_stale_after", "transfer_stale_after"):
+            if getattr(args, name, None) is not None:
+                parameters[name] = getattr(args, name)
+        result = snapshot(db=args.db, limit=args.limit, demo=args.demo, query=parameters)
+        if getattr(args,"anonymize",False):
+            from .terminal_presentation import project
+            result = project(result)
+        print(json.dumps(result, indent=2, ensure_ascii=True, allow_nan=False))
+        return 0
+    if not args.snapshot and not getattr(args, "export", None) and (not sys.stdin.isatty() or not sys.stdout.isatty()):
+        raise ValueError("Ouvrir un terminal interactif, ou utiliser tui --demo --snapshot / --json.")
+    root = Path(__file__).resolve().parent.parent
+    manifest = root / "terminal" / "Cargo.toml"
+    executable = "romeo-tui.exe" if os.name == "nt" else "romeo-tui"
+    built = manifest.parent / "target" / "release" / executable
+    if args.build:
+        if not manifest.is_file():
+            raise ValueError("Sources Rust absentes : compiler depuis le dépôt, puis passer --binary CHEMIN.")
+        cargo = shutil.which("cargo")
+        if not cargo:
+            candidate = Path.home() / ".cargo/bin" / ("cargo.exe" if os.name == "nt" else "cargo")
+            cargo = str(candidate) if candidate.is_file() else None
+        if not cargo:
+            raise ValueError("Installer Rust 1.88+ depuis https://rustup.rs, puis relancer tui --build.")
+        compiled = subprocess.run([cargo, "build", "--locked", "--release", "--manifest-path", str(manifest),
+                                   "--target-dir", str(manifest.parent / "target")], cwd=root)
+        if compiled.returncode:
+            raise ValueError("Compilation de l'interface échouée ; consulter les messages Cargo ci-dessus.")
+    explicit = args.binary or os.environ.get("ROMEO_TUI_BINARY", "")
+    sibling = Path(sys.executable).with_name(executable)
+    if explicit:
+        binary = str(Path(explicit).expanduser().absolute())
+    elif built.is_file():
+        binary = str(built)
+    elif sibling.is_file():
+        binary = str(sibling)
+    else:
+        binary = shutil.which("romeo-tui")
+    if not binary or not Path(binary).is_file():
+        raise ValueError("Interface optionnelle non compilée. Depuis le dépôt : python -m romeo_mcp tui --build --demo")
+    command = [binary, "--python", sys.executable, "--package-root", str(root),
+               "--refresh", str(args.refresh), "--limit", str(args.limit),
+               "--color", args.color]
+    for option in ("view", "query", "page", "sort", "layout", "detail_width", "job_stale_after",
+                   "transfer_stale_after", "preferences", "export"):
+        value = getattr(args, option, None)
+        if value is not None:
+            command.extend(["--" + option.replace("_", "-"), str(value)])
+    if getattr(args, "no_preferences", False):
+        command.append("--no-preferences")
+    for flag in ("notifications", "mouse", "anonymize"):
+        if getattr(args,flag,False): command.append("--"+flag)
+    if args.demo:
+        command.append("--demo")
+    if args.db:
+        command.extend(["--db", str(args.db.expanduser().absolute())])
+    if args.snapshot:
+        command.extend(["--snapshot", "--width", str(args.width), "--height", str(args.height)])
+    try:
+        return subprocess.run(command).returncode
+    except KeyboardInterrupt:
+        return 130

@@ -56,6 +56,14 @@ SUITES = [
      "releases, confirmation, activation, retour et isolation des mises a jour", False),
     ("update-tools", "tests/test_update_tools.py",
      "automatisme autorise, workers, interruptions, retour et protocole MCP", False),
+    ("issue-reports", "tests/test_issue_reports.py",
+     "accord persistant, filtrage, GitHub simule, doublons et publication incertaine", False),
+    ("terminal", "tests/test_terminal.py",
+     "tableau Ratatui optionnel, lecture seule, traces datees et isolation", False),
+    ("terminal-catalog", "tests/test_terminal_catalog.py",
+     "historique complet, pagination, caches, ressources et preuves locales", False),
+    ("terminal-workspace", "tests/test_terminal_workspace.py",
+     "dossiers, historique, reprise, groupes, sessions, filtres et presentation", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.

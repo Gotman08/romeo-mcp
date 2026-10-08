@@ -28,8 +28,9 @@ def job_observation_get(job_id: str) -> dict[str, Any]:
 
 
 @outil(annotations=READ_ONLY, description="Outils pertinents pour une tache et leur visibilite dans le profil actuel. Verification locale ; ne certifie ni connexion SSH ni ressources libres.")
-def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "python", "files", "updates"] = "all") -> dict[str, Any]:
+def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "python", "files", "updates", "issues"] = "all") -> dict[str, Any]:
     groups = {
+        "issues": ["mcp_issue_policy_get", "mcp_issue_policy_set", "mcp_issue_report", "mcp_issue_publish", "mcp_issue_status"],
         "updates": ["mcp_update_check", "mcp_update_policy", "mcp_update_start", "mcp_update_status", "mcp_update_rollback"],
         "jobs": ["job_prepare", "plan_get", "job_submit", "job_status", "job_observation_get", "job_log_tail", "job_efficiency"],
         "resume": ["checkpoint_inspect", "job_checkpoint_request", "job_resilient_prepare", "job_resilient_submit", "job_resume_prepare", "job_resume_submit",

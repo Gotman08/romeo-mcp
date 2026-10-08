@@ -14,6 +14,11 @@ from mcp import ClientSession, StdioServerParameters, stdio_client  # noqa: E402
 #: C'est le seul garde-fou contre une perte silencieuse lors d'un deplacement
 #: de code entre modules.
 OUTILS_ATTENDUS = {
+    'mcp_issue_policy_get',
+    'mcp_issue_policy_set',
+    'mcp_issue_report',
+    'mcp_issue_publish',
+    'mcp_issue_status',
     'checkpoint_export_prepare',
     'checkpoint_export_status',
     'checkpoint_inspect',
@@ -54,6 +59,7 @@ OUTILS_ATTENDUS = {
     'job_array_prepare',
     'job_array_submit',
     'job_efficiency',
+    'job_link_artifact',
     'job_energy_footprint',
     'job_live_metrics',
     'job_log_search',

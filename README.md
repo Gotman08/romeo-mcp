@@ -59,6 +59,8 @@ L’[index de la documentation](docs/README.md) rassemble tous les parcours.
 | Conserver les preuves d’une expérience | [Reproductibilité](docs/reproducibility.md) | [Collecter une fiche](docs/tools/job_report_collect.md) · [Exporter](docs/tools/job_report_export.md) · [Limites des mesures](docs/reproducibility.md#ce-qui-est-réellement-mesuré) |
 | Consulter une procédure ROMEO | [Parcours ROMEO 2025](romeo_mcp/documentation/ressources/romeo_2025/README.md) | [Sommaire officiel](romeo_mcp/documentation/SOMMAIRE.md) · [Chercher](docs/tools/search_docs.md) · [Lire une page](docs/tools/read_doc.md) |
 | Mettre à jour ou contribuer | [Mises à jour](docs/updates.md) | [Versions](CHANGELOG.md) · [Contribution](CONTRIBUTING.md) · [Tests](tests/README.md) · [Sécurité](SECURITY.md) |
+| Ouvrir un tableau de bord terminal | [Interface Ratatui facultative](docs/terminal.md) | `python -m romeo_mcp tui --build --demo` pour le premier essai |
+| Signaler automatiquement un défaut du MCP | [Rapports GitHub autorisés](docs/issue-reports.md) | Tools Report, filtrage privé, doublons et liens relisibles |
 
 ## Pour qui ?
 

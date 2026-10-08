@@ -33,6 +33,9 @@ def main() -> None:
     configure.add_argument("--profile", choices=("essential", "full", "expert"), help="profil d'outils conserve hors du depot")
     serve_parser = sub.add_parser("serve", help="demarrer le serveur stdio")
     serve_parser.add_argument("--profile", choices=("essential", "full", "expert"))
+    terminal = sub.add_parser("tui", help="ouvrir le tableau de bord terminal optionnel Ratatui")
+    from .terminal import add_arguments
+    add_arguments(terminal)
     doctor = sub.add_parser("doctor", help="verifications locales ou distantes en lecture seule")
     doctor.add_argument("--live", action="store_true", help="verifier SSH, projet Slurm, partitions et quotas")
     doctor.add_argument("--timeout", type=int, default=20, help="delai par lecture distante, entre 2 et 60 secondes")
@@ -49,9 +52,27 @@ def main() -> None:
     operation.add_argument("--rollback", action="store_true", help="reactiver l'environnement precedent")
     update.add_argument("--yes", action="store_true", help="confirmation explicite sans dialogue interactif")
     update.add_argument("--json", action="store_true", help="reponse structuree pour --check uniquement")
+    issues = sub.add_parser("issues", help="autoriser les rapports GitHub automatiques ou relire les rapports locaux")
+    issue_action = issues.add_mutually_exclusive_group()
+    issue_action.add_argument("--enable-automatic", action="store_true", help="accord durable pour publier des descriptions filtrees dans le depot public")
+    issue_action.add_argument("--disable-automatic", action="store_true", help="desactiver les nouveaux envois automatiques")
+    issues.add_argument("--yes", action="store_true", help="confirmer l'autorisation initiale des envois publics")
+    issues.add_argument("--report-id", default="", help="relire ce rapport sans reseau")
     args = parser.parse_args()
     try:
-        if args.action == "update":
+        if args.action == "tui":
+            from .terminal import run
+            raise SystemExit(run(args))
+        elif args.action == "issues":
+            from . import issue_reports
+            if args.report_id and (args.enable_automatic or args.disable_automatic):
+                parser.error("--report-id ne s'utilise pas avec une modification de politique")
+            if args.enable_automatic or args.disable_automatic:
+                result = issue_reports.policy_set(args.enable_automatic, args.yes)
+            else:
+                result = {"policy": issue_reports.policy_get(), **issue_reports.status(args.report_id)}
+            print(json.dumps(result, ensure_ascii=True, indent=2))
+        elif args.action == "update":
             if args.json and not args.check:
                 parser.error("--json s'utilise avec update --check")
             updates.command(check_only=args.check, revert=args.rollback, yes=args.yes, json_output=args.json)

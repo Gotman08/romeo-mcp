@@ -37,6 +37,9 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_AUTO_UPDATE` | Accord local, désactivé initialement | `1` autorise les installations automatiques ; `0` les bloque, même après un accord enregistré |
 | `ROMEO_UPDATE_CHECK` | `1` | `0` désactive le contrôle au démarrage ; les outils et le CLI restent utilisables |
 | `ROMEO_UPDATES_DIR` | Dossier utilisateur hors Git | Racine des versions isolées, de la politique et des observations |
+| `ROMEO_AUTO_ISSUES` | Accord local, désactivé initialement | `1` autorise les rapports GitHub automatiques ; `0` désactive ces envois |
+| `ROMEO_REPORTS_DIR` | `issue-reports/` à côté de `ROMEO_CONFIG` | Registre SQLite privé et autorisation persistante, obligatoirement hors Git |
+| `ROMEO_GITHUB_TOKEN` | Connexion GitHub CLI si disponible | Jeton d'environnement privé pour les issues ; jamais enregistré dans le profil ou les rapports |
 | `ROMEO_MAX_CPUS`, `ROMEO_MAX_GPUS`, `ROMEO_MAX_JOBS` | `0` | Seuils locaux indicatifs ; `0` signifie inconnu, sans avertissement de dépassement |
 | `ROMEO_MCP_DB` | `~/.romeo-mcp/jobs.db` | Registre privé des jobs et scripts soumis |
 | `ROMEO_SCRATCH`, `ROMEO_HOME` | Découverts par SSH | Racines distantes ; permettent aussi une simulation hors ligne |

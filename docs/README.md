@@ -35,7 +35,7 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **93 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **98 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 
@@ -48,6 +48,7 @@ JSON, les résultats attendus et des liens vers les outils associés.
 | Transférer les données | [Transferts vérifiés](Tools.md#transferts-vérifiés) | [Envoyer](tools/upload_to_romeo.md) · [Récupérer](tools/download_from_romeo.md) · [Vérifier les quotas](tools/romeo_quota.md) |
 | Ouvrir un service interactif | [Services](Tools.md#services-interactifs) | [Préparer](tools/service_prepare.md) · [Démarrer](tools/service_start.md) · [Se connecter](tools/service_connection_info.md) · [Arrêter](tools/service_stop.md) |
 | Lire la documentation avec l’IA | [Recherche locale](Tools.md#recherche-et-contexte-pour-le-modèle) | [Chercher une section](tools/search_docs.md) · [Lire la page](tools/read_doc.md) |
+| Signaler un défaut du MCP | [Rapports GitHub](issue-reports.md) | [Tools Report](tools/mcp_issue_report.md) · [Autorisation automatique](tools/mcp_issue_policy_set.md) · [Historique](tools/mcp_issue_status.md) |
 
 ## Diagnostiquer et conserver les résultats
 
@@ -95,6 +96,7 @@ la provenance et les limites de cette copie. Le
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
 - [Mises à jour](updates.md) : outils MCP, accord automatique durable, progression, activation et retour arrière.
+- [Tableau de bord terminal](terminal.md) : interface Ratatui facultative, démonstration et traces locales datées.
 
 ## Lire un résultat dans son contexte
 

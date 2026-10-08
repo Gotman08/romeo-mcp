@@ -13,7 +13,7 @@ def status_command(jid):
     quoted = shlex.quote(jid)
     # Query accounting only after leaving the queue; estimated start only for pending jobs.
     return (
-        "live=$(squeue -h -j {jid} -o '%i|%j|%P|%T|%M|%L|%D|%R') || exit $?; "
+        "live=$(squeue -h -j {jid} -o '%i|%j|%P|%T|%M|%L|%D|%R|%E') || exit $?; "
         "printf '###LIVE\n%s\n' \"$live\"; "
         "if [ -n \"$live\" ]; then echo '###START'; "
         "case \"$live\" in *'|PENDING|'*) squeue -h -j {jid} --start -o '%S' || exit $?;; esac; "
@@ -52,6 +52,9 @@ def parse_status(text, jid):
             "remaining": parts[5].strip() if len(parts) > 5 else "",
             "nodes": parts[6].strip() if len(parts) > 6 else "",
             "reason_or_nodelist": parts[7].strip() if len(parts) > 7 else "",
+            "dependencies_remaining": (
+                "" if parts[8].strip().lower() in {"", "null", "(null)", "n/a"} else parts[8].strip()
+            ) if len(parts)>8 and len(parts[8])<=1000 and re.fullmatch(r"[A-Za-z0-9_:,?()%-]*",parts[8].strip()) else None,
             "estimated_start": start or None,
         }
 

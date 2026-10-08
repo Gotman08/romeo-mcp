@@ -212,6 +212,22 @@ def job_status(job_id: str) -> dict[str, Any]:
     if observed["ok"]:
         registry().set_state(jid, observed["state"])
         observed["observation"] = registry().save_observation(jid, target, observed)
+    if jid.isdigit():
+        # Accounting may contain only array tasks and no parent record. Keep
+        # their actual states even when the parent's overall state is unknown.
+        import re
+        section = ""
+        for line in result.stdout.splitlines():
+            if line.startswith("###"):
+                section = line[3:].strip()
+                continue
+            identifier = line.split("|", 1)[0].strip()
+            if section in {"LIVE", "PAST"} and re.fullmatch(re.escape(jid) + r"_\d+", identifier):
+                child = parse_status("###" + section + "\n" + line, identifier)
+                if child.get("ok") is True:
+                    registry().record_array_task(jid, identifier)
+                    registry().set_state(identifier, child["state"])
+                    registry().save_observation(identifier, target, child)
     return observed
 
 @outil(
@@ -380,7 +396,7 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
     if len(body) > max_chars:
         body = body[-max_chars:]
 
-    return {
+    response = {
         "ok": True,
         "job_id": jid,
         "stream": chosen,
@@ -394,6 +410,16 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
         "has_stderr_content": "1" in sections.get("stderr_nonempty", []),
         "content": (body or "(aucune sortie pour l'instant)")[:max_chars],
     }
+    if pattern is None:
+        from .privacy import redact_text
+        import hashlib
+        content = redact_text(response["content"])[-8000:]
+        saved = {"ok": True, "job_id": jid, "stream": chosen, "content": content,
+                 "truncated": truncated or len(response["content"]) > 8000,
+                 "log_sha256": hashlib.sha256(content.encode()).hexdigest()}
+        registry().save_observation("logs:" + jid,
+            {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}, saved)
+    return response
 
 @outil(
     annotations=READ_ONLY,
@@ -418,6 +444,8 @@ def job_efficiency(job_id: str) -> dict[str, Any]:
         return _error(str(exc))
 
     rows = parse_pipe_table(result.stdout)
+    if not result.ok or result.truncated:
+        return _error("Observation d'efficacite incomplete ou en echec", job_id=jid)
     summary = summarize_efficiency(rows, jid)
     if not summary.get("found"):
         return _error(
@@ -426,7 +454,30 @@ def job_efficiency(job_id: str) -> dict[str, Any]:
             job_id=jid,
         )
     summary["ok"] = True
+    target = {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}
+    registry().save_observation("efficiency:" + jid, target, summary)
     return summary
+
+
+@outil(annotations=MUTATING, description="Associe localement un artefact existant (transfer, report, result ou job) au dossier d'un job. Aucun SSH, aucun lancement ou validation de resultat.")
+def job_link_artifact(job_id: str, kind: Literal["transfer", "report", "result", "job"], artifact_id: str) -> dict[str, Any]:
+    store = registry()
+    if kind == "transfer":
+        from .transfers import load
+        load(artifact_id)
+    elif kind == "report":
+        from .issue_store import ReportStore
+        ReportStore().get(artifact_id)
+    elif kind == "result":
+        if store.get_report(artifact_id) is None:
+            raise ValueError("Resultat local introuvable")
+    elif kind == "job":
+        if store.get(artifact_id) is None:
+            raise ValueError("Job associe introuvable")
+    else:
+        raise ValueError("Type d'artefact inconnu")
+    store.link_artifact(str(job_id), kind, str(artifact_id))
+    return {"ok": True, "job_id": str(job_id), "kind": kind, "artifact_id": str(artifact_id), "result_validated": False}
 
 @outil(
     annotations=MUTATING,

@@ -173,7 +173,6 @@ class PlansAndServices(unittest.TestCase):
             if command.startswith('python3 '): return Result(0, 'READY', 0)
             if command.startswith('head '): return Result(0, 'a' * 43, 0)
             raise AssertionError(command)
-        self.session.host = plans.DEFAULT_HOST
         with patch.object(self.session, 'run', side_effect=run):
             result = execution.service_connection_info(started['service_id'], local_port=9000)
         self.assertTrue(result['ok'], result)
