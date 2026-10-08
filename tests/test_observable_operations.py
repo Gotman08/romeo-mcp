@@ -72,6 +72,25 @@ class ObservableTests(unittest.TestCase):
         self.assertTrue(result["scheduler_completed"])
         self.assertFalse(result["result_validated"])
 
+    def test_array_children_are_saved_when_accounting_has_no_parent(self):
+        self.store.record("12","array","cpu","x64cpu","/scratch/test-user","out","err","#SBATCH --array=0-2")
+        reply = Result(0,"###LIVE\n###PAST\n12_0|array|cpu|COMPLETED|1:00|0:0|start|end|\n12_2|array|cpu|FAILED|1:00|1:0|start|end|\n",0)
+        with patch.object(jobs,"_sh",return_value=reply):
+            result = jobs.job_status("12")
+        self.assertFalse(result["ok"])
+        self.assertEqual(self.store.get("12_0")["last_state"],"COMPLETED")
+        self.assertEqual(self.store.observation("12_2")["result"]["state"],"FAILED")
+        self.assertIsNone(self.store.get("12_1"))
+
+    def test_remaining_dependencies_are_observed_without_an_extra_scheduler_call(self):
+        for field,expected in [("afterok:11(unfulfilled)","afterok:11(unfulfilled)"),("(null)","")]:
+            reply=Result(0,"###LIVE\n12|test|cpu|PENDING|0:00|5:00|1|Dependency|"+field+"\n",0)
+            with patch.object(jobs,"_sh",return_value=reply) as read:
+                response=jobs.job_status("12")
+            self.assertEqual(response["dependencies_remaining"],expected)
+            read.assert_called_once()
+            self.assertIn("%E",read.call_args.args[1])
+
     def test_service_failure_preserves_readiness_without_claiming_it_is_current(self):
         target = {"host": self.connection.host, "user": self.connection.user, "account": "test-project"}
         prepared = self.store.prepare_submission({"kind": "service", "target": target})

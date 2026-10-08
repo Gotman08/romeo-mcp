@@ -1,4 +1,5 @@
-//! View-local filters and keyboard navigation, independent of terminal IO.
+//! View-local state, identity preservation and cached records.
+mod interaction;
 use crate::{
     color::Palette,
     model::{now, Job, Report, Snapshot, Transfer},
@@ -22,6 +23,10 @@ pub enum View {
     Transfers,
     Updates,
     Reports,
+    Dossier,
+    Recovery,
+    Groups,
+    Sessions,
 }
 
 impl View {
@@ -32,6 +37,10 @@ impl View {
             Self::Transfers => 2,
             Self::Updates => 3,
             Self::Reports => 4,
+            Self::Dossier => 5,
+            Self::Recovery => 6,
+            Self::Groups => 7,
+            Self::Sessions => 8,
         }
     }
     pub fn from_index(index: usize) -> Self {
@@ -41,13 +50,18 @@ impl View {
             Self::Transfers,
             Self::Updates,
             Self::Reports,
-        ][index % 5]
+            Self::Dossier,
+            Self::Recovery,
+            Self::Groups,
+            Self::Sessions,
+        ][index % 9]
     }
     fn filter_index(self) -> Option<usize> {
         match self {
-            Self::Jobs => Some(0),
+            Self::Jobs | Self::Dossier | Self::Recovery | Self::Groups => Some(0),
             Self::Transfers => Some(1),
             Self::Reports => Some(2),
+            Self::Sessions => Some(3),
             _ => None,
         }
     }
@@ -61,6 +75,8 @@ pub enum Action {
     Quit,
     Copy(bool),
     Export,
+    Remote(&'static str),
+    Cancel,
 }
 
 #[derive(Serialize)]
@@ -73,6 +89,9 @@ pub struct ReadRequest {
     pub force: bool,
     pub job_stale_after: u64,
     pub transfer_stale_after: u64,
+    pub collect: bool,
+    pub detail_job: String,
+    pub progressive: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -82,13 +101,17 @@ pub enum Overlay {
     Help,
     Details,
     Alerts,
+    Actions,
+    Note,
+    Logs,
+    Favorites,
 }
 
 pub struct App {
     pub data: Snapshot,
     pub view: View,
-    filters: [String; 3],
-    sorts: [SortOrder; 3],
+    filters: [String; 4],
+    sorts: [SortOrder; 4],
     sort_at: f64,
     pub editing: bool,
     replace_filter: bool,
@@ -114,15 +137,35 @@ pub struct App {
     pub transfer_stale_after: u64,
     pub alerts_table: TableState,
     pub notice: Option<String>,
+    pub last_confirmation: Option<String>,
+    notice_until: Option<std::time::Instant>,
     pub revision: u64,
     pub pending_read: bool,
     pub force_read: bool,
     pub read_phase: Option<String>,
-    pages: [usize; 4],
-    anchor_allowed: [bool; 4],
+    pages: [usize; 5],
+    anchor_allowed: [bool; 5],
     pending_detail: Option<(View, String)>,
     data_revision: u64,
     rows: RefCell<Rows>,
+    pub sessions_table: TableState,
+    pub favorites: std::collections::BTreeSet<String>,
+    pub notes: BTreeMap<String, String>,
+    pub notifications: bool,
+    pub notification_log: Vec<String>,
+    pub anonymized: bool,
+    pub mouse_enabled: bool,
+    pub id_width: u16,
+    pub note_edit: String,
+    pub note_target: Option<String>,
+    pub menu_selected: usize,
+    pub collect_read: bool,
+    pub debounce_until: Option<std::time::Instant>,
+    pub action_busy: bool,
+    pub table_area: Option<ratatui::layout::Rect>,
+    pub detail_area: Option<ratatui::layout::Rect>,
+    pub tab_hits: Vec<(ratatui::layout::Rect, View)>,
+    seen_notifications: std::collections::BTreeSet<String>,
 }
 
 impl App {
@@ -131,7 +174,12 @@ impl App {
             data: Snapshot::default(),
             view,
             filters: Default::default(),
-            sorts: [SortOrder::Activity, SortOrder::Date, SortOrder::Date],
+            sorts: [
+                SortOrder::Activity,
+                SortOrder::Date,
+                SortOrder::Date,
+                SortOrder::Date,
+            ],
             sort_at: now(),
             editing: false,
             replace_filter: false,
@@ -157,15 +205,35 @@ impl App {
             transfer_stale_after: 60,
             alerts_table: TableState::default().with_selected(0),
             notice: None,
+            last_confirmation: None,
+            notice_until: None,
             revision: 0,
             pending_read: true,
             force_read: false,
             read_phase: None,
-            pages: [0; 4],
-            anchor_allowed: [false; 4],
+            pages: [0; 5],
+            anchor_allowed: [false; 5],
             pending_detail: None,
             data_revision: 0,
             rows: RefCell::new(Rows::default()),
+            sessions_table: TableState::default().with_selected(0),
+            favorites: Default::default(),
+            notes: Default::default(),
+            notifications: false,
+            notification_log: vec![],
+            anonymized: false,
+            mouse_enabled: false,
+            id_width: 8,
+            note_edit: String::new(),
+            note_target: None,
+            menu_selected: 0,
+            collect_read: true,
+            debounce_until: None,
+            action_busy: false,
+            table_area: None,
+            detail_area: None,
+            tab_hits: vec![],
+            seen_notifications: Default::default(),
         }
     }
 
@@ -187,6 +255,56 @@ impl App {
             .into_iter()
             .map(|index| &self.data.jobs[index])
             .collect()
+    }
+
+    pub fn selected_job(&self) -> Option<&Job> {
+        self.jobs()
+            .get(self.jobs_table.selected().unwrap_or(0))
+            .copied()
+    }
+
+    pub fn confirm(&mut self, message: impl Into<String>) {
+        let message = message.into();
+        self.last_confirmation = Some(message.clone());
+        self.notice = Some(message);
+        self.notice_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(5));
+    }
+
+    pub fn expire_confirmation(&mut self) -> bool {
+        if self
+            .notice_until
+            .is_some_and(|deadline| std::time::Instant::now() >= deadline)
+        {
+            self.notice = None;
+            self.notice_until = None;
+            return true;
+        }
+        false
+    }
+
+    fn notify_changes(&mut self, snapshot: &Snapshot) {
+        for event in &snapshot.notifications {
+            if self.seen_notifications.insert(event.key.clone())
+                && self.notifications
+                && self.data.generated_at > 0.0
+            {
+                let text = format!(
+                    "Job {} · {} · {}",
+                    event.job_id,
+                    event.message,
+                    crate::model::timestamp_exact(event.observed_at)
+                );
+                self.confirm(text.clone());
+                self.notification_log.push(text);
+                if self.notification_log.len() > 50 {
+                    self.notification_log.remove(0);
+                }
+            }
+        }
+        if self.seen_notifications.len() > 5000 {
+            self.seen_notifications
+                .retain(|key| snapshot.notifications.iter().any(|event| &event.key == key));
+        }
     }
 
     pub fn recent_jobs(&self) -> Vec<&Job> {
@@ -404,18 +522,26 @@ impl App {
             return false;
         }
         let selection = self.selected_ids();
+        let session_id = self
+            .data
+            .sessions
+            .get(self.sessions_table.selected().unwrap_or(0))
+            .map(|row| row.id.clone());
         let old_alert = self
             .data
             .attention
             .get(self.alerts_table.selected().unwrap_or(0))
             .map(|row| (row.kind.clone(), row.id.clone()));
+        if !snapshot.partial {
+            self.notify_changes(&snapshot);
+        }
         self.data = snapshot;
         self.read_phase = None;
         self.data_revision += 1;
         self.sort_at = now();
         self.restore_selection(selection);
         if self.data.schema == 3 {
-            for index in 0..4 {
+            for index in 0..5 {
                 self.pages[index] = self.page_info(index).page;
             }
             let alert_index =
@@ -424,12 +550,25 @@ impl App {
                 });
             self.alerts_table.select(alert_index.or(Some(0)));
         }
-        self.anchor_allowed = [true; 4];
-        self.loading = false;
+        self.sessions_table.select(
+            self.data
+                .sessions
+                .iter()
+                .position(|row| Some(&row.id) == session_id.as_ref())
+                .or(Some(0)),
+        );
+        self.anchor_allowed = [true; 5];
+        self.loading = self.data.partial;
         self.error = None;
-        if let Some((view, id)) = self.pending_detail.take() {
+        if let Some((view, id)) = if self.data.partial {
+            None
+        } else {
+            self.pending_detail.take()
+        } {
             let position = match view {
-                View::Jobs => self.jobs().iter().position(|row| row.id == id),
+                View::Jobs | View::Dossier | View::Recovery | View::Groups => {
+                    self.jobs().iter().position(|row| row.id == id)
+                }
                 View::Transfers => self.transfers().iter().position(|row| row.id == id),
                 View::Reports => self.reports().iter().position(|row| row.id == id),
                 _ => None,
@@ -440,8 +579,7 @@ impl App {
                 }
                 self.open(Overlay::Details);
             } else {
-                self.notice =
-                    Some("La trace ciblée n'est plus disponible dans le registre.".into());
+                self.confirm("La trace ciblée n'est plus disponible dans le registre.");
             }
         }
         true
@@ -458,13 +596,19 @@ impl App {
 
     pub fn preferences(&self) -> Preferences {
         Preferences {
-            schema: 1,
+            schema: 2,
             view: self.view,
             sorts: self.sorts,
             layout: self.layout,
             detail_percent: self.detail_percent,
             job_stale_after: self.job_stale_after,
             transfer_stale_after: self.transfer_stale_after,
+            favorites: self.favorites.clone(),
+            notes: self.notes.clone(),
+            notifications: self.notifications,
+            mouse: self.mouse_enabled,
+            anonymized: self.anonymized,
+            id_width: self.id_width,
         }
     }
 
@@ -475,9 +619,18 @@ impl App {
         self.detail_percent = value.detail_percent;
         self.job_stale_after = value.job_stale_after;
         self.transfer_stale_after = value.transfer_stale_after;
+        self.favorites = value.favorites.clone();
+        self.notes = value.notes.clone();
+        self.notifications = value.notifications;
+        self.mouse_enabled = value.mouse;
+        self.anonymized = value.anonymized;
+        self.id_width = value.id_width;
     }
 
     pub fn collection_index(&self) -> Option<usize> {
+        if self.view == View::Sessions {
+            return Some(4);
+        }
         self.view.filter_index().or(if self.view == View::Overview {
             Some(3)
         } else {
@@ -491,6 +644,7 @@ impl App {
                 0 => &self.data.coverage.jobs,
                 1 => &self.data.coverage.transfers,
                 2 => &self.data.coverage.reports,
+                4 => &self.data.coverage.sessions,
                 _ => &self.data.coverage.alerts,
             }
             .clone();
@@ -499,6 +653,7 @@ impl App {
             0 => self.data.jobs.len(),
             1 => self.data.transfers.len(),
             2 => self.data.reports.items.len(),
+            4 => self.data.sessions.len(),
             _ => self.data.attention.len(),
         };
         crate::model::Page {
@@ -514,8 +669,9 @@ impl App {
     pub fn set_query(&mut self, query: String) {
         if let Some(index) = self.view.filter_index() {
             self.filters[index] = query;
-            self.pages[index] = 0;
-            self.anchor_allowed[index] = false;
+            let page = self.collection_index().unwrap_or(index);
+            self.pages[page] = 0;
+            self.anchor_allowed[page] = false;
             self.mark_read(false);
         }
     }
@@ -537,10 +693,11 @@ impl App {
         self.revision = (self.revision + 1) % (1 << 53);
         self.pending_read = true;
         self.force_read |= force;
+        self.collect_read |= force;
     }
 
     pub fn read_request(&self) -> ReadRequest {
-        let names = ["jobs", "transfers", "reports", "alerts"];
+        let names = ["jobs", "transfers", "reports", "alerts", "sessions"];
         let selected = self.selected_ids();
         let mut anchors = BTreeMap::new();
         for index in 0..3 {
@@ -559,6 +716,15 @@ impl App {
                 anchors.insert("alerts", format!("{}:{}", alert.kind, alert.id));
             }
         }
+        if self.anchor_allowed[4] {
+            if let Some(row) = self
+                .data
+                .sessions
+                .get(self.sessions_table.selected().unwrap_or(0))
+            {
+                anchors.insert("sessions", row.id.clone());
+            }
+        }
         if let Some((view, id)) = &self.pending_detail {
             if let Some(index) = view.filter_index() {
                 anchors.insert(names[index], id.clone());
@@ -572,7 +738,9 @@ impl App {
                 .map(|(index, name)| {
                     (
                         *name,
-                        if index < 3 {
+                        if index == 4 {
+                            self.filters[3].clone()
+                        } else if index < 3 {
                             self.filters[index].clone()
                         } else {
                             String::new()
@@ -591,7 +759,9 @@ impl App {
                 .map(|(index, name)| {
                     (
                         *name,
-                        if index < 3 {
+                        if index == 4 {
+                            self.sorts[3]
+                        } else if index < 3 {
                             self.sorts[index]
                         } else {
                             SortOrder::Priority
@@ -603,6 +773,20 @@ impl App {
             force: self.force_read,
             job_stale_after: self.job_stale_after,
             transfer_stale_after: self.transfer_stale_after,
+            collect: self.collect_read,
+            progressive: true,
+            detail_job: self
+                .pending_detail
+                .as_ref()
+                .filter(|(view, _)| {
+                    matches!(
+                        view,
+                        View::Jobs | View::Dossier | View::Recovery | View::Groups
+                    )
+                })
+                .map(|(_, id)| id.clone())
+                .or_else(|| self.selected_job().map(|row| row.id.clone()))
+                .unwrap_or_default(),
         }
     }
 
@@ -663,9 +847,14 @@ impl App {
                 .attention
                 .get(self.alerts_table.selected().unwrap_or(0))
                 .map(|row| row.id.clone()),
-            View::Jobs => self
+            View::Jobs | View::Dossier | View::Recovery | View::Groups => self
                 .jobs()
                 .get(self.jobs_table.selected().unwrap_or(0))
+                .map(|row| row.id.clone()),
+            View::Sessions => self
+                .data
+                .sessions
+                .get(self.sessions_table.selected().unwrap_or(0))
                 .map(|row| row.id.clone()),
             View::Transfers => self
                 .transfers()
@@ -690,7 +879,10 @@ impl App {
 
     fn table(&mut self) -> Option<&mut TableState> {
         match self.view {
-            View::Jobs => Some(&mut self.jobs_table),
+            View::Jobs | View::Dossier | View::Recovery | View::Groups => {
+                Some(&mut self.jobs_table)
+            }
+            View::Sessions => Some(&mut self.sessions_table),
             View::Transfers => Some(&mut self.transfers_table),
             View::Reports => Some(&mut self.reports_table),
             View::Overview if self.data.schema == 3 => Some(&mut self.alerts_table),
@@ -700,7 +892,8 @@ impl App {
 
     fn row_count(&self) -> usize {
         match self.view {
-            View::Jobs => self.jobs().len(),
+            View::Jobs | View::Dossier | View::Recovery | View::Groups => self.jobs().len(),
+            View::Sessions => self.data.sessions.len(),
             View::Transfers => self.transfers().len(),
             View::Reports => self.reports().len(),
             View::Overview => self.data.attention.len(),
@@ -720,6 +913,12 @@ impl App {
                 (selected + delta).clamp(0, length as isize - 1) as usize
             ));
             self.scroll = 0;
+            if matches!(
+                self.view,
+                View::Jobs | View::Dossier | View::Recovery | View::Groups
+            ) {
+                self.mark_read(false);
+            }
         }
     }
 
@@ -743,6 +942,10 @@ impl App {
     }
 
     fn close_overlay(&mut self) {
+        if self.overlay == Overlay::Note {
+            self.note_target = None;
+            self.note_edit.clear();
+        }
         self.overlay = Overlay::None;
         (self.scroll, self.scroll_max, self.scroll_page) = self.saved_scroll;
     }
@@ -753,164 +956,7 @@ impl App {
         self.split_visible = false;
         self.scroll = 0;
         self.scroll_max = 0;
-    }
-
-    pub fn key(&mut self, key: KeyEvent) -> Action {
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-            return Action::Quit;
-        }
-        if self.editing {
-            let before = self.query().to_owned();
-            let index = self.view.filter_index().expect("Only lists have an editor");
-            match key.code {
-                KeyCode::Esc => {
-                    self.filters[index].clear();
-                    self.editing = false;
-                }
-                KeyCode::Enter => self.editing = false,
-                KeyCode::Backspace => {
-                    self.filters[index].pop();
-                    self.replace_filter = false;
-                }
-                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.filters[index].clear()
-                }
-                KeyCode::Char(c) if !c.is_control() => {
-                    if self.replace_filter {
-                        self.filters[index].clear();
-                        self.replace_filter = false;
-                    }
-                    if self.filters[index].chars().count() < 80 {
-                        self.filters[index].push(c);
-                    }
-                }
-                _ => {}
-            }
-            if let Some(table) = self.table() {
-                table.select(Some(0));
-            }
-            if self.query() != before {
-                self.pages[index] = 0;
-                self.anchor_allowed[index] = false;
-                self.mark_read(false);
-                return Action::Refresh;
-            }
-            return Action::None;
-        }
-        if key.code == KeyCode::Char('q') {
-            return Action::Quit;
-        }
-        if key.code == KeyCode::Char('r') {
-            self.error = None;
-            self.mark_read(true);
-            return Action::Refresh;
-        }
-        if self.overlay != Overlay::None {
-            match key.code {
-                KeyCode::Esc => self.close_overlay(),
-                KeyCode::Char('?') if self.overlay == Overlay::Help => self.close_overlay(),
-                KeyCode::Char('!') if self.overlay == Overlay::Alerts => self.close_overlay(),
-                KeyCode::Enter if self.overlay == Overlay::Details => self.close_overlay(),
-                _ => self.scroll_key(key.code),
-            }
-            return Action::None;
-        }
-        if (self.view == View::Updates
-            || (self.view == View::Overview && self.data.schema != 3)
-            || (self.focus == Panel::Detail && self.split_visible))
-            && matches!(
-                key.code,
-                KeyCode::Up
-                    | KeyCode::Down
-                    | KeyCode::PageUp
-                    | KeyCode::PageDown
-                    | KeyCode::Home
-                    | KeyCode::End
-                    | KeyCode::Char('j')
-                    | KeyCode::Char('k')
-            )
-        {
-            self.scroll_key(key.code);
-            return Action::None;
-        }
-        match key.code {
-            KeyCode::Char('p') => self.paused = !self.paused,
-            KeyCode::Char('s') => self.cycle_sort(),
-            KeyCode::Char('n') => self.page(true),
-            KeyCode::Char('b') => self.page(false),
-            KeyCode::Char('v') => {
-                self.layout = if self.layout == LayoutMode::Split {
-                    LayoutMode::List
-                } else {
-                    LayoutMode::Split
-                };
-                self.focus = Panel::List;
-                self.scroll = 0;
-            }
-            KeyCode::F(6) if self.split_visible => {
-                self.focus = if self.focus == Panel::List {
-                    Panel::Detail
-                } else {
-                    Panel::List
-                };
-                self.scroll = 0;
-            }
-            KeyCode::Char('[') => {
-                self.detail_percent = self.detail_percent.saturating_sub(5).max(25)
-            }
-            KeyCode::Char(']') => self.detail_percent = (self.detail_percent + 5).min(65),
-            KeyCode::Char('c') => return Action::Copy(false),
-            KeyCode::Char('C') => return Action::Copy(true),
-            KeyCode::Char('e') => return Action::Export,
-            KeyCode::Char('?') => self.open(Overlay::Help),
-            KeyCode::Char('!') => self.open(Overlay::Alerts),
-            KeyCode::Enter if self.view == View::Overview && self.data.schema == 3 => {
-                self.open_alert();
-                return Action::Refresh;
-            }
-            KeyCode::Enter if self.view != View::Updates => self.open(Overlay::Details),
-            KeyCode::Char('/') if self.view.filter_index().is_some() => {
-                self.editing = true;
-                self.replace_filter = true;
-            }
-            KeyCode::Esc => {
-                if let Some(index) = self.view.filter_index() {
-                    self.filters[index].clear();
-                    self.pages[index] = 0;
-                    self.anchor_allowed[index] = false;
-                    self.mark_read(false);
-                }
-                if let Some(table) = self.table() {
-                    table.select(Some(0));
-                }
-            }
-            KeyCode::Tab | KeyCode::Right => {
-                self.switch_view(View::from_index(self.view.index() + 1))
-            }
-            KeyCode::BackTab | KeyCode::Left => {
-                self.switch_view(View::from_index(self.view.index() + 4))
-            }
-            KeyCode::Char(c @ '1'..='5') => {
-                self.switch_view(View::from_index(c as usize - '1' as usize))
-            }
-            KeyCode::Down | KeyCode::Char('j') => self.move_row(1),
-            KeyCode::Up | KeyCode::Char('k') => self.move_row(-1),
-            KeyCode::PageDown => self.move_row(self.page_rows as isize),
-            KeyCode::PageUp => self.move_row(-(self.page_rows as isize)),
-            KeyCode::Home => {
-                if let Some(table) = self.table() {
-                    table.select(Some(0));
-                }
-            }
-            KeyCode::End => {
-                let last = self.row_count().checked_sub(1);
-                if let Some(table) = self.table() {
-                    table.select(last);
-                }
-            }
-            _ => {}
-        }
-        Action::None
+        self.mark_read(false);
     }
 }
 
@@ -1085,13 +1131,14 @@ mod tests {
     fn pause_refresh_reverse_tab_and_editor_quit_are_explicit() {
         let mut app = App::new(View::Overview);
         app.key(key(KeyCode::BackTab));
-        assert_eq!(app.view, View::Reports);
+        assert_eq!(app.view, View::Sessions);
         app.key(key(KeyCode::Char('p')));
         assert!(app.paused);
         assert_eq!(app.key(key(KeyCode::Char('r'))), Action::Refresh);
         app.key(key(KeyCode::Char('2')));
         app.key(key(KeyCode::Char('/')));
-        assert_eq!(app.key(key(KeyCode::Char('q'))), Action::Refresh);
+        assert_eq!(app.key(key(KeyCode::Char('q'))), Action::None);
+        assert!(app.pending_read && app.debounce_until.is_some());
         assert_eq!(app.query(), "q");
         assert_eq!(
             app.key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),

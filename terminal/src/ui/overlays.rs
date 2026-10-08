@@ -30,7 +30,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         Overlay::Help => (
             " Aide · ↑↓ défiler · Échap fermer ",
             vec![
-                Line::from("1–5 / Tab / ←→ : changer de vue"),
+                Line::from("1–9 / Tab / ←→ : changer de vue"),
                 Line::from("↑↓ / j k : sélectionner ; Pg↑ Pg↓ : une page"),
                 Line::from("Début / Fin : première / dernière ligne"),
                 Line::from("Entrée : ouvrir le détail complet, même en mode compact"),
@@ -55,23 +55,109 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 Line::from("Les états sont des observations datées, pas des sondes du cluster."),
                 Line::from("Le tableau ne lance pas de job, de transfert ou de publication."),
                 Line::from("Compteurs : toutes les traces lisibles connues, même hors page."),
-                Line::from("Une copie à 100 % ne garantit pas son intégrité."),
                 Line::from(app.palette.description()),
-                Line::from("tui --color auto/always/never : choisir le mode couleur"),
+                Line::from("6 Dossier / 7 Reprise / 8 Groupes / 9 Sessions"),
+                Line::from("a : menu contextuel ; * : favori ; N : note locale"),
+                Line::from("P : présentation anonymisée ; w/W : largeur identifiant"),
+                Line::from("Filtres combinés : etat:COMPLETED validation:check gpu:oui"),
+                Line::from("partition:gpu depuis:2026-10-01 avant:2026-10-09 cpu:>=8"),
                 Line::from("Aperçu : F6 active le résumé ; Mises à jour : ↑↓/Fin défilent."),
+                Line::from("f : ouvrir les favoris ; X : arrêter l'action d'observation"),
+                Line::from("tui --color auto/always/never : choisir le mode couleur"),
+                Line::from("Une copie à 100 % ne garantit pas son intégrité."),
             ],
         ),
         Overlay::Details => (
             " Détail · ↑↓/Pg défiler · Échap fermer ",
             details::lines(app),
         ),
+        Overlay::Logs => (
+            " Journaux enregistrés · Échap fermer ",
+            super::workspace::log_lines(app),
+        ),
+        Overlay::Note => (
+            " Note locale · Entrée enregistrer · Échap annuler ",
+            vec![
+                Line::from(format!(
+                    "Calcul : {}",
+                    app.note_target.as_deref().unwrap_or("—")
+                )),
+                Line::from(format!(
+                    "{} / 500 caractères",
+                    app.note_edit.chars().count()
+                )),
+                Line::from(format!("{}▏", app.note_edit)),
+            ],
+        ),
+        Overlay::Actions => (
+            " Actions · ↑↓ choisir · Entrée · Échap ",
+            app.menu_items()
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    Line::styled(
+                        format!(
+                            "{} {}",
+                            if index == app.menu_selected {
+                                "›"
+                            } else {
+                                " "
+                            },
+                            item.0
+                        ),
+                        if index == app.menu_selected {
+                            Style::default().fg(super::ACCENT)
+                        } else {
+                            Style::default().fg(TEXT)
+                        },
+                    )
+                })
+                .collect(),
+        ),
+        Overlay::Favorites => (
+            " Favoris · ↑↓ choisir · Entrée dossier · Échap ",
+            if app.favorites.is_empty() {
+                vec![Line::from("Aucun favori. * épingle le calcul sélectionné.")]
+            } else {
+                app.favorites
+                    .iter()
+                    .enumerate()
+                    .map(|(index, id)| {
+                        Line::styled(
+                            format!(
+                                "{} Calcul {}",
+                                if index == app.menu_selected {
+                                    "›"
+                                } else {
+                                    " "
+                                },
+                                id
+                            ),
+                            if index == app.menu_selected {
+                                Style::default().fg(super::ACCENT)
+                            } else {
+                                Style::default().fg(TEXT)
+                            },
+                        )
+                    })
+                    .collect()
+            },
+        ),
         _ => {
             let mut lines = Vec::new();
-            if let Some(notice) = &app.notice {
-                lines.push(Line::from(clean(notice)));
+            if let Some(notice) = app.notice.as_ref().or(app.last_confirmation.as_ref()) {
+                lines.push(Line::from(if app.anonymized {
+                    "Confirmation locale · contenu masqué".into()
+                } else {
+                    clean(notice)
+                }));
             }
             if let Some(error) = &app.error {
-                lines.push(Line::from(clean(error)));
+                lines.push(Line::from(if app.anonymized {
+                    "Erreur de lecture · contenu masqué".into()
+                } else {
+                    clean(error)
+                }));
                 lines.push(Line::from("r : retenter la lecture locale"));
             }
             lines.extend(
@@ -79,6 +165,12 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                     .warnings
                     .iter()
                     .map(|warning| Line::from(clean(warning))),
+            );
+            lines.extend(
+                app.notification_log
+                    .iter()
+                    .rev()
+                    .map(|item| Line::from(clean(item))),
             );
             if lines.is_empty() {
                 lines.push(Line::from("Aucune alerte de lecture enregistrée."));

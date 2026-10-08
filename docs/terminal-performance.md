@@ -1,6 +1,65 @@
-# Mesures du tableau de bord 0.4
+# Mesures du tableau de bord
 
 [Interface](terminal.md) · [Documentation](README.md)
+
+## Version interne 0.5
+
+Mesures du 8 octobre 2026 : 1 000 jobs et 200 transferts fictifs, pages de
+40 lignes et médianes de 10 demandes. La référence 0.4 est le commit
+`c26644fedbd347dec7065190e157c34ba6c929eb`, exécuté dans un processus et sur des
+fichiers fictifs distincts, pour éviter de réutiliser les fichiers déjà ouverts
+par l'autre version.
+Les recherches 0.5 utilisent l'index existant (`collect=false`) ; la 0.4 vérifie
+aussi les sources à chaque recherche. Le cache du système et l'antivirus ne sont
+pas contrôlés ; les lectures initiales ne sont pas des démarrages à caches vidés.
+
+| Mesure | Windows 0.4 | Windows 0.5 | Linux 0.4 | Linux 0.5 |
+|---|---:|---:|---:|---:|
+| Relevé complet initial | 4 723,2 ms | 5 817,6 ms | 185,5 ms | 496,4 ms |
+| Premier affichage partiel des jobs | — | 109,1 ms | — | 422,2 ms |
+| Relecture locale inchangée | 13,8 ms | 14,0 ms | 13,0 ms | 15,8 ms |
+| Recherche, médiane | 13,2 ms | 2,1 ms | 13,8 ms | 1,8 ms |
+| Fichiers JSON reparsés par les recherches | 0 | 0 | 0 | 0 |
+| Vérification des sources pendant une recherche | Oui | Non | Oui | Non |
+
+Le gain concerne la recherche et la disponibilité progressive des données.
+Le coût du relevé complet Windows reste élevé ; un profilage séparé attribue
+4,05 secondes sur 4,58 secondes à l'ouverture de 401 fichiers. Cette mesure
+localise le coût IO sans établir sa cause système. Aucun gain de démarrage complet
+ou de relecture générale n'est annoncé. Les deux versions connaissent les
+1 000 jobs, les 200 transferts et le plus ancien job actif. Après l'inventaire,
+les recherches n'ajoutent aucune lecture du registre de jobs. La saisie est
+regroupée pendant 180 ms ; le benchmark mesure la demande après ce délai, pas
+la latence totale entre frappe et affichage.
+
+Windows utilise Python 3.14.4 ; Linux utilise Python 3.12.3 sous WSL Ubuntu et
+un registre sous `/tmp`. Ces périmètres ne permettent pas une comparaison
+directe entre les systèmes.
+
+Deux sessions PTY Linux de 100 × 30, après 2 secondes de stabilisation et
+6 secondes au repos, avec relecture toutes les 5 secondes : RSS additionné du
+rendu et du lecteur **28,9 Mio en 0.4**, **29,6 Mio en 0.5**. Le CPU relevé est
+**0,33 %** d'un cœur pour les deux versions ; les pas de mesure de 10 ms et
+la fenêtre courte ne permettent pas de conclure à un changement significatif.
+Le pic RSS du lecteur pendant le benchmark est de **26,6 Mio** et **27,0 Mio**.
+
+Avec Rust 1.88 en release, le test `Terminal<TestBackend>` donne **0,521 ms par
+rendu à 100 × 30** et **0,652 ms à 160 × 40**, sur 40 lignes et 200 rendus.
+Il exclut collecte, transport et terminal réel. Les essais interactifs vérifient
+séparément neuf vues à cinq tailles, navigation pendant une copie lente, export
+anonymisé, souris, préférences, restauration du terminal et arrêt des helpers.
+
+Pour reproduire la comparaison avec un checkout distinct de la 0.4 :
+
+```console
+python tools/benchmark_terminal.py --baseline CHEMIN_DU_DEPOT_0_4 --baseline-mode catalog
+python tools/benchmark_terminal.py --baseline CHEMIN_DU_DEPOT_0_4 --baseline-mode catalog --binary CHEMIN_BINAIRE_0_5 --baseline-binary CHEMIN_BINAIRE_0_4
+```
+
+La seconde commande mesure aussi les sessions PTY sous Linux. Les données restent
+synthétiques et les dossiers temporaires du benchmark sont les seuls supprimés.
+
+## Référence historique : passage de 0.3 à 0.4
 
 Mesures locales du 8 octobre 2026, sur des données **entièrement fictives**.
 Le benchmark n'accède ni au cluster ni aux registres/configurations utilisateur.

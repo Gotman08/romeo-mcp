@@ -59,6 +59,7 @@ OUTILS_ATTENDUS = {
     'job_array_prepare',
     'job_array_submit',
     'job_efficiency',
+    'job_link_artifact',
     'job_energy_footprint',
     'job_live_metrics',
     'job_log_search',

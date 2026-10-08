@@ -27,33 +27,72 @@ pub enum Panel {
 pub struct Preferences {
     pub schema: u8,
     pub view: View,
-    pub sorts: [SortOrder; 3],
+    pub sorts: [SortOrder; 4],
     pub layout: LayoutMode,
     pub detail_percent: u16,
     pub job_stale_after: u64,
     pub transfer_stale_after: u64,
+    #[serde(default)]
+    pub favorites: std::collections::BTreeSet<String>,
+    #[serde(default)]
+    pub notes: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub notifications: bool,
+    #[serde(default)]
+    pub mouse: bool,
+    #[serde(default)]
+    pub anonymized: bool,
+    #[serde(default = "default_id_width")]
+    pub id_width: u16,
+}
+fn default_id_width() -> u16 {
+    8
 }
 
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            schema: 1,
+            schema: 2,
             view: View::Overview,
-            sorts: [SortOrder::Activity, SortOrder::Date, SortOrder::Date],
+            sorts: [
+                SortOrder::Activity,
+                SortOrder::Date,
+                SortOrder::Date,
+                SortOrder::Date,
+            ],
             layout: LayoutMode::Split,
             detail_percent: 40,
             job_stale_after: 300,
             transfer_stale_after: 60,
+            favorites: Default::default(),
+            notes: Default::default(),
+            notifications: false,
+            mouse: false,
+            anonymized: false,
+            id_width: 8,
         }
     }
 }
 
 impl Preferences {
     fn valid(&self) -> bool {
-        self.schema == 1
+        self.schema == 2
             && (25..=65).contains(&self.detail_percent)
             && (1..=86400).contains(&self.job_stale_after)
             && (1..=86400).contains(&self.transfer_stale_after)
+            && (7..=32).contains(&self.id_width)
+            && self.favorites.len() <= 1000
+            && self.notes.len() <= 1000
+            && self
+                .favorites
+                .iter()
+                .chain(self.notes.keys())
+                .all(|id| !id.is_empty() && id.len() <= 180 && !id.chars().any(char::is_control))
+            && self
+                .notes
+                .values()
+                .all(|note| note.chars().count() <= 500 && !note.chars().any(char::is_control))
+            && self.notes.values().map(String::len).sum::<usize>() <= 256000
     }
 }
 
@@ -67,11 +106,22 @@ pub fn load(path: &Path) -> io::Result<Preferences> {
         return Err(io::Error::other("Préférences liées à un autre fichier."));
     }
     let mut bytes = Vec::new();
-    fs::File::open(path)?.take(65537).read_to_end(&mut bytes)?;
-    if bytes.len() > 65536 {
+    fs::File::open(path)?
+        .take(1048577)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > 1048576 {
         return Err(io::Error::other("Préférences trop volumineuses."));
     }
-    let preferences: Preferences = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    let mut value: serde_json::Value = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+    if value["schema"] == 1 {
+        if let Some(sorts) = value["sorts"].as_array_mut() {
+            if sorts.len() == 3 {
+                sorts.push("date".into());
+            }
+        }
+        value["schema"] = 2.into();
+    }
+    let preferences: Preferences = serde_json::from_value(value).map_err(io::Error::other)?;
     if !preferences.valid() {
         return Err(io::Error::other("Préférences incompatibles."));
     }
@@ -154,5 +204,39 @@ mod tests {
         let actual = load(&path);
         fs::remove_file(path).unwrap();
         assert_eq!(actual.unwrap(), expected);
+    }
+
+    #[test]
+    fn legacy_preferences_migrate_and_local_annotations_round_trip() {
+        let path = std::env::temp_dir().join(format!(
+            "romeo-viewer-migration-{}.json",
+            std::process::id()
+        ));
+        let mut legacy = serde_json::to_value(Preferences::default()).unwrap();
+        legacy["schema"] = 1.into();
+        legacy["sorts"].as_array_mut().unwrap().pop();
+        for key in [
+            "favorites",
+            "notes",
+            "notifications",
+            "mouse",
+            "anonymized",
+            "id_width",
+        ] {
+            legacy.as_object_mut().unwrap().remove(key);
+        }
+        fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        let mut expected = load(&path).unwrap();
+        assert_eq!(expected.schema, 2);
+        expected.favorites.insert("42".into());
+        expected
+            .notes
+            .insert("42".into(), "Annotation synthétique".into());
+        expected.anonymized = true;
+        save(&path, &expected).unwrap();
+        assert_eq!(load(&path).unwrap(), expected);
+        fs::remove_file(path).unwrap();
+        expected.notes.insert("43".into(), "x".repeat(501));
+        assert!(!expected.valid());
     }
 }

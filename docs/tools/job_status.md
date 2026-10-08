@@ -38,6 +38,13 @@ Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser 
 
 L’état et les informations disponibles dans Slurm, avec un démarrage estimé lorsqu’il est fourni pour un job en attente.
 
+La lecture conserve une observation datée et les sous-jobs numériques réellement
+retournés par Slurm. `dependencies_remaining` contient les dépendances restantes
+du relevé squeue (`%E`), une chaîne vide si Slurm indique leur absence, ou `null`
+si cette information n'a pas été fournie. Aucune interrogation supplémentaire
+n'est nécessaire. Un état global de tableau inconnu ne supprime pas les preuves
+de ses sous-jobs observés.
+
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
 ## Prérequis et limites

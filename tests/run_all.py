@@ -62,6 +62,8 @@ SUITES = [
      "tableau Ratatui optionnel, lecture seule, traces datees et isolation", False),
     ("terminal-catalog", "tests/test_terminal_catalog.py",
      "historique complet, pagination, caches, ressources et preuves locales", False),
+    ("terminal-workspace", "tests/test_terminal_workspace.py",
+     "dossiers, historique, reprise, groupes, sessions, filtres et presentation", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.

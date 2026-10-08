@@ -23,7 +23,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         format!(
             "Filtre : {}{} · {} · Échap effacer",
-            clean(app.query()),
+            if app.anonymized {
+                "[filtre masqué]".into()
+            } else {
+                clean(app.query())
+            },
             if app.editing { "_" } else { "" },
             if app.data.schema == 3 && app.data.request_id != app.revision {
                 "recherche…".into()
@@ -74,7 +78,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         (panels[0], Some(panels[1]))
     } else {
         let length = match app.view {
-            View::Jobs => app.jobs().len(),
+            View::Jobs | View::Dossier | View::Recovery | View::Groups => app.jobs().len(),
             View::Transfers => app.transfers().len(),
             _ => app.reports().len(),
         };
@@ -88,7 +92,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     app.split_visible = detail_area.is_some();
     if !compact && app.layout != LayoutMode::List {
         let count = match app.view {
-            View::Jobs => app.jobs().len(),
+            View::Jobs | View::Dossier | View::Recovery | View::Groups => app.jobs().len(),
             View::Transfers => app.transfers().len(),
             _ => app.reports().len(),
         };
@@ -103,9 +107,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 .min((needed.min(u16::MAX as usize) as u16).max(4));
         }
     }
+    app.table_area = Some(table_area);
+    app.detail_area = detail_area;
     let narrow = table_area.width < 70;
     let (rows, header, widths, title, count, total) = match app.view {
-        View::Jobs => {
+        View::Jobs | View::Dossier | View::Recovery | View::Groups => {
             let jobs = app.jobs();
             let count = jobs.len();
             let rows = jobs
@@ -113,7 +119,18 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 .map(|job| {
                     if narrow {
                         Row::new(vec![
-                            Cell::from(clean(&job.id)),
+                            Cell::from(fit(
+                                &format!(
+                                    "{}{}",
+                                    if app.favorites.contains(&job.id) {
+                                        "*"
+                                    } else {
+                                        ""
+                                    },
+                                    job.id
+                                ),
+                                app.id_width as usize,
+                            )),
                             Cell::from(fit(
                                 &job.name,
                                 table_area.width.saturating_sub(35) as usize,
@@ -125,12 +142,27 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                         ])
                     } else {
                         Row::new(vec![
-                            Cell::from(clean(&job.id)),
+                            Cell::from(fit(
+                                &format!(
+                                    "{}{}",
+                                    if app.favorites.contains(&job.id) {
+                                        "*"
+                                    } else {
+                                        ""
+                                    },
+                                    job.id
+                                ),
+                                app.id_width as usize,
+                            )),
                             Cell::from(clean(&job.name)),
                             Cell::from(job_state(&job.state)).style(state_style(&job.state)),
                             Cell::from(job_validation(job).label())
                                 .style(tone_style(job_validation(job).tone())),
-                            freshness_cell(job.observed_at, app.job_stale_after),
+                            freshness_cell(
+                                job.observed_at,
+                                app.job_stale_after,
+                                crate::status::job_active(&job.state),
+                            ),
                         ])
                     }
                 })
@@ -142,21 +174,33 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             };
             let widths = if narrow {
                 vec![
-                    Constraint::Length(7),
+                    Constraint::Length(app.id_width),
                     Constraint::Min(8),
                     Constraint::Length(11),
                     Constraint::Length(10),
                 ]
             } else {
                 vec![
-                    Constraint::Length(8),
+                    Constraint::Length(app.id_width),
                     Constraint::Min(10),
                     Constraint::Length(16),
                     Constraint::Length(11),
                     Constraint::Length(12),
                 ]
             };
-            (rows, header, widths, "Jobs", count, app.data.jobs.len())
+            (
+                rows,
+                header,
+                widths,
+                match app.view {
+                    View::Dossier => "Dossiers",
+                    View::Recovery => "Reprises",
+                    View::Groups => "Groupes",
+                    _ => "Jobs",
+                },
+                count,
+                app.data.jobs.len(),
+            )
         }
         View::Transfers => {
             let transfers = app.transfers();
@@ -199,7 +243,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                             Cell::from(crate::status::transfer_validation(transfer).label()).style(
                                 tone_style(crate::status::transfer_validation(transfer).tone()),
                             ),
-                            freshness_cell(transfer.observed_at, app.transfer_stale_after),
+                            freshness_cell(
+                                transfer.observed_at,
+                                app.transfer_stale_after,
+                                matches!(transfer.state.as_str(), "running" | "preparing"),
+                            ),
                         ])
                     }
                 })
@@ -276,7 +324,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     app.page_rows = table_area.height.saturating_sub(3).max(1) as usize;
     let selected = match app.view {
-        View::Jobs => app.jobs_table.selected(),
+        View::Jobs | View::Dossier | View::Recovery | View::Groups => app.jobs_table.selected(),
         View::Transfers => app.transfers_table.selected(),
         _ => app.reports_table.selected(),
     };
@@ -315,14 +363,16 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         .row_highlight_style(Style::default().bg(SELECTED).add_modifier(Modifier::BOLD))
         .highlight_symbol("› ");
     match app.view {
-        View::Jobs => frame.render_stateful_widget(table, table_area, &mut app.jobs_table),
+        View::Jobs | View::Dossier | View::Recovery | View::Groups => {
+            frame.render_stateful_widget(table, table_area, &mut app.jobs_table)
+        }
         View::Transfers => {
             frame.render_stateful_widget(table, table_area, &mut app.transfers_table)
         }
         _ => frame.render_stateful_widget(table, table_area, &mut app.reports_table),
     };
     let offset = match app.view {
-        View::Jobs => app.jobs_table.offset(),
+        View::Jobs | View::Dossier | View::Recovery | View::Groups => app.jobs_table.offset(),
         View::Transfers => app.transfers_table.offset(),
         _ => app.reports_table.offset(),
     };
@@ -358,7 +408,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     }
 }
 
-fn freshness_cell(timestamp: Option<f64>, after: u64) -> Cell<'static> {
+fn freshness_cell(timestamp: Option<f64>, after: u64, monitored: bool) -> Cell<'static> {
     let freshness = crate::status::freshness(timestamp, crate::model::now(), after as f64);
     Cell::from(match freshness {
         crate::status::Freshness::Recent | crate::status::Freshness::Old => {
@@ -366,5 +416,38 @@ fn freshness_cell(timestamp: Option<f64>, after: u64) -> Cell<'static> {
         }
         _ => freshness.label().into(),
     })
-    .style(tone_style(freshness.tone()))
+    .style(tone_style(
+        if !monitored && freshness == crate::status::Freshness::Old {
+            crate::status::Tone::Muted
+        } else {
+            freshness.tone()
+        },
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn old_completed_traces_use_a_neutral_tone_but_active_traces_warn() {
+        let old = Some(crate::model::now() - 3600.0);
+        let history = freshness_cell(old, 60, false);
+        let monitored = freshness_cell(old, 60, true);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(24, 2)).unwrap();
+        terminal
+            .draw(|frame| {
+                frame.render_widget(
+                    Table::new(
+                        [Row::new([history]), Row::new([monitored])],
+                        [Constraint::Length(24)],
+                    ),
+                    frame.area(),
+                )
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].fg, MUTED);
+        assert_eq!(buffer[(0, 1)].fg, ratatui::style::Color::Rgb(229, 192, 123));
+    }
 }

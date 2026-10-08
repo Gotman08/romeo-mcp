@@ -4,6 +4,7 @@ import posixpath
 import re
 import shlex
 import uuid
+import time
 from urllib.parse import quote
 
 from .cluster import require_account
@@ -76,7 +77,7 @@ def _service(service_id):
 def allocation_state(s, job_id: str) -> dict:
     if not re.fullmatch(r'\d+', job_id):
         raise ValueError('job_id invalide')
-    result = s.run("squeue -h -j {} -o '%T|%N'".format(job_id), timeout=20, max_chars=4000)
+    result = s.run("squeue -h -j {} -o '%T|%N|%L'".format(job_id), timeout=20, max_chars=4000)
     if not result.ok or result.truncated:
         return {'ok': False, 'job_id': job_id, 'state': 'unknown', 'error': 'Etat Slurm indisponible.'}
     line = result.stdout.strip().splitlines()
@@ -100,7 +101,11 @@ def allocation_state(s, job_id: str) -> dict:
         phase = 'failed'
     else:
         phase = 'unknown'
+    from .slurm import parse_sacct_duration
+    remaining = parse_sacct_duration(parts[2].strip()) if len(parts)>2 else None
     return {'ok': True, 'job_id': job_id, 'state': phase, 'slurm_state': state,
+            'expires_at': time.time()+remaining if state == 'RUNNING' and remaining is not None else None,
+            'expiration_basis': 'Slurm time remaining at observation' if state == 'RUNNING' and remaining is not None else None,
             'node': node if re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]*', node) else None}
 
 
@@ -133,9 +138,9 @@ def service_status(service_id: str) -> dict:
     state["target_checked"] = target_checked
     state["current_state_observed"] = state["ok"] and state["state"] != "unknown"
     if state["ok"] and state["state"] != "unknown":
-        state["observation"] = registry().save_observation(job_id, target, state)
+        state["observation"] = registry().save_observation("service:" + service_id, target, state)
     else:
-        state["last_observation"] = registry().observation(job_id, target)
+        state["last_observation"] = registry().observation("service:" + service_id, target)
     state["service_readiness_observed"] = state["state"] == "ready"
     return state
 

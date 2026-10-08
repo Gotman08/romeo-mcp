@@ -1,4 +1,4 @@
-# Tableau de bord terminal (version interne 0.4)
+# Tableau de bord terminal (version interne 0.5)
 
 [Accueil](../README.md) · [Documentation](README.md) · [Mesures](terminal-performance.md)
 
@@ -51,11 +51,11 @@ les alertes : recompiler le binaire et relancer.
 
 | Touche | Action |
 |---|---|
-| `1` à `5`, `Tab`, Maj-Tab, `←` / `→` | Choisir Aperçu, Jobs, Transferts, Mises à jour ou Rapports |
+| `1` à `9`, `Tab`, Maj-Tab, `←` / `→` | Aperçu, Jobs, Transferts, Mises à jour, Rapports, Dossier, Reprise, Groupes, Sessions |
 | `↑` / `↓`, `j` / `k`, Début / Fin | Sélectionner une ligne ou une alerte ; faire défiler le panneau actif ou les mises à jour |
 | Page précédente / suivante | Se déplacer d'une hauteur de fenêtre dans les lignes chargées ou le panneau actif |
 | `n` / `b` | Charger la page suivante / précédente du registre ou des alertes |
-| `/` | Saisir une recherche propre à Jobs, Transferts ou Rapports ; le premier caractère remplace le filtre précédent |
+| `/` | Rechercher dans Jobs, Transferts, Rapports ou Sessions ; Dossier/Reprise/Groupes partagent la sélection et le filtre Jobs |
 | Entrée | Valider la saisie ; ouvrir le détail complet d'une ligne ; depuis une alerte, rejoindre exactement sa trace |
 | `s` | Changer le tri global : actifs, date, état, priorité ; chaque vue conserve son tri et l'identifiant sélectionné |
 | `v` | Choisir liste seule / liste et détail |
@@ -63,6 +63,11 @@ les alertes : recompiler le binaire et relancer.
 | `[` / `]` | Réduire / augmenter la largeur du détail par pas de 5 %, entre 25 et 65 % |
 | `c` / `C` | Copier l'identifiant / le chemin local d'un transfert dans le presse-papiers |
 | `e` | Exporter un résumé UTF-8 dans le dossier local du tableau ; `!` montre le chemin complet |
+| `a` | Ouvrir le menu contextuel, dont les lectures distantes explicites |
+| `*`, `f`, `N` | Épingler un job, ouvrir les favoris, éditer une note locale (Entrée enregistre, Échap annule) |
+| `P` | Activer/désactiver la présentation anonymisée |
+| `w` / `W` | Réduire/augmenter la colonne des identifiants ; le nom utilise l'espace restant |
+| `X` | Arrêter une copie, un export ou une lecture distante en cours ; aucun job n'est annulé |
 | Échap | Fermer un panneau ; dans une liste, effacer le filtre et quitter sa saisie |
 | `r` | Forcer une relecture locale, même en pause ; reconnecter un lecteur interrompu |
 | `p` | Suspendre/reprendre la relecture automatique |
@@ -82,6 +87,16 @@ Elle porte sur identifiants, noms, chemins, libellés français et états techni
 Majuscules, accents et Unicode décomposé sont normalisés : « en cours »,
 « termine » et « completed » retrouvent les transferts correspondants.
 « Récent », « ancien » et « absent » retrouvent aussi la fraîcheur des traces.
+
+Les filtres sont combinables, avec dates UTC et valeurs citées si elles contiennent
+des espaces : `etat:COMPLETED validation:check gpu:oui`,
+`partition:gpu depuis:2026-10-01 avant:2026-10-09` ou `cpu:>=8`.
+`validation:verified/check/pending/absent` distingue preuve validée, résultat à
+examiner, opération active et absence de validation. CPU désigne les CPU demandés
+par tâche ; GPU utilise un nombre observé, puis demandé, sans transformer une
+mesure absente en zéro. Le filtre de date porte sur la date utilisée par le tri.
+La saisie est regroupée pendant 180 ms et recherche dans l'index existant, sans
+relire les fichiers à chaque caractère. Entrée applique immédiatement le filtre.
 
 Les Jobs sont triés par activité par défaut : un ancien job actif reste
 prioritaire. Le tri par date utilise l'observation, puis la soumission ou la
@@ -171,19 +186,25 @@ Les fichiers JSON et observations sont bornés. Le tableau ne crée pas le regis
 de jobs. `ROMEO_MCP_DB` ou `--db CHEMIN` permettent de le choisir en lecture seule.
 
 **La relecture est locale.** Elle n'interroge ni SSH, Slurm, Spack ou GitHub et
-ne lance aucune opération distante. Demander à l'assistant d'utiliser les outils
-MCP pour actualiser les observations du cluster ; le tableau relira leurs traces.
+ne lance aucune opération distante. Le menu `a` propose séparément **Interroger
+ROMEO** : état, efficacité, derniers journaux, reprise ou service sélectionné.
+Chaque choix effectue une lecture explicite et enregistre son observation ; source
+opaque et date UTC sont indiquées dans la confirmation et les détails. Aucun SSH
+n'est lancé au démarrage, par `r`, pendant une recherche ou par le temporisateur.
+En démonstration, ces actions sont simulées sans connexion.
 Les cibles des anciennes observations ne sont pas comparées à la cible SSH
 actuelle : les états restent un historique daté. Les mises à jour affichées
 concernent seulement l'installation qui lance le tableau.
 
 ## Préférences et actions locales
 
-Vue, tris, disposition, largeur et seuils sont mémorisés dans
+Vue, tris, disposition, largeur, seuils, favoris, notes, notifications et souris sont mémorisés dans
 `~/.romeo-mcp/viewer/preferences.json` (`demo.json` pour la démonstration).
 `--preferences CHEMIN` choisit un fichier ; `--no-preferences` désactive cette
 mémorisation. Les options de lancement priment sur les réglages sauvegardés.
-Filtres, sélection et identifiants SSH ne sont pas sauvegardés. Les préférences
+Filtres, sélection et identifiants SSH ne sont pas sauvegardés. Favoris et notes
+sont privés et limités à 1 000 entrées (500 caractères par note, 256 ko cumulés).
+La version 1 des préférences est migrée lors de la lecture. Les préférences
 corrompues sont signalées et les réglages par défaut sont utilisés.
 
 Les exports concernent la ligne sélectionnée, ou la page d'alertes affichée.
@@ -192,14 +213,73 @@ sans terminal interactif. Un fichier existant n'est jamais écrasé. Sous Linux,
 la copie utilise `wl-copy`, `xclip` ou `xsel` s'ils sont disponibles ; sous macOS,
 `pbcopy` ; sous Windows, PowerShell. Une indisponibilité est signalée et l'export
 reste utilisable. Les helpers de copie détenus par le tableau ont un délai de
-deux secondes et sont arrêtés à l'expiration.
+deux secondes. Copie et export tournent dans un helper possédé par l'interface,
+sans bloquer la navigation. Une confirmation de cinq secondes reste visible en
+présence d'avertissements et consultable avec `!`. Les actions locales sont bornées
+à dix secondes, les lectures distantes à 75 ; `X` et la fermeture arrêtent leurs
+processus, y compris les enfants SSH. Seules les opérations de l'interface sont
+concernées.
 
 Clés SSH, utilisateurs, codes projet, scripts et jetons ne font pas partie du
 contrat d'affichage. Les noms et chemins peuvent être privés, y compris dans
-les exports : utiliser `--demo` pour une capture publique. Les caractères de
+les exports. `--anonymize` ou `P` masque noms, partitions, chemins, notes,
+contenu des journaux, résumés/URLs des rapports et avertissements, à l'écran et
+dans les exports ; les identifiants techniques, mesures et preuves restent
+visibles. Ce mode projette les données sans modifier les registres privés.
+`--demo` reste disponible pour une capture entièrement fictive. Les caractères de
 contrôle sont neutralisés avant affichage. La relecture ne change aucune
 configuration MCP ; préférences et exports sont les écritures locales explicites
 du tableau.
+
+## Dossiers, reprise et observations
+
+La vue **Dossier** regroupe les artefacts explicitement associés, mesures,
+chronologie et dernières lignes enregistrées. `job_link_artifact(job_id, kind,
+artifact_id)` associe un transfert, rapport, résultat ou job déjà existant ; cette
+association ne valide aucun résultat et ne publie aucun rapport. Les résultats
+scellés et exports de checkpoints fournissent aussi leurs associations enregistrées.
+Les noms de fichiers communs ne sont jamais utilisés pour inventer un lien.
+
+**Reprise** affiche séparément checkpoint complet, intégrité, association au
+programme/données, copie indépendante et reprise observée. Un champ absent reste
+inconnu. La copie exige un plan d'export scellé, le même transfert et une preuve
+datée pour le même manifeste, génération, exécution et association programme/données.
+Le tableau ne rehache pas les fichiers ; il montre une vérification antérieure
+avec sa date, sans promettre l'intégrité actuelle ou une absence future de perte.
+
+L'efficacité distingue demandes du script, allocation comptable, temps CPU,
+durée et mémoire mesurés. Une utilisation GPU non mesurée reste inconnue. Les
+groupes montrent uniquement les sous-jobs/stades enregistrés, leurs échecs et
+les dépendances déclarées. Les dépendances restantes proviennent du champ `%E`
+de [squeue](https://slurm.schedmd.com/squeue.html) enregistré par `job_status`,
+sans nouvelle interrogation supplémentaire. Une observation absente reste inconnue ;
+le tableau n'infère pas une dépendance satisfaite à partir d'un nom ou d'un résultat.
+Les listes de membres et d'associations sont bornées à 100 et peuvent être
+partielles. Le nombre d'associations connues est indiqué ; les relevés de résultats
+et plans historiques consultés sont eux aussi bornés, ce nombre peut donc être
+un minimum plutôt qu'un inventaire exhaustif.
+
+**Sessions** distingue état Slurm, état du service et disponibilité observée.
+Une expiration est affichée uniquement lorsqu'un temps restant a été enregistré,
+au relevé ; l'ancienne disponibilité n'est pas une sonde en temps réel.
+
+Le registre conserve désormais les changements significatifs, avec au plus
+256 événements par identifiant d'observation et une fenêtre globale de 200 000
+identifiants d'événements. Le dossier montre les 48 plus récents. Les anciens
+changements non enregistrés ne sont pas reconstruits. Les extraits de journaux
+collectés sans filtre sont filtrés pour les secrets et bornés à 8 000 caractères.
+
+`--notifications` ou le menu active des confirmations de fin/échec et de nouveau
+checkpoint vérifié. Elles sont dédupliquées dans la session, y compris pour un
+job hors page, et restent consultables dans `!`. Le premier inventaire ne rejoue
+pas toutes les anciennes fins de calcul. `--mouse` ou le menu active sélection,
+onglets et défilement ; le clavier reste disponible.
+
+Lors du premier inventaire, les jobs disponibles sont affichés progressivement,
+avec le bandeau **inventaire incomplet / compteurs partiels**. La version 0.5
+demande explicitement ce mode ; les tableaux 0.4 conservent une réponse finale
+unique et ceux utilisant le contrat 2 restent compatibles. Une trace terminée
+et vérifiée conserve une date ancienne avec une couleur neutre.
 
 ## Rendu sans terminal et développement
 
@@ -209,6 +289,8 @@ python -m romeo_mcp tui --demo --json
 python -m romeo_mcp tui --json --view jobs --query "en cours" --page 1
 python -m romeo_mcp tui --view jobs --layout list --sort priority
 python -m romeo_mcp tui --view transfers --export resume-transfert.txt
+python -m romeo_mcp tui --view dossier --notifications --mouse
+python -m romeo_mcp tui --anonymize --view recovery --export resume-reprise.txt
 ```
 
 `--snapshot` utilise réellement le backend de test Ratatui pour produire un
@@ -226,9 +308,16 @@ numériques des journaux rsync par blocs bornés, sans exporter le texte du jour
 responsabilités. Un seul lecteur Python isolé est détenu par l'interface, avec
 canaux bornés ; il est arrêté et récolté à la fermeture du tableau.
 
+`terminal_workspace`, `terminal_filters`, `terminal_presentation` et
+`terminal_remote` isolent dossiers, filtres, projection et lectures explicites.
+`app/interaction.rs` sépare navigation de l'état ; `actions.rs` possède les
+helpers, leurs délais et leur fermeture. Le rendu ne réalise aucun SSH ni accès
+aux fichiers.
+
 ```console
 python tests/run_all.py --only terminal
 python tests/run_all.py --only terminal-catalog
+python tests/run_all.py --only terminal-workspace
 cargo fmt --manifest-path terminal/Cargo.toml -- --check
 cargo test --locked --manifest-path terminal/Cargo.toml
 cargo clippy --locked --manifest-path terminal/Cargo.toml --all-targets -- -D warnings

@@ -21,6 +21,7 @@ pub struct Reader {
     stopped: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
     progress: Arc<Mutex<Option<Progress>>>,
+    partial: Arc<Mutex<Option<Snapshot>>>,
 }
 
 #[derive(serde::Deserialize)]
@@ -99,6 +100,8 @@ impl Reader {
         let thread_stopped = Arc::clone(&stopped);
         let progress = Arc::new(Mutex::new(None));
         let thread_progress = Arc::clone(&progress);
+        let partial = Arc::new(Mutex::new(None));
+        let thread_partial = Arc::clone(&partial);
         let thread = thread::spawn(move || {
             while let Ok(request) = receive_request.recv() {
                 let result = (|| {
@@ -127,7 +130,17 @@ impl Reader {
                             }
                             continue;
                         }
-                        return Snapshot::parse(&line);
+                        let snapshot = Snapshot::parse(&line)?;
+                        if snapshot.partial {
+                            if let Ok(mut slot) = thread_partial.lock() {
+                                *slot = Some(snapshot);
+                            }
+                            continue;
+                        }
+                        if let Ok(mut slot) = thread_partial.lock() {
+                            slot.take();
+                        }
+                        return Ok(snapshot);
                     }
                 })();
                 let failed = result.is_err();
@@ -144,6 +157,7 @@ impl Reader {
             stopped,
             thread: Some(thread),
             progress,
+            partial,
         })
     }
 
@@ -167,6 +181,9 @@ impl Reader {
 
     pub fn progress(&self) -> Option<Progress> {
         self.progress.lock().ok()?.take()
+    }
+    pub fn partial(&self) -> Option<Snapshot> {
+        self.partial.lock().ok()?.take()
     }
 }
 

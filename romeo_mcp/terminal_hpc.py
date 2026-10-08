@@ -5,6 +5,7 @@ import re
 
 _DIRECTIVE = re.compile(r"^\s*#SBATCH\s+--([a-z-]+)(?:=|\s+)([0-9]+)\s*$")
 _OMP = re.compile(r"^\s*(?:export\s+)?OMP_NUM_THREADS=['\"]?([0-9]+)['\"]?\s*$")
+_TIME = re.compile(r"^\s*#SBATCH\s+--time(?:=|\s+)((?:[0-9]+-)?[0-9]+:[0-9]{2}:[0-9]{2})\s*$")
 _FIELDS = {"nodes": "nodes", "ntasks": "tasks", "ntasks-per-node": "tasks_per_node",
            "cpus-per-task": "cpus_per_task", "gpus": "gpus", "gpus-per-node": "gpus_per_node",
            "gpus-per-task": "gpus_per_task"}
@@ -27,6 +28,12 @@ def resources(script, observation):
             omp = _OMP.fullmatch(line)
             if omp and count(omp[1]) is not None:
                 requested["omp_threads"] = count(omp[1])
+            limit = _TIME.fullmatch(line)
+            if limit:
+                from .slurm import parse_sacct_duration
+                seconds = parse_sacct_duration(limit[1])
+                if seconds is not None and seconds <= 2**53:
+                    requested["time_limit_seconds"] = int(seconds)
     observed = {}
     if isinstance(observation, dict):
         for source, destination in (("nodes", "nodes"), ("ntasks", "tasks"),

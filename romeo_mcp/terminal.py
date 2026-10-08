@@ -22,7 +22,7 @@ def add_arguments(parser) -> None:
     parser.add_argument("--db", type=Path, help="registre local alternatif, ouvert en lecture seule")
     parser.add_argument("--refresh", type=int, default=5, metavar="SECONDES", help="relecture locale toutes les 5 s par défaut")
     parser.add_argument("--limit", type=int, default=40, help="nombre de jobs/transferts/rapports par vue, entre 1 et 100")
-    parser.add_argument("--view", choices=("overview", "jobs", "transfers", "updates", "reports"),
+    parser.add_argument("--view", choices=("overview", "jobs", "transfers", "updates", "reports", "dossier", "recovery", "groups", "sessions"),
                         help="vue initiale ; dernière vue mémorisée par défaut")
     parser.add_argument("--query", default="", help="recherche globale dans la vue choisie, accents ignorés")
     parser.add_argument("--page", type=int, default=1, help="page de données initiale, à partir de 1")
@@ -36,6 +36,9 @@ def add_arguments(parser) -> None:
     preferences.add_argument("--no-preferences", action="store_true", help="ignorer les préférences et ne rien mémoriser")
     parser.add_argument("--width", type=int, default=100, help="largeur du rendu --snapshot")
     parser.add_argument("--height", type=int, default=30, help="hauteur du rendu --snapshot")
+    parser.add_argument("--notifications", action="store_true", help="notifications locales des changements observés")
+    parser.add_argument("--mouse", action="store_true", help="navigation à la souris facultative")
+    parser.add_argument("--anonymize", action="store_true", help="masquer noms, chemins et journaux dans les écrans et exports")
 
 
 def run(args) -> int:
@@ -58,15 +61,18 @@ def run(args) -> int:
             raise ValueError("--json ne nécessite pas de compilation ; retirer --build")
         from .terminal_catalog import snapshot
         view = args.view or "overview"
-        collection = "alerts" if view in {"overview", "updates"} else view
+        collection = "alerts" if view in {"overview", "updates"} else "jobs" if view in {"dossier", "recovery", "groups"} else view
         parameters = {"queries": {collection: query}, "pages": {collection: page-1}}
         if getattr(args, "sort", None):
             parameters["sorts"] = {collection: args.sort}
         for name in ("job_stale_after", "transfer_stale_after"):
             if getattr(args, name, None) is not None:
                 parameters[name] = getattr(args, name)
-        print(json.dumps(snapshot(db=args.db, limit=args.limit, demo=args.demo, query=parameters),
-                         indent=2, ensure_ascii=True, allow_nan=False))
+        result = snapshot(db=args.db, limit=args.limit, demo=args.demo, query=parameters)
+        if getattr(args,"anonymize",False):
+            from .terminal_presentation import project
+            result = project(result)
+        print(json.dumps(result, indent=2, ensure_ascii=True, allow_nan=False))
         return 0
     if not args.snapshot and not getattr(args, "export", None) and (not sys.stdin.isatty() or not sys.stdout.isatty()):
         raise ValueError("Ouvrir un terminal interactif, ou utiliser tui --demo --snapshot / --json.")
@@ -109,6 +115,8 @@ def run(args) -> int:
             command.extend(["--" + option.replace("_", "-"), str(value)])
     if getattr(args, "no_preferences", False):
         command.append("--no-preferences")
+    for flag in ("notifications", "mouse", "anonymize"):
+        if getattr(args,flag,False): command.append("--"+flag)
     if args.demo:
         command.append("--demo")
     if args.db:

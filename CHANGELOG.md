@@ -48,6 +48,19 @@
 
 ## Non publié
 
+- Interface terminal interne 0.5 : dossiers liés, reprise avec preuves séparées,
+  efficacité demandée/mesurée, groupes Slurm et sessions datées. Favoris et notes
+  privés, notifications facultatives sans répétition, présentation anonymisée
+  dans les écrans/exports. Filtres combinés et saisie regroupée, recherche sans
+  collecte de fichiers, inventaire initial progressif avec compteurs partiels.
+  Copie/export en arrière-plan et confirmations visibles malgré les avertissements,
+  souris facultative et largeur d'identifiants réglable. Lecture distante uniquement
+  par action explicite ; arrêt des helpers détenus lors de la fermeture. Nouvel
+  outil local `job_link_artifact`, historique borné des observations, mesures et
+  journaux persistés ; dépendances restantes observées et sous-jobs réellement
+  enregistrés. Traces anciennes terminées/vérifiées neutres. Compatibilité des
+  anciennes préférences et des tableaux 0.4/contrat 2.
+
 - Interface terminal interne 0.4 : recherche et pagination dans tout l'historique,
   jobs actifs prioritaires et compteurs globaux explicites. Alertes ouvrant la
   trace concernée, intégrité des transferts séparée du pourcentage dans la liste.

@@ -1,10 +1,12 @@
 //! Optional terminal client. The Python MCP entry point stays a separate process.
+mod actions;
 mod app;
 mod bridge;
 mod color;
 mod local;
 mod model;
 mod preferences;
+mod presentation;
 mod query;
 mod status;
 mod ui;
@@ -41,7 +43,7 @@ pub struct Options {
     refresh: u64,
     #[arg(long, default_value_t = 40, value_parser = clap::value_parser!(u16).range(1..=100))]
     limit: u16,
-    #[arg(long, value_parser = ["overview", "jobs", "transfers", "updates", "reports"])]
+    #[arg(long, value_parser = ["overview", "jobs", "transfers", "updates", "reports", "dossier", "recovery", "groups", "sessions"])]
     view: Option<String>,
     #[arg(long, default_value = "", value_parser = query_argument)]
     query: String,
@@ -69,6 +71,14 @@ pub struct Options {
     width: u16,
     #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u16).range(10..=80))]
     height: u16,
+    #[arg(long, hide=true, value_parser=["copy","export"])]
+    helper: Option<String>,
+    #[arg(long)]
+    notifications: bool,
+    #[arg(long)]
+    mouse: bool,
+    #[arg(long)]
+    anonymize: bool,
 }
 
 fn query_argument(value: &str) -> Result<String, String> {
@@ -84,6 +94,9 @@ fn query_argument(value: &str) -> Result<String, String> {
 
 fn run() -> io::Result<()> {
     let options = Options::parse();
+    if let Some(kind) = &options.helper {
+        return actions::helper(kind);
+    }
     if !options.snapshot
         && options.export.is_none()
         && (!io::stdin().is_terminal() || !io::stdout().is_terminal())
@@ -122,12 +135,19 @@ fn run() -> io::Result<()> {
         Some("transfers") => View::Transfers,
         Some("updates") => View::Updates,
         Some("reports") => View::Reports,
+        Some("dossier") => View::Dossier,
+        Some("recovery") => View::Recovery,
+        Some("groups") => View::Groups,
+        Some("sessions") => View::Sessions,
         Some(_) => View::Overview,
         None => preferred.view,
     };
     let mut app = App::new(view);
     app.configure(&preferred);
     app.view = view;
+    app.notifications |= options.notifications;
+    app.mouse_enabled |= options.mouse;
+    app.anonymized |= options.anonymize;
     app.notice = preference_error;
     if let Some(layout) = options.layout {
         app.layout = layout;
@@ -183,7 +203,7 @@ fn run() -> io::Result<()> {
         };
         app.apply(data);
         if let Some(path) = &options.export {
-            local::export(path, &ui::summary(&app))?;
+            local::export(path, &ui::summary(&mut app))?;
             println!("Résumé exporté : {}", path.display());
             return Ok(());
         }
@@ -202,7 +222,28 @@ fn run() -> io::Result<()> {
         let mut last_draw = Instant::now();
         let mut dirty = true;
         let mut last_contact = Instant::now();
+        let mut last_collection = Instant::now();
+        let mut task: Option<actions::Task> = None;
+        let mut mouse_capture = actions::MouseCapture::default();
         loop {
+            mouse_capture.update(app.mouse_enabled)?;
+            dirty |= app.expire_confirmation();
+            if let Some(partial) = reader.as_ref().and_then(Reader::partial) {
+                last_contact = Instant::now();
+                app.apply(partial);
+                dirty = true;
+            }
+            if let Some(result) = task.as_ref().and_then(|task| task.result.try_recv().ok()) {
+                let remote = task.as_ref().is_some_and(|task| task.remote);
+                app.confirm(result.unwrap_or_else(|message| message));
+                task.take();
+                app.action_busy = false;
+                dirty = true;
+                if remote {
+                    app.collect_read = true;
+                    app.pending_read = true;
+                }
+            }
             if let Some(progress) = reader.as_ref().and_then(Reader::progress) {
                 last_contact = Instant::now();
                 if progress.request_id == app.revision {
@@ -239,20 +280,26 @@ fn run() -> io::Result<()> {
             if !app.paused
                 && !app.loading
                 && app.error.is_none()
-                && last_refresh.elapsed() >= Duration::from_secs(options.refresh)
+                && last_collection.elapsed() >= Duration::from_secs(options.refresh)
             {
+                app.collect_read = true;
                 request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
+                last_collection = Instant::now();
             }
-            if app.pending_read && !app.loading && app.error.is_none() {
+            if app.pending_read
+                && !app.loading
+                && app.error.is_none()
+                && app
+                    .debounce_until
+                    .is_none_or(|deadline| Instant::now() >= deadline)
+            {
                 request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
             }
             if let Some(path) = &preference_path {
                 let preferred = app.preferences();
                 if preferred != last_preferences {
                     if preferences::save(path, &preferred).is_err() {
-                        app.notice = Some(
-                            "Préférences non sauvegardées ; vérifier le dossier local.".into(),
-                        );
+                        app.confirm("Préférences non sauvegardées ; vérifier le dossier local.");
                     }
                     last_preferences = preferred;
                 }
@@ -275,48 +322,24 @@ fn run() -> io::Result<()> {
                                         &mut app,
                                         &mut last_refresh,
                                     );
+                                    last_collection = Instant::now();
                                 }
                             }
                             Action::None => {}
-                            Action::Copy(path) => {
-                                app.notice = Some(match app.copy_value(path) {
-                                    Some(value) => match local::copy(&value) {
-                                        Ok(()) => if path {
-                                            "Chemin copié."
-                                        } else {
-                                            "Identifiant copié."
-                                        }
-                                        .into(),
-                                        Err(_) => {
-                                            "Presse-papiers indisponible ; e exporte un résumé."
-                                                .into()
-                                        }
-                                    },
-                                    None => "Aucune valeur à copier dans cette vue.".into(),
-                                });
-                            }
-                            Action::Export => {
-                                app.notice = Some(match local::export_path() {
-                                    Some(path) => match local::export(&path, &ui::summary(&app)) {
-                                        Ok(()) => format!("Résumé exporté : {}", path.display()),
-                                        Err(_) => {
-                                            "Export impossible ; vérifier le dossier local.".into()
-                                        }
-                                    },
-                                    None => {
-                                        "Dossier utilisateur absent ; utiliser --export CHEMIN."
-                                            .into()
-                                    }
-                                });
-                            }
+                            action => actions::dispatch(action, &options, &mut app, &mut task),
                         }
                         dirty = true;
                     }
                     Event::Resize(_, _) => dirty = true,
+                    Event::Mouse(event) => {
+                        app.mouse(event);
+                        dirty = true;
+                    }
                     _ => {}
                 }
             }
         }
+        drop(task);
         Ok(())
     })
 }
@@ -344,6 +367,7 @@ fn request_refresh(
     if app.loading {
         app.pending_read = false;
         app.force_read = false;
+        app.collect_read = false;
         *started = Instant::now();
     } else {
         app.error = Some("Lecteur local indisponible ; r pour reconnecter.".into());

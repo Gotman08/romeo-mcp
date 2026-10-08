@@ -145,6 +145,7 @@ Voir le [guide des rapports publics et de l'autorisation persistante](issue-repo
 | [`job_resilient_prepare`](tools/job_resilient_prepare.md) | Préparer une chaîne de segments reprenables. | `full`, `expert` |
 | [`job_resilient_submit`](tools/job_resilient_submit.md) | Soumettre une chaîne de segments reprenables à partir du plan relu. | `full`, `expert` |
 | [`job_status`](tools/job_status.md) | Lire l’état d’un job Slurm. | `essential`, `full`, `expert` |
+| [`job_link_artifact`](tools/job_link_artifact.md) | Associer localement un artefact existant au dossier d'un job. | `full`, `expert` |
 | [`list_jobs`](tools/list_jobs.md) | Retrouver votre file et les jobs enregistrés. | `essential`, `full`, `expert` |
 | [`cancel_job`](tools/cancel_job.md) | Demander l’annulation d’un job. | `essential`, `full`, `expert` |
 | [`wait_for_job`](tools/wait_for_job.md) | Attendre brièvement la fin d’un job. | `full`, `expert` |

@@ -22,6 +22,15 @@ from pathlib import Path
 
 PLAN_TTL_SECONDS = 24 * 60 * 60
 
+
+def _event_key(payload: dict) -> str:
+    """Keep state/proof changes, not a new event for every elapsed-time tick."""
+    fields = ("state", "slurm_state", "result_validated", "resume_validated", "service_readiness_observed",
+              "checkpoint_after_signal_verified", "latest_checkpoint", "checkpoint", "protection",
+              "application_completion_observed", "exit_code", "cpu_efficiency_pct", "max_rss_mb", "log_sha256",
+              "dependencies_remaining")
+    return json.dumps({key: payload[key] for key in fields if key in payload}, sort_keys=True)
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
     job_id       TEXT PRIMARY KEY,
@@ -60,6 +69,16 @@ CREATE TABLE IF NOT EXISTS job_observations (
     observed_at REAL NOT NULL,
     payload TEXT NOT NULL,
     PRIMARY KEY (job_id, target)
+);
+CREATE TABLE IF NOT EXISTS observation_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL, target TEXT NOT NULL, observed_at REAL NOT NULL,
+    payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS observation_events_job ON observation_events(job_id, event_id DESC);
+CREATE TABLE IF NOT EXISTS artifact_links (
+    job_id TEXT NOT NULL, kind TEXT NOT NULL, artifact_id TEXT NOT NULL,
+    created_at REAL NOT NULL, PRIMARY KEY(job_id,kind,artifact_id)
 );
 """
 
@@ -156,10 +175,40 @@ class Registry:
         """Retain the latest observed state across SSH and MCP restarts."""
         observed = time.time()
         key = json.dumps(target, sort_keys=True)
+        encoded = json.dumps(payload, ensure_ascii=False)
         with self._lock, self._conn:
             self._conn.execute("INSERT OR REPLACE INTO job_observations VALUES (?, ?, ?, ?)",
-                               (str(job_id), key, observed, json.dumps(payload, ensure_ascii=False)))
+                               (str(job_id), key, observed, encoded))
+            previous = self._conn.execute(
+                "SELECT payload FROM observation_events WHERE job_id=? AND target=? ORDER BY event_id DESC LIMIT 1",
+                (str(job_id), key)).fetchone()
+            if previous is None or _event_key(json.loads(previous[0])) != _event_key(payload):
+                self._conn.execute("INSERT INTO observation_events(job_id,target,observed_at,payload) VALUES(?,?,?,?)",
+                                   (str(job_id), key, observed, encoded))
+                self._conn.execute("DELETE FROM observation_events WHERE job_id=? AND event_id NOT IN "
+                                   "(SELECT event_id FROM observation_events WHERE job_id=? ORDER BY event_id DESC LIMIT 256)",
+                                   (str(job_id), str(job_id)))
+                self._conn.execute("DELETE FROM observation_events WHERE event_id < "
+                                   "(SELECT MAX(event_id)-200000 FROM observation_events)")
         return {"observed_at": observed, "target": target, "source": "slurm", "current_state_observed": True}
+
+    def link_artifact(self, job_id: str, kind: str, artifact_id: str) -> None:
+        """Record an explicit association; matching filenames are never evidence."""
+        if kind not in {"transfer", "report", "result", "job"} or not artifact_id or len(artifact_id) > 180:
+            raise ValueError("Association d'artefact invalide")
+        with self._lock, self._conn:
+            if not self._conn.execute("SELECT 1 FROM jobs WHERE job_id=?", (str(job_id),)).fetchone():
+                raise ValueError("Job local introuvable")
+            self._conn.execute("INSERT OR IGNORE INTO artifact_links VALUES(?,?,?,?)",
+                               (str(job_id), kind, str(artifact_id), time.time()))
+
+    def record_array_task(self, parent_id: str, identifier: str) -> None:
+        import re
+        if not re.fullmatch(re.escape(parent_id) + r"_\d+", identifier):
+            raise ValueError("Sous-job Slurm invalide")
+        with self._lock, self._conn:
+            self._conn.execute("INSERT OR IGNORE INTO jobs SELECT ?,name,submitted_at,partition,arch,workdir,"
+                "stdout_glob,stderr_glob,script,last_state,note FROM jobs WHERE job_id=?", (identifier,parent_id))
 
     def observation(self, job_id: str, target: dict | None = None) -> dict | None:
         with self._lock:

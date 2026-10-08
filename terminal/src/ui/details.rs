@@ -32,6 +32,8 @@ pub fn lines(app: &App) -> Vec<Line<'static>> {
         View::Transfers => transfer(app),
         View::Reports => report(app),
         View::Updates => super::updates::lines(app),
+        View::Dossier | View::Recovery | View::Groups => super::workspace::lines(app),
+        View::Sessions => super::workspace::session_lines(app),
     }
 }
 
@@ -59,7 +61,11 @@ fn job(app: &App) -> Vec<Line<'static>> {
         line("Durée écoulée", present(&job.elapsed)),
         line("Temps restant", present(&job.remaining)),
         line("Observé il y a", age(job.observed_at)),
-        freshness_line(job.observed_at, app.job_stale_after),
+        freshness_line(
+            job.observed_at,
+            app.job_stale_after,
+            crate::status::job_active(&job.state),
+        ),
         line("Observation exacte", timestamp_exact(job.observed_at)),
         line("Soumis il y a", age(job.submitted_at)),
         line("Soumission exacte", timestamp_exact(job.submitted_at)),
@@ -206,7 +212,11 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
     }
     lines.extend([
         line("Observé il y a", age(transfer.observed_at)),
-        freshness_line(transfer.observed_at, app.transfer_stale_after),
+        freshness_line(
+            transfer.observed_at,
+            app.transfer_stale_after,
+            matches!(transfer.state.as_str(), "running" | "preparing"),
+        ),
         line("Observation exacte", timestamp_exact(transfer.observed_at)),
         line("Plan créé", timestamp_exact(transfer.created_at)),
         Line::from(""),
@@ -240,16 +250,26 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
-fn freshness_line(timestamp: Option<f64>, after: u64) -> Line<'static> {
+fn freshness_line(timestamp: Option<f64>, after: u64, monitored: bool) -> Line<'static> {
     let freshness = crate::status::freshness(timestamp, crate::model::now(), after as f64);
     marked(
         "Fraîcheur",
         format!("{} · seuil {} s", freshness.label(), after),
-        tone_style(freshness.tone()),
+        tone_style(
+            if !monitored && freshness == crate::status::Freshness::Old {
+                Tone::Muted
+            } else {
+                freshness.tone()
+            },
+        ),
     )
 }
 
-fn allocation(lines: &mut Vec<Line<'static>>, title: &'static str, allocation: &Allocation) {
+pub(super) fn allocation(
+    lines: &mut Vec<Line<'static>>,
+    title: &'static str,
+    allocation: &Allocation,
+) {
     lines.push(Line::from(title));
     let mut any = false;
     for (label, value) in [

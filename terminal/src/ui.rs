@@ -5,6 +5,7 @@ mod overlays;
 mod overview;
 mod progress;
 mod updates;
+mod workspace;
 
 use crate::{
     app::{App, Overlay, View},
@@ -29,7 +30,13 @@ const ACCENT: Color = Color::Rgb(86, 182, 194);
 const ERROR: Color = Color::Rgb(239, 135, 146);
 const SELECTED: Color = Color::Rgb(28, 40, 52);
 
-pub fn summary(app: &App) -> String {
+pub fn summary(app: &mut App) -> String {
+    let original = if app.anonymized {
+        let projected = crate::presentation::project(&app.data);
+        Some(std::mem::replace(&mut app.data, projected))
+    } else {
+        None
+    };
     let mut output = format!(
         "ROMEO MCP — résumé d'observations enregistrées\nRelevé local : {}\n\n",
         crate::model::timestamp_exact(Some(app.data.generated_at))
@@ -41,6 +48,9 @@ pub fn summary(app: &App) -> String {
         output.push('\n');
     }
     output.push_str("\nCes preuves datées ne constituent pas une interrogation du cluster.\n");
+    if let Some(data) = original {
+        app.data = data;
+    }
     output
 }
 
@@ -102,7 +112,20 @@ fn paragraph(frame: &mut Frame, area: Rect, title: &str, lines: Vec<Line<'static
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    if app.anonymized {
+        let projected = crate::presentation::project(&app.data);
+        let original = std::mem::replace(&mut app.data, projected);
+        draw_inner(frame, app);
+        app.data = original;
+    } else {
+        draw_inner(frame, app);
+    }
+}
+fn draw_inner(frame: &mut Frame, app: &mut App) {
     app.split_visible = false;
+    app.table_area = None;
+    app.detail_area = None;
+    app.tab_hits.clear();
     let area = frame.area();
     frame.render_widget(
         Block::default().style(Style::default().fg(TEXT).bg(BACKGROUND)),
@@ -177,7 +200,14 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                     Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("Tableau de bord"),
-                Span::styled("   v0.4 interne", Style::default().fg(MUTED)),
+                Span::styled(
+                    if app.anonymized {
+                        "   v0.5 · PRÉSENTATION"
+                    } else {
+                        "   v0.5 interne"
+                    },
+                    Style::default().fg(MUTED),
+                ),
             ]),
             Line::from(format!(
                 " {}",
@@ -186,20 +216,38 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         ]),
         parts[0],
     );
-    let titles = if area.width < 80 {
-        ["1 Vue", "2 Jobs", "3 Cop.", "4 MAJ", "5 Rapp."]
+    let all = [
+        "1 Aperçu",
+        "2 Jobs",
+        "3 Copies",
+        "4 MAJ",
+        "5 Rapports",
+        "6 Dossier",
+        "7 Reprise",
+        "8 Groupes",
+        "9 Sessions",
+    ];
+    let count = if area.width < 65 {
+        3
+    } else if area.width < 140 {
+        5
     } else {
-        [
-            "1 Aperçu",
-            "2 Jobs",
-            "3 Transferts",
-            "4 Mises à jour",
-            "5 Rapports",
-        ]
+        9
     };
+    let start = app.view.index().saturating_sub(count / 2).min(9 - count);
+    let titles = &all[start..start + count];
+    let mut x = parts[1].x + 2;
+    for (index, title) in titles.iter().enumerate() {
+        let width = Line::from(*title).width() as u16 + 2;
+        app.tab_hits.push((
+            Rect::new(x, parts[1].y + 1, width, 1),
+            View::from_index(start + index),
+        ));
+        x += width + 1;
+    }
     frame.render_widget(
-        Tabs::new(titles)
-            .select(app.view.index())
+        Tabs::new(titles.iter().copied())
+            .select(app.view.index() - start)
             .padding(" ", " ")
             .highlight_style(Style::default().fg(ACCENT).add_modifier(Modifier::BOLD))
             .divider(" ")
@@ -208,8 +256,14 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     );
     match app.view {
         View::Overview => overview::draw(frame, parts[2], app),
-        View::Jobs | View::Transfers | View::Reports => lists::draw(frame, parts[2], app),
+        View::Jobs
+        | View::Transfers
+        | View::Reports
+        | View::Dossier
+        | View::Recovery
+        | View::Groups => lists::draw(frame, parts[2], app),
         View::Updates => updates::draw(frame, parts[2], app),
+        View::Sessions => workspace::sessions(frame, parts[2], app),
     }
     footer(frame, parts[3], app);
     if app.overlay != Overlay::None {
@@ -218,7 +272,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 }
 
 fn footer(frame: &mut Frame, area: Rect, app: &App) {
-    let is_list = matches!(app.view, View::Jobs | View::Transfers | View::Reports);
+    let is_list = matches!(
+        app.view,
+        View::Jobs
+            | View::Transfers
+            | View::Reports
+            | View::Dossier
+            | View::Recovery
+            | View::Groups
+            | View::Sessions
+    );
     let shortcuts = if area.width < 80 {
         if is_list {
             " ↑↓ n/b pages / filtre Entrée détail ? q"
@@ -228,13 +291,31 @@ fn footer(frame: &mut Frame, area: Rect, app: &App) {
             " ↑↓ alerte Entrée ouvrir F6 résumé ? q"
         }
     } else if is_list {
-        " Tab vues ↑↓ choisir n/b pages / filtre s tri F6 panneau c copier e exporter ? q"
+        " Tab vues ↑↓ n/b pages / filtre a actions F6 panneau * favori c copier e exporter ? q"
     } else if app.view == View::Updates {
         " Tab vues ↑↓/Pg défiler p pause r relire e exporter ? aide q quitter"
     } else {
         " ↑↓ alerte Entrée ouvrir n/b pages F6 résumé c copier e exporter ? q"
     };
-    let status = if app.editing {
+    let status = if let Some(notice) = &app.notice {
+        format!(
+            " {}{}",
+            if app.anonymized {
+                "Action terminée · contenu masqué"
+            } else {
+                notice
+            },
+            if app.error.is_some() || !app.data.warnings.is_empty() {
+                " · ! alertes"
+            } else {
+                " · ! détail"
+            }
+        )
+    } else if app.action_busy {
+        " Action en arrière-plan · navigation disponible".into()
+    } else if app.data.partial {
+        " Inventaire incomplet · compteurs partiels · jobs disponibles".into()
+    } else if app.editing {
         " Recherche : Entrée valider · Échap effacer".to_owned()
     } else if app.error.is_some() {
         " Lecture interrompue · r reconnecter · ! détail".to_owned()
@@ -250,8 +331,6 @@ fn footer(frame: &mut Frame, area: Rect, app: &App) {
                 .as_deref()
                 .unwrap_or("Lecture locale en cours")
         )
-    } else if let Some(notice) = &app.notice {
-        format!(" {notice} · ! détail")
     } else if app.data.demo {
         " Données fictives · aucune connexion au cluster".to_owned()
     } else {
@@ -391,7 +470,7 @@ mod tests {
         app.data.updates.state = "idle".into();
         app.data.updates.automatic_enabled = true;
         app.data.updates.checked_at = Some(1000.0);
-        let exported = summary(&app);
+        let exported = summary(&mut app);
         assert!(exported.contains("Version actuelle : 1.4.0"));
         assert!(exported.contains("Prochain démarrage : 1.4.1"));
         assert!(exported.contains("Mises à jour automatiques : activées"));
@@ -422,6 +501,10 @@ mod tests {
             View::Transfers,
             View::Updates,
             View::Reports,
+            View::Dossier,
+            View::Recovery,
+            View::Groups,
+            View::Sessions,
         ] {
             for (width, height) in [(100, 30), (80, 24), (60, 18), (48, 16), (40, 10), (1, 1)] {
                 let mut app = App::new(view);
@@ -457,6 +540,55 @@ mod tests {
         assert!(render(48, 16, &mut app).contains("r reconnecter"));
         app.key(key(KeyCode::Char('!')));
         assert!(render(100, 30, &mut app).contains("Une explication"));
+    }
+
+    #[test]
+    fn confirmations_survive_warnings_and_sharing_masks_private_content() {
+        let mut app = App::new(View::Dossier);
+        app.data.jobs = vec![Job {
+            id: "42".into(),
+            name: "private-project".into(),
+            ..Default::default()
+        }];
+        app.data.workspace.job_id = "42".into();
+        app.data.workspace.logs = Some(crate::model::Logs {
+            content: "/private/log-path".into(),
+            ..Default::default()
+        });
+        app.notes.insert("42".into(), "private-note".into());
+        app.data.warnings.push("/private/warning-path".into());
+        app.confirm("Résumé exporté : /private/export-path");
+        assert!(render(100, 30, &mut app).contains("Résumé exporté"));
+        app.notice = None;
+        app.key(key(KeyCode::Char('!')));
+        assert!(render(100, 30, &mut app).contains("/private/export-path"));
+        app.key(key(KeyCode::Esc));
+        app.anonymized = true;
+        let exported = summary(&mut app);
+        for secret in ["private-project", "private/log-path", "private-note"] {
+            assert!(!exported.contains(secret));
+        }
+        app.key(key(KeyCode::Char('!')));
+        let text = render(100, 30, &mut app);
+        assert!(!text.contains("private/"));
+        assert_eq!(app.data.jobs[0].name, "private-project");
+    }
+
+    #[test]
+    fn sessions_keep_availability_and_the_active_filter_visible_at_small_sizes() {
+        let mut app = App::new(View::Sessions);
+        app.data.sessions.push(crate::model::Session {
+            name: "jupyter".into(),
+            ready: Some(true),
+            ..Default::default()
+        });
+        app.set_query("ready".into());
+        for (width, height) in [(48, 16), (100, 30)] {
+            let text = render(width, height, &mut app);
+            assert!(text.contains("Filtre : ready"));
+            assert!(text.contains("Observée"));
+            assert!(text.contains("actions") || width < 80);
+        }
     }
 
     #[test]

@@ -24,6 +24,21 @@ pub struct Snapshot {
     pub recent_jobs: Vec<Job>,
     #[serde(default)]
     pub active_jobs: usize,
+    #[serde(default)]
+    pub partial: bool,
+    #[serde(default)]
+    pub workspace: Workspace,
+    #[serde(default)]
+    pub sessions: Vec<Session>,
+    #[serde(default)]
+    pub notifications: Vec<Notification>,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Notification {
+    pub key: String,
+    pub job_id: String,
+    pub message: String,
+    pub observed_at: Option<f64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -32,6 +47,116 @@ pub struct Coverage {
     pub transfers: Page,
     pub reports: Page,
     pub alerts: Page,
+    #[serde(default)]
+    pub sessions: Page,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Workspace {
+    #[serde(default)]
+    pub job_id: String,
+    #[serde(default)]
+    pub links: Vec<Artifact>,
+    #[serde(default)]
+    pub links_total: usize,
+    #[serde(default)]
+    pub events: Vec<HistoryEvent>,
+    #[serde(default)]
+    pub members: Vec<Member>,
+    #[serde(default)]
+    pub efficiency: Efficiency,
+    #[serde(default)]
+    pub recovery: Recovery,
+    pub logs: Option<Logs>,
+    #[serde(default)]
+    pub group: Group,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Artifact {
+    pub kind: String,
+    pub id: String,
+    pub name: String,
+    pub state: String,
+    pub basis: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct HistoryEvent {
+    pub kind: String,
+    pub state: String,
+    pub observed_at: Option<f64>,
+    pub source: String,
+    pub generation: Option<u64>,
+    pub resume_observed: bool,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Member {
+    pub id: String,
+    pub name: String,
+    pub state: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Group {
+    pub array_parent: Option<String>,
+    pub parent_plan: Option<String>,
+    #[serde(default)]
+    pub array_spec: String,
+    #[serde(default)]
+    pub dependencies: String,
+    pub remaining_dependencies: Option<String>,
+    pub dependencies_observed_at: Option<f64>,
+    #[serde(default)]
+    pub dependencies_source: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Efficiency {
+    pub alloc_cpus: Option<f64>,
+    pub alloc_gpus: Option<f64>,
+    pub elapsed_seconds: Option<f64>,
+    pub cpu_seconds_used: Option<f64>,
+    pub cpu_seconds_reserved: Option<f64>,
+    pub cpu_efficiency_pct: Option<f64>,
+    pub max_rss_mb: Option<f64>,
+    pub req_mem_mb: Option<f64>,
+    pub mem_efficiency_pct: Option<f64>,
+    pub gpu_utilization_pct: Option<f64>,
+    pub observed_at: Option<f64>,
+    #[serde(default)]
+    pub source: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Recovery {
+    pub complete: Option<bool>,
+    pub integrity: Option<bool>,
+    pub compatible: Option<bool>,
+    pub independent_backup: Option<bool>,
+    pub resume_observed: Option<bool>,
+    pub step: Option<u64>,
+    pub generation: Option<u64>,
+    pub world_size: Option<u64>,
+    pub observed_at: Option<f64>,
+    #[serde(default)]
+    pub source: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Logs {
+    pub content: String,
+    pub observed_at: Option<f64>,
+    pub stream: String,
+    pub truncated: bool,
+    pub source: String,
+}
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Session {
+    pub id: String,
+    pub name: String,
+    pub job_id: String,
+    pub state: String,
+    pub slurm_state: String,
+    pub ready: Option<bool>,
+    pub created_at: Option<f64>,
+    pub observed_at: Option<f64>,
+    pub expires_at: Option<f64>,
+    pub source: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -84,6 +209,7 @@ pub struct Allocation {
     pub gpus: Option<u64>,
     pub gpus_per_node: Option<u64>,
     pub gpus_per_task: Option<u64>,
+    pub time_limit_seconds: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -207,11 +333,23 @@ impl Snapshot {
             || value.warnings.len() > 100
             || value.attention.len() > 100
             || value.recent_jobs.len() > 4
+            || value.sessions.len() > 100
+            || value.notifications.len() > 50
+            || value.workspace.links.len() > 100
+            || value.workspace.events.len() > 48
+            || value.workspace.members.len() > 100
+            || value
+                .workspace
+                .logs
+                .as_ref()
+                .is_some_and(|logs| logs.content.len() > 32000)
             || (value.schema == 3
                 && (!value.coverage.jobs.valid(value.jobs.len())
                     || !value.coverage.transfers.valid(value.transfers.len())
                     || !value.coverage.reports.valid(value.reports.items.len())
                     || !value.coverage.alerts.valid(value.attention.len())
+                    || ((value.coverage.sessions.page_size != 0 || !value.sessions.is_empty())
+                        && !value.coverage.sessions.valid(value.sessions.len()))
                     || value.active_jobs > value.coverage.jobs.total))
             || !value.generated_at.is_finite()
             || value.generated_at <= 0.0

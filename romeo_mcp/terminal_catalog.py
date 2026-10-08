@@ -15,7 +15,7 @@ import unicodedata
 from . import terminal_data as data
 from .terminal_cache import JsonFiles, database_signature, signature
 
-VIEWS = ("jobs", "transfers", "reports", "alerts")
+VIEWS = ("jobs", "transfers", "reports", "alerts", "sessions")
 SORTS = ("activity", "date", "state", "priority")
 ACTIVE = {"RUNNING", "PENDING", "SUBMITTED", "CONFIGURING", "COMPLETING", "SUSPENDED",
           "RESIZING", "REQUEUED", "REQUEUE_FED", "REQUEUE_HOLD"}
@@ -44,15 +44,21 @@ def request(value=None):
     """Bound and whitelist requests even when the caller bypasses the CLI."""
     value = {} if value is None else value
     if not isinstance(value, dict) or any(key not in {"request_id", "queries", "pages", "sorts", "anchors", "force",
-                                                    "job_stale_after", "transfer_stale_after"} for key in value):
+                                                    "job_stale_after", "transfer_stale_after", "collect", "detail_job", "progressive"} for key in value):
         raise ValueError("Requête de lecture incompatible")
     result = {"request_id": value.get("request_id", 0), "force": value.get("force", False),
+              "collect": value.get("collect", True), "detail_job": value.get("detail_job", ""),
+              "progressive": value.get("progressive", False),
               "job_stale_after": value.get("job_stale_after", 300),
               "transfer_stale_after": value.get("transfer_stale_after", 60)}
     if type(result["request_id"]) is not int or not 0 <= result["request_id"] <= 2**53:
         raise ValueError("Identifiant de lecture invalide")
     if type(result["force"]) is not bool:
         raise ValueError("Forçage de lecture invalide")
+    if type(result["collect"]) is not bool or not isinstance(result["detail_job"], str) or len(result["detail_job"]) > 80:
+        raise ValueError("Collecte ou dossier invalide")
+    if type(result["progressive"]) is not bool:
+        raise ValueError("Inventaire progressif invalide")
     for key in ("job_stale_after", "transfer_stale_after"):
         if type(result[key]) is not int or not 1 <= result[key] <= 86400:
             raise ValueError("Seuil de fraîcheur invalide")
@@ -100,34 +106,65 @@ class Catalog:
         self.request_id = 0
         self.transfer_stamps = {}
         self.transfer_warnings = set()
+        self.initialized = False
+        self.partial = False
+        self.current_query = None
+        self.workspace_key = None
+        self.workspace_value = None
+        self.export_stamp = ()
+        self.notifications = []
+        self.runtime_value = None
+        self.updates_value = None
+        self.metadata_dirty = True
+        self.metadata_warnings = []
 
     def _heartbeat(self, phase, processed, total=None):
         if self.progress is not None and time.monotonic() - self.progress_at >= 0.5:
             self.progress({"message": "progress", "request_id": self.request_id,
                            "phase": phase, "processed": processed, "total": total})
             self.progress_at = time.monotonic()
+            if phase == "transfers" and self.partial and self.current_query["progressive"]:
+                self.progress(self._snapshot(self.current_query, time.time(), partial=True))
 
     def close(self):
         self.index.close()
 
     def _replace(self, kind, rows):
         # Roll back this source if its iterator fails halfway through.
+        previous = {row[0]: json.loads(row[1]) for row in self.index.execute("SELECT id,record FROM records WHERE kind='jobs'")} if kind == "jobs" else {}
+        changes = []
         with self.index:
             self.index.execute("DELETE FROM records WHERE kind=?", (kind,))
             for number, row in enumerate(rows, 1):
                 self._store(kind, row)
+                old = previous.get(row["id"])
+                if old is not None:
+                    message = None
+                    observed_at = row.get("observed_at")
+                    if observed_at and old["state"] != row["state"] and (row["state"] in ERROR or row["state"] == "COMPLETED"):
+                        message = JOB_LABELS.get(row["state"], row["state"])
+                    proof, earlier = row.get("checkpoint") or {}, old.get("checkpoint") or {}
+                    if proof.get("integrity_verified") is True and (earlier.get("generation") != proof.get("generation") or earlier.get("integrity_verified") is not True):
+                        message = "Checkpoint vérifié · génération " + str(proof["generation"])
+                        observed_at = proof.get("observed_at")
+                    if message:
+                        import hashlib
+                        changes.append({"job_id": row["id"], "message": message, "observed_at": observed_at,
+                            "key": hashlib.sha256((row["id"] + message + str(observed_at)).encode()).hexdigest()})
                 self._heartbeat(kind, number)
+        self.notifications = (self.notifications + changes)[-50:]
 
     def _store(self, kind, row):
         state = row["state"]
         upper = state.upper()
         active = state in ACTIVE if kind == "jobs" else state in {"running", "preparing"} if kind == "transfers" else False
-        label = (JOB_LABELS if kind == "jobs" else TRANSFER_LABELS if kind == "transfers" else REPORT_LABELS).get(state, "Inconnu")
+        label = (JOB_LABELS if kind == "jobs" else TRANSFER_LABELS if kind == "transfers" else REPORT_LABELS).get(state, state if kind == "sessions" else "Inconnu")
         unverified = not row["result_validated"] and (state == "COMPLETED" if kind == "jobs"
             else state in {"completed", "completed_unverified"} if kind == "transfers" else False)
         validation = "Vérifié" if row["result_validated"] else "À vérifier" if unverified else "À venir" if active else "Non validé"
         name = row.get("name", row.get("summary", ""))
         fields = [row["id"], name, state, label, validation, row.get("partition", ""),
+                  row.get("job_id", ""),
                   row.get("category", ""), row.get("local_path", ""), row.get("remote_path", ""),
                   row.get("direction", "")]
         if kind == "transfers":
@@ -232,7 +269,14 @@ class Catalog:
         # Freshness is computed at request time, rather than frozen in the cache.
         freshness = "CASE WHEN observed IS NULL OR observed<=0 THEN ' absent' WHEN observed>? THEN ' date future' WHEN observed<?-CASE WHEN kind='jobs' THEN ? ELSE ? END THEN ' ancien' ELSE ' recent' END"
         where = base + " AND instr(searchable || " + freshness + ",?)>0"
-        parameters = (*base_params, at + 5, at, query["job_stale_after"], query["transfer_stale_after"], normalize(query["queries"][view]))
+        from .terminal_filters import compile_query
+        try:
+            filters, parameters_filter, words = compile_query(query["queries"][view], normalize)
+        except ValueError as exc:
+            filters, parameters_filter, words = "0", (), ""
+            self.filter_warnings.append("Filtre " + view + " : " + str(exc))
+        where += " AND " + filters
+        parameters = (*base_params, at + 5, at, query["job_stale_after"], query["transfer_stale_after"], normalize(words), *parameters_filter)
         total = self._count(base, base_params)
         matched = self._count(where, parameters)
         pages = max(1, (matched + self.limit - 1) // self.limit)
@@ -271,6 +315,7 @@ class Catalog:
 
     def snapshot(self, value=None):
         query = request(value)
+        self.current_query = query
         self.request_id = query["request_id"]
         self.progress_at = time.monotonic()
         warnings = []
@@ -290,23 +335,78 @@ class Catalog:
             runtime, updates = demo["runtime"], demo["updates"]
             self.automatic = demo["reports"]["automatic_enabled"]
         else:
-            self._sync_jobs(query["force"])
-            self._sync_transfers(query["force"])
-            self._sync_reports(query["force"])
-            for messages in self.source_warnings.values():
-                warnings.extend(messages)
-            runtime = data.read_runtime(self.path, warnings)
-            updates = data.read_updates(warnings)
+            if query["collect"] or query["force"] or not self.initialized:
+                self.metadata_dirty = True
+                self._sync_jobs(query["force"])
+                self.partial = not self.initialized
+                if self.partial and self.progress is not None and query["progressive"]:
+                    self.progress(self._snapshot(query, at, partial=True))
+                self._sync_transfers(query["force"])
+                self._sync_reports(query["force"])
+                try:
+                    self.export_stamp = tuple((item.name, signature(item)) for item in
+                        self.files.directories(self.path.parent / "checkpoint-exports", files=True))
+                except OSError:
+                    self.workspace_key = None
+                from .terminal_workspace import sessions
+                stamp = database_signature(self.path)
+                if self.stamps.get("sessions") != stamp or query["force"]:
+                    try:
+                        self._replace("sessions", sessions(self.path))
+                        self.stamps["sessions"] = stamp
+                        self.source_warnings["sessions"] = []
+                    except (OSError, sqlite3.Error, ValueError):
+                        self.source_warnings["sessions"] = ["Historique des sessions indisponible."]
+                self.initialized = True
+                self.partial = False
+        return self._snapshot(query, at)
+
+    def _snapshot(self, query, at, *, partial=False):
+        self.filter_warnings = []
+        warnings = [item for messages in self.source_warnings.values() for item in messages]
+        if self.demo:
+            demo = data.demo_snapshot(100)
+            runtime, updates = demo["runtime"], demo["updates"]
+            from .terminal_demo import sessions as demo_sessions
+            self._replace("sessions", demo_sessions(at))
+        else:
+            if self.metadata_dirty or self.runtime_value is None:
+                self.metadata_warnings = []
+                self.runtime_value = data.read_runtime(self.path, self.metadata_warnings)
+                self.updates_value = data.read_updates(self.metadata_warnings)
+                self.metadata_dirty = False
+            warnings.extend(self.metadata_warnings)
+            runtime, updates = self.runtime_value, self.updates_value
         coverage, items = {}, {}
         for view in VIEWS:
             items[view], coverage[view] = self._page(view, query, at)
         recent = [json.loads(row[0]) for row in self.index.execute(
             "SELECT record FROM records WHERE kind='jobs' ORDER BY date DESC,id LIMIT 4")]
-        return {"schema": 3, "request_id": query["request_id"], "generated_at": at, "demo": self.demo,
+        detail = query["detail_job"]
+        if not any(job["id"] == detail for job in items["jobs"]):
+            detail = items["jobs"][0]["id"] if items["jobs"] else ""
+        workspace = {}
+        if not partial and not self.demo:
+            from .terminal_workspace import workspace as read_workspace
+            key = (self.stamps.get("jobs"), detail, tuple(self.transfer_stamps.items()), self.export_stamp)
+            if self.workspace_key != key:
+                try:
+                    self.workspace_value = read_workspace(self.path, detail, self.files, self.index)
+                    self.workspace_key = key
+                except (OSError, sqlite3.Error, ValueError):
+                    self.workspace_value = {}
+                    warnings.append("Dossier de calcul indisponible.")
+            workspace = self.workspace_value or {}
+        elif self.demo:
+            from .terminal_demo import workspace as demo_workspace
+            workspace = demo_workspace(detail, at)
+        return {"schema": 3, "partial": partial, "request_id": query["request_id"], "generated_at": at, "demo": self.demo,
                 "runtime": runtime, "jobs": items["jobs"], "transfers": items["transfers"],
                 "reports": {"automatic_enabled": self.automatic, "items": items["reports"]},
-                "updates": updates, "warnings": list(dict.fromkeys(warnings))[:100],
+                "updates": updates, "warnings": list(dict.fromkeys(warnings + self.filter_warnings))[:100],
                 "attention": items["alerts"], "recent_jobs": recent, "coverage": coverage,
+                "workspace": workspace, "sessions": items["sessions"],
+                "notifications": self.notifications,
                 "active_jobs": self._count("kind='jobs' AND active=1")}
 
 

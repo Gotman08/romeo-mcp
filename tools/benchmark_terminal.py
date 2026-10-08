@@ -59,10 +59,15 @@ def worker(options):
     sys.path.insert(0, str(options.package))
     from romeo_mcp import terminal_data
     reader = None
+    partial_at = []
+    first_started = time.perf_counter()
+    def progress(value):
+        if value.get("partial") and not partial_at:
+            partial_at.append((time.perf_counter()-first_started)*1000)
     if options.mode == "catalog":
         from romeo_mcp.terminal_catalog import Catalog
-        reader = Catalog(db=options.db)
-        collect = reader.snapshot
+        reader = Catalog(db=options.db, progress=progress)
+        collect = (lambda: reader.snapshot({"progressive":True})) if options.query_mode=="index" else reader.snapshot
     else:
         collect = lambda: terminal_data.snapshot(db=options.db)
     samples, cpu_samples = [], []
@@ -82,6 +87,19 @@ def worker(options):
         if reader is not None:
             output.update(job_reads=reader.job_reads, transfer_json_reads=reader.files.reads,
                           transfer_directory_scans=reader.files.scans)
+            output["first_partial_ms"] = partial_at[0] if partial_at else None
+            query_samples = []
+            reads_before = (reader.job_reads,reader.files.reads,reader.files.scans)
+            for _ in range(options.repeats):
+                request = {"queries":{"jobs":"Synthetic"}}
+                if options.query_mode == "index": request["collect"] = False
+                start = time.perf_counter()
+                reader.snapshot(request)
+                query_samples.append((time.perf_counter()-start)*1000)
+            output["query_median_ms"] = statistics.median(query_samples)
+            output["query_collects_sources"] = options.query_mode != "index"
+            output["query_added_parses"] = reader.files.reads-reads_before[1]
+            output["query_added_job_reads"] = reader.job_reads-reads_before[0]
         if sys.platform.startswith("linux"):
             import resource
             output["peak_reader_rss_mib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
@@ -154,11 +172,13 @@ def main():
     parser.add_argument("--transfers", type=int, default=200)
     parser.add_argument("--repeats", type=int, default=10)
     parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--baseline-mode", choices=["catalog","legacy"], default="legacy")
     parser.add_argument("--binary", type=Path)
     parser.add_argument("--baseline-binary", type=Path)
     parser.add_argument("--mode", choices=["catalog", "legacy"], help=argparse.SUPPRESS)
     parser.add_argument("--package", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--db", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--query-mode", choices=["index","collect"], default="collect",help=argparse.SUPPRESS)
     options = parser.parse_args()
     if not 1 <= options.jobs <= 10000 or not 0 <= options.transfers <= 10000 or not 3 <= options.repeats <= 100:
         parser.error("Use 1..10000 jobs, 0..10000 transfers and 3..100 repeats")
@@ -168,20 +188,27 @@ def main():
     if (options.binary or options.baseline_binary) and not sys.platform.startswith("linux"):
         parser.error("PTY idle measurements currently require Linux")
     with tempfile.TemporaryDirectory(prefix="romeo-benchmark-") as directory:
-        root = Path(directory)
-        path = fixture(root, options.jobs, options.transfers)
+        workspace = Path(directory)
+        version_roots = {}
         result = {"synthetic": True, "jobs": options.jobs, "transfers": options.transfers,
-                  "repeats": options.repeats, "platform": sys.platform, "python": sys.version.split()[0]}
-        for label, package, mode in (("current", ROOT, "catalog"), ("baseline", options.baseline, "legacy")):
+                  "repeats": options.repeats, "platform": sys.platform, "python": sys.version.split()[0],
+                  "separate_version_fixtures": True}
+        for label, package, mode in (("current", ROOT, "catalog"), ("baseline", options.baseline, options.baseline_mode)):
             if package is not None:
+                root = workspace / label
+                root.mkdir()
+                version_roots[label] = root
+                # The baseline must not inherit files opened by the current reader.
+                path = fixture(root, options.jobs, options.transfers)
                 output = subprocess.check_output([sys.executable, str(Path(__file__).resolve()), "--mode", mode,
-                    "--package", str(package.resolve()), "--db", str(path), "--repeats", str(options.repeats)],
+                    "--package", str(package.resolve()), "--db", str(path), "--repeats", str(options.repeats),
+                    "--query-mode", "index" if label=="current" else "collect"],
                     env=environment(root), text=True, encoding="utf-8", timeout=120)
                 result[label] = json.loads(output)
         for label, binary, package in (("current_idle", options.binary, ROOT),
                                       ("baseline_idle", options.baseline_binary, options.baseline)):
             if binary is not None and package is not None:
-                result[label] = idle(binary.resolve(), package.resolve(), root)
+                result[label] = idle(binary.resolve(), package.resolve(), version_roots[label.removesuffix("_idle")])
         print(json.dumps(result, indent=2))
 
 

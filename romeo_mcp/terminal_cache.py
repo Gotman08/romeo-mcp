@@ -59,17 +59,21 @@ class JsonFiles:
                 self.bytes -= self.files.popitem(last=False)[1][2]
         return result
 
-    def directories(self, root):
+    def directories(self, root, *, files=False):
         import os
         from .terminal_data import IDENTIFIER
         stamp = signature(root)
-        previous = self.inventories.get(root)
+        inventory_key = (root, files)
+        previous = self.inventories.get(inventory_key)
         if previous is not None and previous[0] == stamp:
             return previous[1]
+        if stamp is None:
+            return ()
         with os.scandir(root) as entries:
             paths = tuple(Path(entry.path) for entry in entries
-                          if IDENTIFIER.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False))
+                          if (entry.is_file(follow_symlinks=False) if files else
+                              IDENTIFIER.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False)))
         self.scans += 1
         if signature(root) == stamp:
-            self.inventories[root] = (stamp, paths)
+            self.inventories[inventory_key] = (stamp, paths)
         return paths
