@@ -1,4 +1,4 @@
-# Tableau de bord terminal (version interne 0.2)
+# Tableau de bord terminal (version interne 0.3)
 
 [Accueil](../README.md) · [Documentation](README.md)
 
@@ -28,6 +28,18 @@ python -m romeo_mcp tui --demo
 python -m romeo_mcp tui
 ```
 
+Pour choisir les couleurs explicitement :
+
+```console
+python -m romeo_mcp tui --demo --color always
+python -m romeo_mcp tui --color never
+```
+
+`--color auto` est le défaut : une variable `NO_COLOR` non vide désactive la
+palette. `always` active les couleurs même si cette variable a été héritée
+du lanceur ; `never` choisit le mode monochrome. Le bandeau indique la raison
+du mode monochrome. Ces options concernent seulement ce processus d'interface.
+
 Le mode `--demo` affiche des jobs, transferts, checkpoints, rapports et versions **fictifs**. Il ne
 lit ni votre registre ni votre configuration et n'utilise aucun accès ROMEO.
 Sans cette option, le tableau présente les traces locales de cette installation.
@@ -52,6 +64,7 @@ Une incompatibilité est signalée dans les alertes ; recompiler puis relancer.
 | Page précédente / suivante | Parcourir la liste par pages ou faire défiler le panneau ouvert |
 | `/` | Saisir un filtre propre à Jobs, Transferts ou Rapports ; le premier caractère remplace le précédent filtre |
 | Entrée | Conserver le filtre pendant sa saisie ; sinon ouvrir le détail complet d'une ligne ou de l'aperçu |
+| `s` | Changer le tri de la liste : date récente, état A–Z, priorité ; chaque vue garde son tri et la sélection reste sur le même identifiant |
 | Échap | Fermer un panneau ; dans une liste, effacer le filtre et quitter sa saisie en une seule fois |
 | `r` | Relire les fichiers locaux, même en pause ; reconnecter un lecteur interrompu |
 | `p` | Suspendre/reprendre la relecture automatique |
@@ -63,6 +76,21 @@ Le terminal s'adapte à sa taille ; un format de 100 colonnes sur 30 lignes
 est confortable. En dessous de 48 × 16, un message invite à l'agrandir.
 Le mode compact réserve l'espace à la liste ; Entrée ouvre un détail défilant.
 L'aide, l'aperçu, les mises à jour et les détails restent consultables en entier.
+Les panneaux qui débordent affichent une barre de défilement et leur plage de
+lignes. Les listes présentent aussi une barre lorsque d'autres lignes sont
+hors de la fenêtre. Page précédente/suivante parcourt la hauteur visible du panneau.
+
+La recherche porte sur les libellés français affichés et les états techniques,
+ainsi que les noms et identifiants. Majuscules, accents et caractères Unicode
+décomposés sont normalisés : « en cours », « termine » et « completed » trouvent
+les transferts correspondants. Le tri par date utilise l'observation la plus
+récente, puis la soumission si aucune observation de job n'existe ; les dates
+absentes viennent en dernier. Le tri par priorité place les échecs d'abord,
+puis les validations ou observations à examiner, les opérations actives et
+les autres traces. Un identifiant départage les égalités.
+L'instant de priorité est fixé lors de la lecture : le vieillissement d'une
+observation ne déplace pas la sélection entre deux relevés. Une nouvelle
+lecture recalcule l'ordre en conservant l'identifiant sélectionné.
 Une lecture lente n'empêche pas de naviguer ou de quitter. Après 10 secondes sans
 réponse, le lecteur détenu par le tableau est arrêté et les dernières données
 restent affichées. `r` relance ce lecteur ; il ne relance aucune opération ROMEO.
@@ -72,10 +100,19 @@ restent affichées. `r` relance ce lecteur ; il ne relance aucune opération ROM
 - **Aperçu** : calculs interrompus, résultats à valider et observations anciennes
   en premier, puis activité récente, profil et configuration. Les compteurs
   concernent les traces chargées, pas l'ensemble du cluster.
+  Les copies terminées sans validation et les observations de transferts actifs
+  anciennes ou absentes remontent aussi ici. Une trace compte une fois même si
+  plusieurs points demandent un examen. Le seuil d'observation ancienne est
+  de cinq minutes ; il ne prouve pas qu'une opération distante s'est arrêtée.
 - **Jobs** : soumissions du registre, dernière observation Slurm enregistrée,
   son âge, durées et code de sortie connus. La disponibilité d'un service ne
   remplace pas l'observation Slurm du job. Un job `COMPLETED` garde un résultat
   « non validé » tant qu'une validation distincte n'a pas été enregistrée. Les
+  colonnes **Calcul** et **Résultat** séparent cette fin et la validation :
+  « Terminé » avec « À vérifier » reste un résultat non vérifié. Les libellés et
+  couleurs d'états sont communs à la liste, au détail et à l'aperçu, notamment
+  pour les pertes de nœud et les dépassements de mémoire.
+  Les détails sont regroupés en État, Temps, Checkpoint et Validation. Les
   champs durée écoulée, temps restant et code de sortie sont séparés ; `—`
   signifie qu'aucune valeur n'est connue. Les checkpoints affichés proviennent
   des observations du runtime, associées au job, à l'exécution, aux empreintes
@@ -88,6 +125,9 @@ restent affichées. `r` relance ce lecteur ; il ne relance aucune opération ROM
   sont écartés. La progression vient des mesures enregistrées, jamais du temps
   écoulé : octets utiles traités, pourcentage, débit et estimation de temps quand
   disponibles. Une copie à 100 % peut encore avoir un résultat non vérifié.
+  La barre de copie utilise exclusivement ce pourcentage mesuré ; une progression
+  absente ou incohérente n'affiche aucune barre remplie. Le mode compact garde le
+  pourcentage et le détail complet affiche la barre.
 - **Mises à jour** : version du lecteur, sélection au prochain lancement,
   dernier contrôle GitHub en cache, autorisation et phase enregistrées.
   Un cache absent ou en erreur donne une disponibilité inconnue.
@@ -144,7 +184,7 @@ Le lecteur Python (`terminal_data.py`, `terminal_evidence.py`) définit les sour
 et les preuves compactes. `transfer_progress.py` extrait les mesures numériques
 des journaux rsync par blocs bornés ; aucun texte du journal n'est exporté.
 Le lanceur (`terminal.py`) gère les options et la compilation explicite.
-`terminal/src/model.rs`, `app.rs`, `ui/` et `bridge.rs` séparent contrat,
+`terminal/src/model.rs`, `status.rs`, `query.rs`, `color.rs`, `app.rs`, `ui/` et `bridge.rs` séparent contrat,
 navigation, vues et lecteur en arrière-plan. Un seul processus Python est
 utilisé, avec des canaux bornés ; il est arrêté à la fermeture du tableau.
 
@@ -163,3 +203,5 @@ terminal/target/release/romeo-tui` ouvre deux sessions PTY de démonstration et
 vérifie la navigation, les sorties par `q` et Ctrl-C, la reconnexion après
 arrêt du lecteur, le délai d'une lecture bloquée, la restauration des attributs
 du terminal et l'absence de lecteur Python restant après fermeture.
+Il inspecte également les séquences ANSI réellement produites dans les trois
+modes couleur, avec et sans une variable `NO_COLOR` héritée.

@@ -281,11 +281,20 @@ class TerminalTests(unittest.TestCase):
         for args in (("--limit", "0"), ("--refresh", "999"), ("--width", "10000")):
             self.assertNotEqual(self.cli("tui", "--json", *args).returncode, 0)
 
+    def test_color_choices_are_validated_without_loading_a_native_viewer(self):
+        for mode in ("auto", "always", "never"):
+            result = self.cli("tui", "--demo", "--json", "--color", mode)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(json.loads(result.stdout)["demo"])
+        result = self.cli("tui", "--demo", "--json", "--color", "invalid")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--color", result.stderr)
+
     def test_launch_preserves_argument_boundaries_for_paths_with_spaces(self):
         binary = self.root / "custom viewer.exe"
         binary.write_text("fixture", encoding="utf-8")
         args = SimpleNamespace(refresh=5, limit=40, width=100, height=30, json=False, snapshot=True,
-                               build=False, binary=str(binary), view="jobs", demo=True, db=self.db)
+                               build=False, binary=str(binary), view="jobs", demo=True, db=self.db, color="always")
         with patch.object(terminal.subprocess, "run", return_value=SimpleNamespace(returncode=7)) as launch:
             self.assertEqual(terminal.run(args), 7)
         command = launch.call_args.args[0]
@@ -293,6 +302,7 @@ class TerminalTests(unittest.TestCase):
         self.assertEqual(command[command.index("--db") + 1], str(self.db))
         self.assertEqual(command[command.index("--python") + 1], sys.executable)
         self.assertNotIn("shell", launch.call_args.kwargs)
+        self.assertEqual(command[command.index("--color") + 1], "always")
 
     def test_installed_viewer_next_to_python_works_without_activating_the_venv(self):
         package = self.root / "installed/romeo_mcp/terminal.py"
@@ -303,7 +313,7 @@ class TerminalTests(unittest.TestCase):
         binary = scripts / ("romeo-tui.exe" if os.name == "nt" else "romeo-tui")
         binary.touch()
         args = SimpleNamespace(refresh=5, limit=40, width=100, height=30, json=False, snapshot=True,
-                               build=False, binary="", view="reports", demo=True, db=None)
+                               build=False, binary="", view="reports", demo=True, db=None, color="auto")
         with patch.object(terminal, "__file__", str(package)), \
                 patch.object(terminal.sys, "executable", str(executable)), \
                 patch.object(terminal.shutil, "which", return_value=None) as path_lookup, \

@@ -1,8 +1,12 @@
 //! Adaptive record tables, independent filters and optional inline details.
-use super::{block, details, fit, paragraph, state_style, ACCENT, MUTED, SELECTED};
+use super::{
+    block, details, fit, paragraph, progress, scrollbar, state_style, tone_style, ACCENT, MUTED,
+    SELECTED,
+};
 use crate::{
     app::{App, View},
     model::{age, clean, report_state, transfer_state},
+    status::{job_state, job_validation},
 };
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -22,12 +26,20 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             if app.editing { "_" } else { "" }
         )
     };
+    let compact = area.width < 85 || area.height < 20;
+    let show_sort_line = !compact;
     let top = Layout::vertical([
-        Constraint::Length(if app.view == View::Reports { 2 } else { 1 }),
+        Constraint::Length(1 + u16::from(app.view == View::Reports) + u16::from(show_sort_line)),
         Constraint::Min(1),
     ])
     .split(area);
     let mut filters = vec![Line::from(fit(&filtered, area.width as usize))];
+    if show_sort_line {
+        filters.push(
+            Line::from(format!("Tri : {} · s changer", app.sort_order().label()))
+                .style(Style::default().fg(MUTED)),
+        );
+    }
     if app.view == View::Reports {
         filters.push(Line::from(format!(
             "Envoi automatique : {}",
@@ -42,8 +54,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         Paragraph::new(filters).style(Style::default().fg(ACCENT)),
         top[0],
     );
-    let compact = area.width < 85 || area.height < 20;
-    let (table_area, detail_area) = if compact {
+    let (mut table_area, mut detail_area) = if compact {
         (top[1], None)
     } else if area.width >= 128 {
         let panels = Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)])
@@ -62,6 +73,21 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             Layout::vertical([Constraint::Length(height), Constraint::Min(1)]).split(top[1]);
         (panels[0], Some(panels[1]))
     };
+    if !compact {
+        let count = match app.view {
+            View::Jobs => app.jobs().len(),
+            View::Transfers => app.transfers().len(),
+            _ => app.reports().len(),
+        };
+        table_area.height = table_area.height.min((count as u16 + 3).max(5));
+        if let Some(ref mut detail) = detail_area {
+            let needed = Paragraph::new(details::lines(app))
+                .wrap(Wrap { trim: false })
+                .line_count(detail.width.saturating_sub(2))
+                .saturating_add(2);
+            detail.height = detail.height.min(needed.min(u16::MAX as usize) as u16);
+        }
+    }
     let narrow = table_area.width < 70;
     let (rows, header, widths, title, count, total) = match app.view {
         View::Jobs => {
@@ -75,37 +101,44 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                             Cell::from(clean(&job.id)),
                             Cell::from(fit(
                                 &job.name,
-                                table_area.width.saturating_sub(25) as usize,
+                                table_area.width.saturating_sub(35) as usize,
                             )),
-                            Cell::from(clean(&job.state)).style(state_style(&job.state)),
+                            Cell::from(fit(job_state(&job.state), 11))
+                                .style(state_style(&job.state)),
+                            Cell::from(job_validation(job).label())
+                                .style(tone_style(job_validation(job).tone())),
                         ])
                     } else {
                         Row::new(vec![
                             Cell::from(clean(&job.id)),
                             Cell::from(clean(&job.name)),
-                            Cell::from(clean(&job.state)).style(state_style(&job.state)),
+                            Cell::from(job_state(&job.state)).style(state_style(&job.state)),
+                            Cell::from(job_validation(job).label())
+                                .style(tone_style(job_validation(job).tone())),
                             Cell::from(age(job.observed_at)),
                         ])
                     }
                 })
                 .collect::<Vec<_>>();
             let header = if narrow {
-                vec!["Job", "Nom", "État"]
+                vec!["Job", "Nom", "Calcul", "Résultat"]
             } else {
-                vec!["Job", "Nom", "État Slurm", "Trace"]
+                vec!["Job", "Nom", "Calcul", "Résultat", "Observé"]
             };
             let widths = if narrow {
                 vec![
-                    Constraint::Length(8),
+                    Constraint::Length(7),
                     Constraint::Min(8),
-                    Constraint::Length(12),
+                    Constraint::Length(11),
+                    Constraint::Length(10),
                 ]
             } else {
                 vec![
-                    Constraint::Length(9),
-                    Constraint::Min(12),
-                    Constraint::Length(18),
-                    Constraint::Length(10),
+                    Constraint::Length(8),
+                    Constraint::Min(10),
+                    Constraint::Length(16),
+                    Constraint::Length(11),
+                    Constraint::Length(7),
                 ]
             };
             (rows, header, widths, "Jobs", count, app.data.jobs.len())
@@ -144,7 +177,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                             Cell::from(clean(name)),
                             Cell::from(transfer_state(&transfer.state))
                                 .style(state_style(&transfer.state)),
-                            Cell::from(percent),
+                            Cell::from(progress::bar(transfer.progress.as_ref(), 16)),
                             Cell::from(age(transfer.observed_at)),
                         ])
                     }
@@ -153,7 +186,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             let header = if narrow {
                 vec!["Fichier", "État", "Copie"]
             } else {
-                vec!["Sens", "Fichier", "État", "Copie", "Trace"]
+                vec!["Sens", "Fichier", "État", "Copie", "Observé"]
             };
             let widths = if narrow {
                 vec![
@@ -165,9 +198,9 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 vec![
                     Constraint::Length(8),
                     Constraint::Min(12),
-                    Constraint::Length(20),
-                    Constraint::Length(6),
-                    Constraint::Length(8),
+                    Constraint::Length(15),
+                    Constraint::Length(16),
+                    Constraint::Length(7),
                 ]
             };
             (
@@ -222,7 +255,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         selected.unwrap_or(0).min(count - 1) + 1
     };
-    let title = format!(" {title} {count}/{total} · ligne {position}/{count} ");
+    let title = if compact {
+        format!(" {title} {count}/{total} · {} ", app.sort_order().label())
+    } else {
+        format!(" {title} {count}/{total} · ligne {position}/{count} ")
+    };
     let table = Table::new(rows, widths)
         .header(Row::new(header).style(Style::default().fg(MUTED)))
         .block(block(title))
@@ -235,6 +272,12 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         }
         _ => frame.render_stateful_widget(table, table_area, &mut app.reports_table),
     };
+    let offset = match app.view {
+        View::Jobs => app.jobs_table.offset(),
+        View::Transfers => app.transfers_table.offset(),
+        _ => app.reports_table.offset(),
+    };
+    scrollbar(frame, table_area, count, offset, app.page_rows);
     if let Some(area) = detail_area {
         paragraph(
             frame,

@@ -1,7 +1,10 @@
 //! Optional terminal client. The Python MCP entry point stays a separate process.
 mod app;
 mod bridge;
+mod color;
 mod model;
+mod query;
+mod status;
 mod ui;
 
 use app::{Action, App, View};
@@ -27,6 +30,8 @@ pub struct Options {
     package_root: PathBuf,
     #[arg(long)]
     demo: bool,
+    #[arg(long, value_enum, default_value_t = color::ColorMode::Auto)]
+    color: color::ColorMode,
     #[arg(long)]
     db: Option<PathBuf>,
     #[arg(long, default_value_t = 5, value_parser = clap::value_parser!(u64).range(1..=300))]
@@ -60,6 +65,10 @@ fn run() -> io::Result<()> {
     let mut app = App::new(view);
     app.data.demo = options.demo;
     app.refresh_seconds = options.refresh;
+    app.palette = options
+        .color
+        .palette(std::env::var("NO_COLOR").ok().as_deref());
+    crossterm::style::force_color_output(app.palette == color::Palette::Color);
     let mut reader = None;
     let mut last_refresh = Instant::now();
     request_refresh(&mut reader, &options, &mut app, &mut last_refresh);

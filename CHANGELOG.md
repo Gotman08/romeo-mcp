@@ -48,6 +48,13 @@
 
 ## Non publié
 
+- Interface terminal interne 0.3 : recherche française tolérant les accents,
+  états et validations harmonisés, transferts à examiner dans l'aperçu, détails
+  structurés et panneaux adaptés au contenu. Tris indépendants par date, état
+  ou priorité avec sélection conservée, barres de défilement et copie mesurée.
+  Modes `--color auto/always/never`, indication du mode monochrome et vérification
+  des couleurs réellement produites dans un terminal interactif.
+
 - Interface terminal interne 0.2 : filtres indépendants et visibles, effacement
   en un Échap, pagination, palette sombre et détails complets défilants. Les
   listes restent utilisables dès 48 × 16 et l'aperçu priorise les calculs à examiner.

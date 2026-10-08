@@ -44,8 +44,11 @@ La suite Python `terminal` vérifie le lecteur sans nécessiter Cargo ou le clus
 Elle vérifie aussi l'association et l'âge des checkpoints, les mesures rsync
 bornées, la lecture seule des rapports et l'absence de publication réseau.
 Les tests Rust couvrent les filtres propres à chaque vue, les pages, les détails
-défilants et le format compact. Le test PTY Linux simule un lecteur interrompu
-puis bloqué pour vérifier sa récupération et son arrêt après le délai.
+défilants et le format compact, ainsi que la recherche accentuée, les tris et la
+sélection, les erreurs Slurm et la séparation calcul/validation. Le test PTY
+Linux simule un lecteur interrompu puis bloqué pour vérifier sa récupération
+et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
+`auto`, `always` et `never`, y compris avec un `NO_COLOR` hérité.
 
 | Nom pour `--only` | Fichier | Ce qui est vérifié |
 |---|---|---|

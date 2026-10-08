@@ -1,4 +1,5 @@
 //! Versioned snapshot contract. No SSH, filesystem or MCP calls belong here.
+pub use crate::status::{report_state, transfer_state};
 use serde::Deserialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -204,32 +205,6 @@ pub fn bytes(value: f64) -> String {
         format!("{amount:.0} {}", units[index])
     } else {
         format!("{amount:.1} {}", units[index])
-    }
-}
-
-pub fn report_state(state: &str) -> &'static str {
-    match state {
-        "local_only" => "Local",
-        "publishing" => "Envoi à vérifier",
-        "published" => "Publié",
-        "duplicate" => "Déjà publié",
-        "failed" => "Échec",
-        "publication_unknown" => "Envoi incertain",
-        "rate_limited" => "En attente",
-        _ => "Inconnu",
-    }
-}
-
-pub fn transfer_state(state: &str) -> &'static str {
-    match state {
-        "prepared" => "Préparé",
-        "preparing" => "Préparation",
-        "running" => "En cours",
-        "completed" => "Terminé",
-        "completed_unverified" => "À vérifier",
-        "cancelled" => "Annulé",
-        "failed" | "launchFailed" => "Échec",
-        _ => "Inconnu",
     }
 }
 

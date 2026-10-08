@@ -152,6 +152,58 @@ def session(binary: Path, exit_key: bytes) -> dict:
         os.close(slave)
 
 
+def color_session(binary: Path, mode: str, no_color: bool, expected_color: bool) -> dict:
+    """Inspect actual native ANSI output, including an inherited NO_COLOR."""
+    import fcntl
+    import pty
+    import struct
+    import termios
+
+    master, slave = pty.openpty()
+    process = None
+    try:
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
+        before = termios.tcgetattr(slave)
+        environment = {**os.environ, "TERM": "xterm-256color"}
+        environment.pop("NO_COLOR", None)
+        if no_color:
+            environment["NO_COLOR"] = "1"
+        process = subprocess.Popen([str(binary), "--python", sys.executable, "--package-root", str(ROOT),
+                                    "--demo", "--color", mode], stdin=slave, stdout=slave, stderr=slave,
+                                   env=environment, start_new_session=True)
+        output = bytearray()
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                raise AssertionError("Le terminal couleur s'est arrete avant le rendu")
+            if select.select([master], [], [], 0.1)[0]:
+                output.extend(os.read(master, 65536))
+            if b"Simulation" in output and b"ROMEO" in output:
+                break
+        else:
+            raise AssertionError("Le rendu couleur n'a pas ete observe")
+        colored = bool(re.search(rb"\x1b\[[0-9;]*(?:38|48);2;\d+;\d+;\d+", output))
+        if colored != expected_color:
+            raise AssertionError(f"Mode couleur incorrect : {mode}, NO_COLOR={no_color}")
+        if not expected_color and (b"NO_COLOR" if no_color and mode == "auto" else b"--color never") not in output:
+            raise AssertionError("La raison du mode monochrome n'est pas affichee")
+        children = Path(f"/proc/{process.pid}/task/{process.pid}/children")
+        readers = [int(value) for value in children.read_text().split()]
+        os.write(master, b"q")
+        if process.wait(timeout=10) != 0 or termios.tcgetattr(slave) != before:
+            raise AssertionError("Le mode couleur n'a pas restaure le terminal")
+        if any(Path(f"/proc/{pid}").exists() for pid in readers):
+            raise AssertionError("Un lecteur couleur reste actif")
+        return {"mode": mode, "no_color": no_color, "ansi_colors": colored,
+                "terminal_restored": True, "reader_stopped": True}
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+        os.close(master)
+        os.close(slave)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--binary", type=Path, required=True)
@@ -161,7 +213,10 @@ def main() -> None:
     binary = args.binary.expanduser().resolve()
     if not binary.is_file():
         parser.error("Binaire compilé introuvable")
-    print(json.dumps({"sessions": [session(binary, b"q"), session(binary, b"\x03")]}))
+    print(json.dumps({"sessions": [session(binary, b"q"), session(binary, b"\x03")],
+                      "colors": [color_session(binary, *case) for case in (
+                          ("auto", False, True), ("auto", True, False),
+                          ("always", True, True), ("never", False, False))]}))
 
 
 if __name__ == "__main__":

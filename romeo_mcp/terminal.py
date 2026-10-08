@@ -11,6 +11,8 @@ import sys
 
 def add_arguments(parser) -> None:
     parser.add_argument("--demo", action="store_true", help="données fictives, sans lire votre configuration")
+    parser.add_argument("--color", choices=("auto", "always", "never"), default="auto",
+                        help="couleurs : auto respecte NO_COLOR, always les active, never les désactive")
     parser.add_argument("--build", action="store_true", help="compiler explicitement le binaire optionnel avec Cargo")
     output = parser.add_mutually_exclusive_group()
     output.add_argument("--json", action="store_true", help="exporter un relevé local sans ouvrir de terminal")
@@ -68,7 +70,8 @@ def run(args) -> int:
     if not binary or not Path(binary).is_file():
         raise ValueError("Interface optionnelle non compilée. Depuis le dépôt : python -m romeo_mcp tui --build --demo")
     command = [binary, "--python", sys.executable, "--package-root", str(root),
-               "--refresh", str(args.refresh), "--limit", str(args.limit), "--view", args.view]
+               "--refresh", str(args.refresh), "--limit", str(args.limit), "--view", args.view,
+               "--color", args.color]
     if args.demo:
         command.append("--demo")
     if args.db:

@@ -1,10 +1,29 @@
-//! Readable fields and compact historical evidence for the selected record.
-use super::line;
+//! Selected records grouped by state, time, recovery and validation evidence.
+use super::{line, progress, state_style, tone_style, ACCENT};
 use crate::{
     app::{App, View},
     model::{age, bytes, present, report_state, transfer_state},
+    status::{job_state, job_validation, Tone},
 };
-use ratatui::text::Line;
+use ratatui::{
+    style::{Modifier, Style},
+    text::{Line, Span},
+};
+
+fn section(title: &'static str) -> Line<'static> {
+    Line::styled(
+        title,
+        Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
+    )
+}
+
+fn marked(label: &str, value: impl AsRef<str>, style: Style) -> Line<'static> {
+    let mut output = line(label, value);
+    if let Some(span) = output.spans.last_mut() {
+        span.style = style;
+    }
+    output
+}
 
 pub fn lines(app: &App) -> Vec<Line<'static>> {
     match app.view {
@@ -25,55 +44,50 @@ fn job(app: &App) -> Vec<Line<'static>> {
             "Aucun job ne correspond au filtre. Échap : effacer."
         })];
     };
-    let validation = if job.result_validated {
-        "Validation enregistrée"
-    } else if matches!(
-        job.state.as_str(),
-        "RUNNING"
-            | "PENDING"
-            | "SUBMITTED"
-            | "CONFIGURING"
-            | "COMPLETING"
-            | "SUSPENDED"
-            | "RESIZING"
-    ) {
-        "À vérifier après la fin du calcul"
-    } else {
-        "Aucune validation de résultat enregistrée"
-    };
     let mut lines = vec![
+        section("État"),
         line("Job", &job.id),
         line("Nom", &job.name),
-        line("État Slurm", &job.state),
+        marked(
+            "Calcul",
+            format!("{} ({})", job_state(&job.state), present(&job.state)),
+            state_style(&job.state),
+        ),
         line("Partition", &job.partition),
-        line("Soumis il y a", age(job.submitted_at)),
-        line("Observé il y a", age(job.observed_at)),
+        Line::from(""),
+        section("Temps"),
         line("Durée écoulée", present(&job.elapsed)),
         line("Temps restant", present(&job.remaining)),
-        line("Code de sortie", present(&job.exit_code)),
-        line("Résultat", validation),
+        line("Observé il y a", age(job.observed_at)),
+        line("Soumis il y a", age(job.submitted_at)),
+        Line::from(""),
+        section("Checkpoint"),
     ];
     if let Some(checkpoint) = &job.checkpoint {
         lines.extend([
-            Line::from(""),
             line(
-                "Checkpoint",
+                "Sauvegarde",
                 format!(
                     "Génération {} · étape {}",
                     checkpoint.generation, checkpoint.step
                 ),
             ),
             line("Rangs associés", checkpoint.world_size.to_string()),
-            line(
+            marked(
                 "Intégrité",
                 if checkpoint.integrity_verified {
                     "Vérifiée dans l'observation"
                 } else {
                     "Non vérifiée"
                 },
+                tone_style(if checkpoint.integrity_verified {
+                    Tone::Success
+                } else {
+                    Tone::Warning
+                }),
             ),
             line(
-                "Reprise de l'exécution",
+                "Reprise",
                 if checkpoint.resume_validated {
                     "Chargement et progression observés"
                 } else {
@@ -91,8 +105,18 @@ fn job(app: &App) -> Vec<Line<'static>> {
             line("Preuve datant de", age(checkpoint.observed_at)),
         ]);
     } else {
-        lines.push(line("Checkpoint", "Aucune observation enregistrée"));
+        lines.push(Line::from("Aucune observation enregistrée"));
     }
+    lines.extend([
+        Line::from(""),
+        section("Validation"),
+        marked(
+            "Résultat",
+            job_validation(job).label(),
+            tone_style(job_validation(job).tone()),
+        ),
+        line("Code de sortie", present(&job.exit_code)),
+    ]);
     lines
 }
 
@@ -106,66 +130,81 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
         })];
     };
     let mut lines = vec![
+        section("État"),
         line("Transfert", &transfer.id),
-        line("Local", &transfer.local_path),
-        line("Distant", &transfer.remote_path),
-        line(
-            "État",
+        marked(
+            "Copie",
             format!(
                 "{} ({})",
                 transfer_state(&transfer.state),
                 present(&transfer.state)
             ),
+            state_style(&transfer.state),
         ),
         line("Phase", present(&transfer.phase)),
-        line("Observé il y a", age(transfer.observed_at)),
+        Line::from(""),
+        section("Progression"),
     ];
-    if let Some(progress) = &transfer.progress {
-        if let Some(percent) = progress.percent() {
-            lines.push(line(
-                "Progression",
-                if let Some(total) = progress.bytes_total {
-                    format!(
-                        "{percent} % · {} / {}",
-                        bytes(progress.bytes_transferred as f64),
-                        bytes(total as f64)
-                    )
-                } else {
-                    format!(
-                        "{percent} % · {} traités (rsync)",
-                        bytes(progress.bytes_transferred as f64)
-                    )
-                },
-            ));
-            lines.push(line(
+    if let Some(progress) = transfer
+        .progress
+        .as_ref()
+        .filter(|progress| progress.percent().is_some())
+    {
+        lines.push(progress::bar(Some(progress), 32));
+        lines.push(line(
+            "Octets traités",
+            if let Some(total) = progress.bytes_total {
+                format!(
+                    "{} / {}",
+                    bytes(progress.bytes_transferred as f64),
+                    bytes(total as f64)
+                )
+            } else {
+                format!("{} (rsync)", bytes(progress.bytes_transferred as f64))
+            },
+        ));
+        lines.extend([
+            Line::from(""),
+            section("Temps"),
+            line(
                 "Débit utile",
                 progress
                     .bytes_per_second
                     .map(|speed| format!("{}/s", bytes(speed)))
                     .unwrap_or_else(|| "—".into()),
-            ));
-            lines.push(line(
+            ),
+            line(
                 "Temps estimé",
                 progress
                     .eta_seconds
                     .map(|seconds| format!("{seconds:.0} s"))
                     .unwrap_or_else(|| "—".into()),
-            ));
-            lines.push(line("Mesure datant de", age(progress.observed_at)));
-        } else {
-            lines.push(line("Progression", "Non mesurée"));
-        }
+            ),
+            line("Mesure datant de", age(progress.observed_at)),
+        ]);
     } else {
-        lines.push(line("Progression", "Non mesurée par ce transport"));
+        lines.extend([
+            Line::from("Non mesurée par ce transport"),
+            Line::from(""),
+            section("Temps"),
+        ]);
     }
     lines.extend([
-        line(
+        line("Observé il y a", age(transfer.observed_at)),
+        Line::from(""),
+        section("Validation"),
+        marked(
             "Intégrité",
             if transfer.result_validated {
                 "Copie vérifiée dans le résultat enregistré"
             } else {
                 "Validation de copie absente"
             },
+            tone_style(if transfer.result_validated {
+                Tone::Success
+            } else {
+                Tone::Warning
+            }),
         ),
         line(
             "Annulation",
@@ -175,6 +214,10 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
                 "—"
             },
         ),
+        Line::from(""),
+        section("Chemins"),
+        line("Local", &transfer.local_path),
+        line("Distant", &transfer.remote_path),
     ]);
     lines
 }
@@ -189,34 +232,50 @@ fn report(app: &App) -> Vec<Line<'static>> {
         })];
     };
     let mut lines = vec![
+        section("État"),
         line("Rapport", &report.id),
         line("Résumé", &report.summary),
         line("Catégorie", &report.category),
-        line("Publication", report_state(&report.state)),
+        marked(
+            "Publication",
+            report_state(&report.state),
+            state_style(&report.state),
+        ),
         line("Occurrences", report.occurrences.to_string()),
+        Line::from(""),
+        section("Temps"),
         line("Dernière preuve", age(report.observed_at)),
+        Line::from(""),
+        section("Validation"),
+        marked(
+            "Publication relue",
+            if report.result_validated {
+                "Vérifiée à cette date"
+            } else {
+                "Aucune publication vérifiée"
+            },
+            tone_style(if report.result_validated {
+                Tone::Success
+            } else {
+                Tone::Muted
+            }),
+        ),
+        Line::from(""),
+        section("Issue GitHub"),
         line(
-            "Issue GitHub",
+            "Issue",
             report
                 .issue_number
                 .map(|number| format!("#{number}"))
                 .unwrap_or_else(|| "—".into()),
         ),
         line("Lien", present(&report.issue_url)),
-        line(
-            "Vérification",
-            if report.result_validated {
-                "Publication relue et vérifiée à cette date"
-            } else {
-                "Aucune publication vérifiée"
-            },
-        ),
     ];
     if report.retry_after > crate::model::now() {
-        lines.push(line(
-            "Nouvel envoi après",
-            format!("{:.0} s", report.retry_after - crate::model::now()),
-        ));
+        lines.push(Line::from(vec![Span::raw(format!(
+            "Nouvel envoi après : {:.0} s",
+            report.retry_after - crate::model::now()
+        ))]));
     }
     lines
 }

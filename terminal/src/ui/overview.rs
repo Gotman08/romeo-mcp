@@ -1,8 +1,9 @@
 //! Prioritize interrupted calculations and evidence requiring inspection.
-use super::{block, line, paragraph, scrollable, state_style, ACCENT, MUTED};
+use super::{block, line, paragraph, scrollable, state_style, tone_style, ACCENT, MUTED};
 use crate::{
     app::{App, Overlay},
     model::{age, clean, now, report_state},
+    status::{job_active, job_attention, job_state, tone, transfer_attention, Tone},
 };
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -15,15 +16,20 @@ use ratatui::{
 fn attention(app: &App) -> (Vec<Line<'static>>, usize) {
     let mut lines = Vec::new();
     let mut count = 0;
+    let at = now();
     for job in &app.data.jobs {
-        if matches!(
-            job.state.as_str(),
-            "FAILED" | "TIMEOUT" | "CANCELLED" | "NODE_FAIL" | "OUT_OF_MEMORY"
-        ) {
+        if let Some(reason) = job_attention(job, at) {
             count += 1;
             lines.push(Line::from(vec![
                 Span::raw(format!("{}  {}  ", clean(&job.id), clean(&job.name))),
-                Span::styled(clean(&job.state), state_style(&job.state)),
+                Span::styled(
+                    reason,
+                    tone_style(if tone(&job.state) == Tone::Error {
+                        Tone::Error
+                    } else {
+                        Tone::Warning
+                    }),
+                ),
             ]));
             if let Some(checkpoint) = &job.checkpoint {
                 lines.push(Line::from(format!(
@@ -37,44 +43,31 @@ fn attention(app: &App) -> (Vec<Line<'static>>, usize) {
                     }
                 )));
             }
-        } else if job.state == "COMPLETED" && !job.result_validated {
-            count += 1;
-            lines.push(Line::from(format!(
-                "{}  {} · résultat à valider",
-                clean(&job.id),
-                clean(&job.name)
-            )));
-        } else if matches!(job.state.as_str(), "RUNNING" | "PENDING")
-            && job.observed_at.is_none_or(|time| now() - time > 300.0)
-        {
-            count += 1;
-            lines.push(Line::from(format!(
-                "{} · observation ancienne ou absente",
-                clean(&job.id)
-            )));
         }
     }
     for transfer in &app.data.transfers {
-        if matches!(
-            transfer.state.as_str(),
-            "failed" | "cancelled" | "launchFailed"
-        ) {
+        if let Some(reason) = transfer_attention(transfer, at) {
             count += 1;
-            lines.push(Line::from(format!(
-                "Copie {} · {}",
-                clean(&transfer.name),
-                clean(&transfer.state)
-            )));
+            lines.push(Line::from(vec![
+                Span::raw(format!("Copie {} · ", clean(&transfer.name))),
+                Span::styled(
+                    reason,
+                    tone_style(if tone(&transfer.state) == Tone::Error {
+                        Tone::Error
+                    } else {
+                        Tone::Warning
+                    }),
+                ),
+            ]));
         }
     }
     for report in &app.data.reports.items {
         if matches!(report.state.as_str(), "failed" | "publication_unknown") {
             count += 1;
-            lines.push(Line::from(format!(
-                "Rapport · {} · {}",
-                clean(&report.summary),
-                report_state(&report.state)
-            )));
+            lines.push(Line::from(vec![
+                Span::raw(format!("Rapport · {} · ", clean(&report.summary))),
+                Span::styled(report_state(&report.state), state_style(&report.state)),
+            ]));
         }
     }
     if let Some(error) = &app.error {
@@ -89,7 +82,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         .data
         .jobs
         .iter()
-        .filter(|job| matches!(job.state.as_str(), "RUNNING" | "PENDING"))
+        .filter(|job| job_active(&job.state))
         .count();
     let (alert, count) = attention(app);
     let header_height = if area.width >= 80 { 3 } else { 1 };
@@ -145,10 +138,10 @@ fn content(app: &App, mut rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
         Line::from(""),
         Line::from("Activité récente").style(Style::default().fg(MUTED)),
     ]);
-    for job in app.data.jobs.iter().take(4) {
+    for job in app.recent_jobs().into_iter().take(4) {
         rows.push(Line::from(vec![
             Span::raw(format!("{}  {}  ", clean(&job.id), clean(&job.name))),
-            Span::styled(clean(&job.state), state_style(&job.state)),
+            Span::styled(job_state(&job.state), state_style(&job.state)),
             Span::styled(
                 format!(" · trace {}", age(job.observed_at)),
                 Style::default().fg(MUTED),
@@ -184,4 +177,48 @@ fn content(app: &App, mut rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
         Line::from("2 : Jobs · 3 : Transferts · 5 : Rapports").style(Style::default().fg(MUTED)),
     );
     rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{app::View, model::Transfer};
+
+    #[test]
+    fn transfer_attention_counts_records_once_and_keeps_validated_history_quiet() {
+        let mut app = App::new(View::Overview);
+        app.data.transfers = vec![
+            Transfer {
+                state: "completed".into(),
+                name: "unverified".into(),
+                ..Transfer::default()
+            },
+            Transfer {
+                state: "completed_unverified".into(),
+                name: "unverified2".into(),
+                ..Transfer::default()
+            },
+            Transfer {
+                state: "running".into(),
+                name: "old".into(),
+                observed_at: Some(now() - 600.0),
+                ..Transfer::default()
+            },
+            Transfer {
+                state: "completed".into(),
+                name: "verified".into(),
+                result_validated: true,
+                ..Transfer::default()
+            },
+        ];
+        let (lines, count) = attention(&app);
+        assert_eq!(count, 3);
+        let text = lines
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(text.contains("Copie à vérifier"));
+        assert!(text.contains("Observation ancienne"));
+    }
 }

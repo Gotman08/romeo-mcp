@@ -3,17 +3,22 @@ mod details;
 mod lists;
 mod overlays;
 mod overview;
+mod progress;
 mod updates;
 
 use crate::{
     app::{App, Overlay, View},
+    color::Palette,
     model::{age, clean, present},
+    status::{self, Tone},
 };
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Paragraph, Tabs, Wrap},
+    widgets::{
+        Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Tabs, Wrap,
+    },
     Frame,
 };
 
@@ -39,14 +44,16 @@ fn line(label: &str, value: impl AsRef<str>) -> Line<'static> {
 }
 
 fn state_style(state: &str) -> Style {
-    let color = match state.to_ascii_uppercase().as_str() {
-        "RUNNING" | "PREPARING" => ACCENT,
-        "COMPLETED" | "READY" | "PUBLISHED" | "DUPLICATE" => Color::Rgb(152, 195, 121),
-        "FAILED" | "TIMEOUT" | "CANCELLED" | "LAUNCHFAILED" | "PUBLICATION_UNKNOWN" => ERROR,
-        "PENDING" | "COMPLETED_UNVERIFIED" | "RATE_LIMITED" | "PUBLISHING" => {
-            Color::Rgb(229, 192, 123)
-        }
-        _ => MUTED,
+    tone_style(status::tone(state))
+}
+
+fn tone_style(tone: Tone) -> Style {
+    let color = match tone {
+        Tone::Active => ACCENT,
+        Tone::Success => Color::Rgb(152, 195, 121),
+        Tone::Warning => Color::Rgb(229, 192, 123),
+        Tone::Error => ERROR,
+        Tone::Muted => MUTED,
     };
     Style::default().fg(color)
 }
@@ -118,7 +125,21 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     } else {
         "HISTORIQUE LOCAL"
     };
-    let status = if area.width < 80 {
+    let status = if app.palette != Palette::Color {
+        format!(
+            "{} · {} · local {} s · {reading}",
+            if app.data.demo { "DÉMO" } else { "LOCAL" },
+            if area.width < 80 {
+                match app.palette {
+                    Palette::NoColorEnvironment => "mono/NO_COLOR",
+                    _ => "mono/--color never",
+                }
+            } else {
+                app.palette.description()
+            },
+            app.refresh_seconds
+        )
+    } else if area.width < 80 {
         format!(
             "{} · local {} s · relu {} · {reading}",
             if app.data.demo { "DÉMO" } else { "LOCAL" },
@@ -140,7 +161,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                     Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("Tableau de bord"),
-                Span::styled("   v0.2 interne", Style::default().fg(MUTED)),
+                Span::styled("   v0.3 interne", Style::default().fg(MUTED)),
             ]),
             Line::from(format!(
                 " {}",
@@ -184,12 +205,12 @@ fn footer(frame: &mut Frame, area: Rect, app: &App) {
     let is_list = matches!(app.view, View::Jobs | View::Transfers | View::Reports);
     let shortcuts = if area.width < 80 {
         if is_list {
-            " ↑↓ / filtre Entrée détail ? aide q quitter"
+            " ↑↓ / filtre s tri Entrée détail ? aide q quit"
         } else {
             " 1–5 vues ↑↓ défiler ? aide q quitter"
         }
     } else if is_list {
-        " Tab vues ↑↓/Pg sélection / filtre Échap effacer Entrée détail ? aide q quitter"
+        " Tab vues ↑↓/Pg sélection / filtre s tri Entrée détail ? aide q quitter"
     } else {
         " 1–5/Tab vues ↑↓ défiler r relire p pause ? aide ! alertes q quitter"
     };
@@ -225,12 +246,45 @@ fn scrollable(
     app: &mut App,
 ) {
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-    app.scroll_max = paragraph
-        .line_count(area.width.saturating_sub(2))
-        .saturating_sub(area.height.saturating_sub(2) as usize)
-        .min(u16::MAX as usize) as u16;
+    let total = paragraph.line_count(area.width.saturating_sub(2));
+    let visible = area.height.saturating_sub(2) as usize;
+    app.scroll_page = visible.max(1) as u16;
+    app.scroll_max = total.saturating_sub(visible).min(u16::MAX as usize) as u16;
     app.scroll = app.scroll.min(app.scroll_max);
-    frame.render_widget(paragraph.block(block(title)).scroll((app.scroll, 0)), area);
+    let mut border = block(title);
+    if app.scroll_max > 0 {
+        border = border.title_bottom(
+            Line::from(format!(
+                " Lignes {}–{} / {} ",
+                app.scroll as usize + 1,
+                (app.scroll as usize + visible).min(total),
+                total
+            ))
+            .style(Style::default().fg(MUTED)),
+        );
+    }
+    frame.render_widget(paragraph.block(border).scroll((app.scroll, 0)), area);
+    scrollbar(frame, area, total, app.scroll as usize, visible);
+}
+
+fn scrollbar(frame: &mut Frame, area: Rect, total: usize, position: usize, visible: usize) {
+    if total <= visible || area.width == 0 || area.height <= 2 {
+        return;
+    }
+    let mut state = ScrollbarState::new(total)
+        .position(position)
+        .viewport_content_length(visible);
+    frame.render_stateful_widget(
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_symbol(Some("│"))
+            .thumb_symbol("┃")
+            .track_style(Style::default().fg(Color::Rgb(70, 81, 96)))
+            .thumb_style(Style::default().fg(MUTED)),
+        Rect::new(area.x, area.y + 1, area.width, area.height - 2),
+        &mut state,
+    );
 }
 
 #[cfg(test)]
@@ -270,13 +324,14 @@ mod tests {
         });
         let text = render(48, 16, &mut app);
         assert!(text.contains("42001"));
-        assert!(text.contains("RUNNING"));
+        assert!(text.contains("En cours"));
+        assert!(text.contains("Résultat"));
         assert!(text.contains("Entrée"));
         app.key(key(KeyCode::Enter));
         let text = render(48, 16, &mut app);
         assert!(text.contains("Durée écoulée"));
         app.key(key(KeyCode::End));
-        assert!(render(48, 16, &mut app).contains("Checkpoint"));
+        assert!(render(48, 16, &mut app).contains("Validation"));
     }
 
     #[test]
@@ -357,5 +412,53 @@ mod tests {
         assert!(render(48, 16, &mut app).contains("r reconnecter"));
         app.key(key(KeyCode::Char('!')));
         assert!(render(100, 30, &mut app).contains("Une explication"));
+    }
+
+    #[test]
+    fn failure_and_validation_styles_survive_selection() {
+        let mut app = App::new(View::Jobs);
+        app.data.jobs = vec![
+            Job {
+                id: "node".into(),
+                state: "NODE_FAIL".into(),
+                ..Job::default()
+            },
+            Job {
+                id: "done".into(),
+                state: "COMPLETED".into(),
+                ..Job::default()
+            },
+        ];
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let mut text = String::new();
+        let mut errors = 0;
+        let mut warnings = 0;
+        for y in 0..30 {
+            for x in 0..100 {
+                let cell = &buffer[(x, y)];
+                text.push_str(cell.symbol());
+                errors += usize::from(cell.fg == ERROR);
+                warnings += usize::from(cell.fg == Color::Rgb(229, 192, 123));
+            }
+        }
+        assert!(text.contains("Nœud perdu"));
+        assert!(text.contains("À vérifier"));
+        assert!(errors >= "Nœud perdu".chars().count());
+        assert!(warnings >= "À vérifier".chars().count());
+    }
+
+    #[test]
+    fn monochrome_reason_and_scroll_position_are_visible_at_small_sizes() {
+        let mut app = App::new(View::Overview);
+        app.palette = Palette::NoColorEnvironment;
+        assert!(render(48, 16, &mut app).contains("NO_COLOR"));
+        app.key(key(KeyCode::Char('?')));
+        let text = render(48, 16, &mut app);
+        assert!(text.contains("Lignes"));
+        assert!(text.contains('┃'));
+        app.key(key(KeyCode::End));
+        assert!(render(48, 16, &mut app).contains("--color"));
     }
 }
