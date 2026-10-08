@@ -2,22 +2,23 @@
 use super::{line, paragraph, scrollable};
 use crate::{
     app::{App, Overlay},
-    model::{age, present},
+    model::{age, present, timestamp_exact},
 };
 use ratatui::{layout::Rect, text::Line, Frame};
 
-pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
+pub(super) fn lines(app: &App) -> Vec<Line<'static>> {
     let update = &app.data.updates;
     let availability = match update.update_available {
         Some(true) => "Version plus récente dans le contrôle enregistré",
         Some(false) => "Pas de version plus récente dans ce contrôle",
         None => "Disponibilité inconnue ; aucun contrôle concluant",
     };
-    let lines = vec![
+    vec![
         line("Version actuelle", &update.version),
         line("Prochain démarrage", &update.next_version),
         line("Dernière version connue", present(&update.latest_version)),
         line("Contrôle datant de", age(update.checked_at)),
+        line("Contrôle exact", timestamp_exact(update.checked_at)),
         Line::from(availability),
         Line::from(""),
         line(
@@ -33,6 +34,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         line("Préparation", present(&update.state)),
         line("Phase", present(&update.phase)),
         line("Trace opération", age(update.observed_at)),
+        line("Trace exacte", timestamp_exact(update.observed_at)),
         line(
             "Reconnexion",
             if update.restart_required {
@@ -43,7 +45,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         ),
         Line::from(""),
         Line::from("Cache local. Les outils MCP effectuent les contrôles GitHub."),
-    ];
+    ]
+}
+
+pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
+    let lines = lines(app);
     if app.overlay == Overlay::None {
         scrollable(frame, area, " Mises à jour · ↑↓ défiler ", lines, app);
     } else {

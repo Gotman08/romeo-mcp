@@ -104,18 +104,62 @@ pub fn job_active(state: &str) -> bool {
     )
 }
 
-pub fn observation_old(timestamp: Option<f64>, at: f64) -> bool {
-    timestamp.is_none_or(|time| {
-        !time.is_finite() || time <= 0.0 || time > at + 5.0 || at - time > STALE_AFTER
-    })
+pub fn observation_old_after(timestamp: Option<f64>, at: f64, after: f64) -> bool {
+    timestamp
+        .is_none_or(|time| !time.is_finite() || time <= 0.0 || time > at + 5.0 || at - time > after)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Freshness {
+    Recent,
+    Old,
+    Absent,
+    Future,
+}
+
+impl Freshness {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Recent => "Récent",
+            Self::Old => "Ancien",
+            Self::Absent => "Absent",
+            Self::Future => "Date future",
+        }
+    }
+    pub fn tone(self) -> Tone {
+        match self {
+            Self::Old => Tone::Warning,
+            Self::Future => Tone::Error,
+            _ => Tone::Muted,
+        }
+    }
+}
+
+pub fn freshness(timestamp: Option<f64>, at: f64, after: f64) -> Freshness {
+    match timestamp {
+        Some(time) if time.is_finite() && time > 0.0 => {
+            if time > at + 5.0 {
+                Freshness::Future
+            } else if at - time > after {
+                Freshness::Old
+            } else {
+                Freshness::Recent
+            }
+        }
+        _ => Freshness::Absent,
+    }
 }
 
 pub fn job_attention(job: &Job, at: f64) -> Option<&'static str> {
+    job_attention_after(job, at, STALE_AFTER)
+}
+
+pub fn job_attention_after(job: &Job, at: f64, after: f64) -> Option<&'static str> {
     if tone(&job.state) == Tone::Error {
         Some(job_state(&job.state))
     } else if job.state == "COMPLETED" && !job.result_validated {
         Some("Résultat à vérifier")
-    } else if job_active(&job.state) && observation_old(job.observed_at, at) {
+    } else if job_active(&job.state) && observation_old_after(job.observed_at, at, after) {
         Some("Observation ancienne ou absente")
     } else {
         None
@@ -123,6 +167,10 @@ pub fn job_attention(job: &Job, at: f64) -> Option<&'static str> {
 }
 
 pub fn transfer_attention(transfer: &Transfer, at: f64) -> Option<&'static str> {
+    transfer_attention_after(transfer, at, STALE_AFTER)
+}
+
+pub fn transfer_attention_after(transfer: &Transfer, at: f64, after: f64) -> Option<&'static str> {
     if tone(&transfer.state) == Tone::Error {
         Some(transfer_state(&transfer.state))
     } else if matches!(
@@ -132,7 +180,7 @@ pub fn transfer_attention(transfer: &Transfer, at: f64) -> Option<&'static str> 
     {
         Some("Copie à vérifier")
     } else if matches!(transfer.state.as_str(), "running" | "preparing")
-        && observation_old(transfer.observed_at, at)
+        && observation_old_after(transfer.observed_at, at, after)
     {
         Some("Observation ancienne ou absente")
     } else {
@@ -185,6 +233,24 @@ pub fn job_validation(job: &Job) -> Validation {
     } else if job.state == "COMPLETED" {
         Validation::Check
     } else if job_active(&job.state) {
+        Validation::Pending
+    } else {
+        Validation::Absent
+    }
+}
+
+pub fn transfer_validation(transfer: &Transfer) -> Validation {
+    if transfer.result_validated {
+        Validation::Verified
+    } else if matches!(
+        transfer.state.as_str(),
+        "completed" | "completed_unverified"
+    ) {
+        Validation::Check
+    } else if matches!(
+        transfer.state.as_str(),
+        "running" | "preparing" | "prepared"
+    ) {
         Validation::Pending
     } else {
         Validation::Absent

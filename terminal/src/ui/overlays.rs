@@ -37,8 +37,16 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 Line::from("/ : rechercher ; la saisie remplace le filtre précédent"),
                 Line::from("Entrée : conserver ; Échap : effacer en une fois"),
                 Line::from("Les filtres Jobs, Transferts et Rapports sont indépendants."),
+                Line::from("Recherche globale dans le registre local, pages bornées."),
+                Line::from("n / b : page de données suivante / précédente"),
+                Line::from("Aperçu : ↑↓ sélectionner une alerte ; Entrée ouvre sa trace"),
+                Line::from("F6 : liste / détail actif (résumé dans l'Aperçu)"),
+                Line::from("v : liste seule / liste et détail ; [ ] : largeur du détail"),
+                Line::from("c : copier l'identifiant ; C : copier le chemin d'un transfert"),
+                Line::from("e : exporter un résumé local ; ! montre le chemin complet"),
+                Line::from("Préférences : dernière vue, tri et disposition mémorisés."),
                 Line::from("Recherche : libellés français et techniques, accents ignorés."),
-                Line::from("s : tri par date, état ou priorité ; sélection conservée"),
+                Line::from("s : tri actifs, date, état ou priorité ; sélection conservée"),
                 Line::from("r : relire les fichiers ; reconnecter le lecteur en erreur"),
                 Line::from("p : pause / reprise de la relecture locale"),
                 Line::from("! : consulter toutes les alertes de lecture"),
@@ -46,11 +54,11 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 Line::from(""),
                 Line::from("Les états sont des observations datées, pas des sondes du cluster."),
                 Line::from("Le tableau ne lance pas de job, de transfert ou de publication."),
-                Line::from("Les nombres concernent les traces récentes chargées."),
+                Line::from("Compteurs : toutes les traces lisibles connues, même hors page."),
                 Line::from("Une copie à 100 % ne garantit pas son intégrité."),
                 Line::from(app.palette.description()),
                 Line::from("tui --color auto/always/never : choisir le mode couleur"),
-                Line::from("Aperçu et Mises à jour : ↑↓ ou Fin pour lire toute la vue."),
+                Line::from("Aperçu : F6 active le résumé ; Mises à jour : ↑↓/Fin défilent."),
             ],
         ),
         Overlay::Details => (
@@ -59,6 +67,9 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         ),
         _ => {
             let mut lines = Vec::new();
+            if let Some(notice) = &app.notice {
+                lines.push(Line::from(clean(notice)));
+            }
             if let Some(error) = &app.error {
                 lines.push(Line::from(clean(error)));
                 lines.push(Line::from("r : retenter la lecture locale"));

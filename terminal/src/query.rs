@@ -1,4 +1,5 @@
 //! Accent-tolerant display search and deterministic ordering of bounded records.
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
@@ -14,8 +15,10 @@ pub fn matches(query: &str, fields: &[&str]) -> bool {
     query.is_empty() || normalize(&fields.join(" ")).contains(query)
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SortOrder {
+    Activity,
     #[default]
     Date,
     State,
@@ -25,14 +28,16 @@ pub enum SortOrder {
 impl SortOrder {
     pub fn next(self) -> Self {
         match self {
+            Self::Activity => Self::Date,
             Self::Date => Self::State,
             Self::State => Self::Priority,
-            Self::Priority => Self::Date,
+            Self::Priority => Self::Activity,
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::Activity => "Actifs d'abord",
             Self::Date => "Date ↓",
             Self::State => "État A–Z",
             Self::Priority => "Priorité",
@@ -41,6 +46,7 @@ impl SortOrder {
 }
 
 pub struct Key {
+    pub active: bool,
     pub priority: u8,
     pub date: Option<f64>,
     pub state: String,
@@ -50,6 +56,7 @@ pub struct Key {
 impl Key {
     pub fn new(priority: u8, date: Option<f64>, state: &str, id: &str) -> Self {
         Self {
+            active: false,
             priority,
             date: date.filter(|time| time.is_finite() && *time > 0.0),
             state: normalize(state),
@@ -65,6 +72,11 @@ impl Key {
                 .total_cmp(&self.date.unwrap_or(0.0))
         };
         match order {
+            SortOrder::Activity => other
+                .active
+                .cmp(&self.active)
+                .then_with(|| (self.priority != 0).cmp(&(other.priority != 0)))
+                .then_with(recent),
             SortOrder::Date => recent(),
             SortOrder::State => self.state.cmp(&other.state).then_with(recent),
             SortOrder::Priority => self.priority.cmp(&other.priority).then_with(recent),

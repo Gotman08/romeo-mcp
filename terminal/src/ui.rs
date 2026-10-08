@@ -29,6 +29,21 @@ const ACCENT: Color = Color::Rgb(86, 182, 194);
 const ERROR: Color = Color::Rgb(239, 135, 146);
 const SELECTED: Color = Color::Rgb(28, 40, 52);
 
+pub fn summary(app: &App) -> String {
+    let mut output = format!(
+        "ROMEO MCP — résumé d'observations enregistrées\nRelevé local : {}\n\n",
+        crate::model::timestamp_exact(Some(app.data.generated_at))
+    );
+    for line in details::lines(app) {
+        for span in line.spans {
+            output.push_str(&crate::model::clean(&span.content));
+        }
+        output.push('\n');
+    }
+    output.push_str("\nCes preuves datées ne constituent pas une interrogation du cluster.\n");
+    output
+}
+
 fn block(title: impl Into<String>) -> Block<'static> {
     Block::bordered()
         .border_type(BorderType::Rounded)
@@ -87,6 +102,7 @@ fn paragraph(frame: &mut Frame, area: Rect, title: &str, lines: Vec<Line<'static
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    app.split_visible = false;
     let area = frame.area();
     frame.render_widget(
         Block::default().style(Style::default().fg(TEXT).bg(BACKGROUND)),
@@ -127,7 +143,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     };
     let status = if app.palette != Palette::Color {
         format!(
-            "{} · {} · local {} s · {reading}",
+            "{} · {} · relu {} · {reading}",
             if app.data.demo { "DÉMO" } else { "LOCAL" },
             if area.width < 80 {
                 match app.palette {
@@ -137,7 +153,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             } else {
                 app.palette.description()
             },
-            app.refresh_seconds
+            age(Some(app.data.generated_at))
         )
     } else if area.width < 80 {
         format!(
@@ -161,7 +177,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                     Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("Tableau de bord"),
-                Span::styled("   v0.3 interne", Style::default().fg(MUTED)),
+                Span::styled("   v0.4 interne", Style::default().fg(MUTED)),
             ]),
             Line::from(format!(
                 " {}",
@@ -171,7 +187,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         parts[0],
     );
     let titles = if area.width < 80 {
-        ["1 Vue", "2 Jobs", "3 Cop.", "4 MAJ", "5 Bugs"]
+        ["1 Vue", "2 Jobs", "3 Cop.", "4 MAJ", "5 Rapp."]
     } else {
         [
             "1 Aperçu",
@@ -205,14 +221,18 @@ fn footer(frame: &mut Frame, area: Rect, app: &App) {
     let is_list = matches!(app.view, View::Jobs | View::Transfers | View::Reports);
     let shortcuts = if area.width < 80 {
         if is_list {
-            " ↑↓ / filtre s tri Entrée détail ? aide q quit"
+            " ↑↓ n/b pages / filtre Entrée détail ? q"
+        } else if app.view == View::Updates {
+            " ↑↓ défiler p pause r relire ? q"
         } else {
-            " 1–5 vues ↑↓ défiler ? aide q quitter"
+            " ↑↓ alerte Entrée ouvrir F6 résumé ? q"
         }
     } else if is_list {
-        " Tab vues ↑↓/Pg sélection / filtre s tri Entrée détail ? aide q quitter"
+        " Tab vues ↑↓ choisir n/b pages / filtre s tri F6 panneau c copier e exporter ? q"
+    } else if app.view == View::Updates {
+        " Tab vues ↑↓/Pg défiler p pause r relire e exporter ? aide q quitter"
     } else {
-        " 1–5/Tab vues ↑↓ défiler r relire p pause ? aide ! alertes q quitter"
+        " ↑↓ alerte Entrée ouvrir n/b pages F6 résumé c copier e exporter ? q"
     };
     let status = if app.editing {
         " Recherche : Entrée valider · Échap effacer".to_owned()
@@ -223,6 +243,15 @@ fn footer(frame: &mut Frame, area: Rect, app: &App) {
             " {} alerte(s) de lecture · ! détail",
             app.data.warnings.len()
         )
+    } else if app.loading {
+        format!(
+            " {} · dernier relevé conservé",
+            app.read_phase
+                .as_deref()
+                .unwrap_or("Lecture locale en cours")
+        )
+    } else if let Some(notice) = &app.notice {
+        format!(" {notice} · ! détail")
     } else if app.data.demo {
         " Données fictives · aucune connexion au cluster".to_owned()
     } else {
@@ -354,6 +383,22 @@ mod tests {
     }
 
     #[test]
+    fn updates_summary_includes_the_saved_proof_and_authorization() {
+        let mut app = App::new(View::Updates);
+        app.data.updates.version = "1.4.0".into();
+        app.data.updates.next_version = "1.4.1".into();
+        app.data.updates.latest_version = "1.4.2".into();
+        app.data.updates.state = "idle".into();
+        app.data.updates.automatic_enabled = true;
+        app.data.updates.checked_at = Some(1000.0);
+        let exported = summary(&app);
+        assert!(exported.contains("Version actuelle : 1.4.0"));
+        assert!(exported.contains("Prochain démarrage : 1.4.1"));
+        assert!(exported.contains("Mises à jour automatiques : activées"));
+        assert!(exported.contains("1970-01-01 00:16:40 UTC"));
+    }
+
+    #[test]
     fn compact_overview_can_scroll_to_configuration_and_restore_help() {
         let mut app = App::new(View::Overview);
         app.data.runtime.profile = "essential".into();
@@ -460,5 +505,40 @@ mod tests {
         assert!(text.contains('┃'));
         app.key(key(KeyCode::End));
         assert!(render(48, 16, &mut app).contains("--color"));
+    }
+
+    #[test]
+    #[ignore = "explicit rendering measurement, not a timing assertion"]
+    fn measure_render_cost() {
+        let mut app = App::new(View::Jobs);
+        app.data.jobs = (0..40)
+            .map(|id| Job {
+                id: id.to_string(),
+                name: format!("Synthetic job {id}"),
+                state: "RUNNING".into(),
+                ..Default::default()
+            })
+            .collect();
+        app.data.schema = 3;
+        app.data.coverage.jobs = crate::model::Page {
+            pages: 25,
+            loaded: 40,
+            matched: 1000,
+            total: 1000,
+            page_size: 40,
+            ..Default::default()
+        };
+        for (width, height) in [(100, 30), (160, 40)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+            let start = std::time::Instant::now();
+            for _ in 0..200 {
+                terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+            }
+            println!(
+                "Ratatui TestBackend {width}x{height}, 40 rows: {:.3} ms/draw (200 draws)",
+                start.elapsed().as_secs_f64() * 5.0
+            );
+        }
     }
 }

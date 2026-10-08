@@ -1,11 +1,12 @@
 //! Adaptive record tables, independent filters and optional inline details.
 use super::{
-    block, details, fit, paragraph, progress, scrollbar, state_style, tone_style, ACCENT, MUTED,
-    SELECTED,
+    block, details, fit, paragraph, progress, scrollable, scrollbar, state_style, tone_style,
+    ACCENT, MUTED, SELECTED,
 };
 use crate::{
     app::{App, View},
     model::{age, clean, report_state, transfer_state},
+    preferences::{LayoutMode, Panel},
     status::{job_state, job_validation},
 };
 use ratatui::{
@@ -21,9 +22,17 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         "Filtre : tous · / rechercher".into()
     } else {
         format!(
-            "Filtre : {}{} · Échap effacer",
+            "Filtre : {}{} · {} · Échap effacer",
             clean(app.query()),
-            if app.editing { "_" } else { "" }
+            if app.editing { "_" } else { "" },
+            if app.data.schema == 3 && app.data.request_id != app.revision {
+                "recherche…".into()
+            } else {
+                format!(
+                    "{} correspondance(s)",
+                    app.page_info(app.collection_index().unwrap_or(0)).matched
+                )
+            }
         )
     };
     let compact = area.width < 85 || area.height < 20;
@@ -54,11 +63,14 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         Paragraph::new(filters).style(Style::default().fg(ACCENT)),
         top[0],
     );
-    let (mut table_area, mut detail_area) = if compact {
+    let (mut table_area, mut detail_area) = if compact || app.layout == LayoutMode::List {
         (top[1], None)
     } else if area.width >= 128 {
-        let panels = Layout::horizontal([Constraint::Percentage(60), Constraint::Percentage(40)])
-            .split(top[1]);
+        let panels = Layout::horizontal([
+            Constraint::Percentage(100 - app.detail_percent),
+            Constraint::Percentage(app.detail_percent),
+        ])
+        .split(top[1]);
         (panels[0], Some(panels[1]))
     } else {
         let length = match app.view {
@@ -73,7 +85,8 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             Layout::vertical([Constraint::Length(height), Constraint::Min(1)]).split(top[1]);
         (panels[0], Some(panels[1]))
     };
-    if !compact {
+    app.split_visible = detail_area.is_some();
+    if !compact && app.layout != LayoutMode::List {
         let count = match app.view {
             View::Jobs => app.jobs().len(),
             View::Transfers => app.transfers().len(),
@@ -85,7 +98,9 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                 .wrap(Wrap { trim: false })
                 .line_count(detail.width.saturating_sub(2))
                 .saturating_add(2);
-            detail.height = detail.height.min(needed.min(u16::MAX as usize) as u16);
+            detail.height = detail
+                .height
+                .min((needed.min(u16::MAX as usize) as u16).max(4));
         }
     }
     let narrow = table_area.width < 70;
@@ -115,7 +130,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                             Cell::from(job_state(&job.state)).style(state_style(&job.state)),
                             Cell::from(job_validation(job).label())
                                 .style(tone_style(job_validation(job).tone())),
-                            Cell::from(age(job.observed_at)),
+                            freshness_cell(job.observed_at, app.job_stale_after),
                         ])
                     }
                 })
@@ -138,7 +153,7 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                     Constraint::Min(10),
                     Constraint::Length(16),
                     Constraint::Length(11),
-                    Constraint::Length(7),
+                    Constraint::Length(12),
                 ]
             };
             (rows, header, widths, "Jobs", count, app.data.jobs.len())
@@ -162,10 +177,13 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                         .unwrap_or_else(|| "—".into());
                     if narrow {
                         Row::new(vec![
-                            Cell::from(fit(name, table_area.width.saturating_sub(22) as usize)),
-                            Cell::from(transfer_state(&transfer.state))
+                            Cell::from(fit(name, table_area.width.saturating_sub(34) as usize)),
+                            Cell::from(fit(transfer_state(&transfer.state), 10))
                                 .style(state_style(&transfer.state)),
                             Cell::from(percent),
+                            Cell::from(crate::status::transfer_validation(transfer).label()).style(
+                                tone_style(crate::status::transfer_validation(transfer).tone()),
+                            ),
                         ])
                     } else {
                         Row::new(vec![
@@ -177,30 +195,42 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
                             Cell::from(clean(name)),
                             Cell::from(transfer_state(&transfer.state))
                                 .style(state_style(&transfer.state)),
-                            Cell::from(progress::bar(transfer.progress.as_ref(), 16)),
-                            Cell::from(age(transfer.observed_at)),
+                            Cell::from(progress::bar(transfer.progress.as_ref(), 13)),
+                            Cell::from(crate::status::transfer_validation(transfer).label()).style(
+                                tone_style(crate::status::transfer_validation(transfer).tone()),
+                            ),
+                            freshness_cell(transfer.observed_at, app.transfer_stale_after),
                         ])
                     }
                 })
                 .collect::<Vec<_>>();
             let header = if narrow {
-                vec!["Fichier", "État", "Copie"]
+                vec!["Fichier", "État", "Copie", "Intégrité"]
             } else {
-                vec!["Sens", "Fichier", "État", "Copie", "Observé"]
+                vec![
+                    "Sens",
+                    "Fichier",
+                    "État",
+                    "Copie",
+                    "Intégrité",
+                    "Observation",
+                ]
             };
             let widths = if narrow {
                 vec![
-                    Constraint::Min(12),
-                    Constraint::Length(12),
+                    Constraint::Min(10),
+                    Constraint::Length(10),
                     Constraint::Length(6),
+                    Constraint::Length(10),
                 ]
             } else {
                 vec![
-                    Constraint::Length(8),
-                    Constraint::Min(12),
-                    Constraint::Length(15),
-                    Constraint::Length(16),
                     Constraint::Length(7),
+                    Constraint::Min(10),
+                    Constraint::Length(11),
+                    Constraint::Length(13),
+                    Constraint::Length(10),
+                    Constraint::Length(12),
                 ]
             };
             (
@@ -255,7 +285,26 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         selected.unwrap_or(0).min(count - 1) + 1
     };
-    let title = if compact {
+    let page = app.page_info(app.collection_index().unwrap_or(0));
+    let title = if app.data.schema == 3 {
+        let sort = match app.sort_order() {
+            crate::query::SortOrder::Activity => "Actifs",
+            crate::query::SortOrder::Date => "Date ↓",
+            crate::query::SortOrder::State => "État",
+            crate::query::SortOrder::Priority => "Priorité",
+        };
+        format!(
+            " {title} {count}/{} · p.{}/{} · {sort}{} ",
+            page.total,
+            page.page + 1,
+            page.pages,
+            if app.split_visible && app.focus == Panel::List {
+                " · actif"
+            } else {
+                ""
+            }
+        )
+    } else if compact {
         format!(" {title} {count}/{total} · {} ", app.sort_order().label())
     } else {
         format!(" {title} {count}/{total} · ligne {position}/{count} ")
@@ -279,12 +328,22 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     scrollbar(frame, table_area, count, offset, app.page_rows);
     if let Some(area) = detail_area {
-        paragraph(
-            frame,
-            area,
-            " Détail · Entrée pour tout lire ",
-            details::lines(app),
-        );
+        if app.focus == Panel::Detail && app.overlay == crate::app::Overlay::None {
+            scrollable(
+                frame,
+                area,
+                " Détail · actif · F6 liste ",
+                details::lines(app),
+                app,
+            );
+        } else {
+            paragraph(
+                frame,
+                area,
+                " Détail · F6 activer · Entrée ",
+                details::lines(app),
+            );
+        }
     } else if count == 0 {
         let inner = Rect::new(
             table_area.x + 1,
@@ -297,4 +356,15 @@ pub(super) fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
             inner,
         );
     }
+}
+
+fn freshness_cell(timestamp: Option<f64>, after: u64) -> Cell<'static> {
+    let freshness = crate::status::freshness(timestamp, crate::model::now(), after as f64);
+    Cell::from(match freshness {
+        crate::status::Freshness::Recent | crate::status::Freshness::Old => {
+            format!("{} {}", freshness.label(), age(timestamp))
+        }
+        _ => freshness.label().into(),
+    })
+    .style(tone_style(freshness.tone()))
 }

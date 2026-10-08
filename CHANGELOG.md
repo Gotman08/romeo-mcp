@@ -48,6 +48,16 @@
 
 ## Non publié
 
+- Interface terminal interne 0.4 : recherche et pagination dans tout l'historique,
+  jobs actifs prioritaires et compteurs globaux explicites. Alertes ouvrant la
+  trace concernée, intégrité des transferts séparée du pourcentage dans la liste.
+  Panneau actif défilant, choix liste/détail et largeur réglable ; dates UTC,
+  badges et seuils de fraîcheur distincts. Ressources HPC demandées/observées
+  séparées, préférences locales, copie et export UTF-8. Index privé en mémoire,
+  cache invalidé par fichiers/WAL, transferts modifiés relus individuellement,
+  progression d'inventaire et requêtes obsolètes écartées. Mesures reproductibles
+  de lecture, rendu, CPU et mémoire ; contrat 3 avec compatibilité du lecteur 2.
+
 - Interface terminal interne 0.3 : recherche française tolérant les accents,
   états et validations harmonisés, transferts à examiner dans l'aperçu, détails
   structurés et panneaux adaptés au contenu. Tris indépendants par date, état

@@ -2,10 +2,13 @@
 mod app;
 mod bridge;
 mod color;
+mod local;
 mod model;
+mod preferences;
 mod query;
 mod status;
 mod ui;
+mod view_cache;
 
 use app::{Action, App, View};
 use bridge::Reader;
@@ -38,8 +41,28 @@ pub struct Options {
     refresh: u64,
     #[arg(long, default_value_t = 40, value_parser = clap::value_parser!(u16).range(1..=100))]
     limit: u16,
-    #[arg(long, default_value = "overview", value_parser = ["overview", "jobs", "transfers", "updates", "reports"])]
-    view: String,
+    #[arg(long, value_parser = ["overview", "jobs", "transfers", "updates", "reports"])]
+    view: Option<String>,
+    #[arg(long, default_value = "", value_parser = query_argument)]
+    query: String,
+    #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..=2147483648))]
+    page: u32,
+    #[arg(long, value_parser = ["activity", "date", "state", "priority"])]
+    sort: Option<String>,
+    #[arg(long, value_enum)]
+    layout: Option<preferences::LayoutMode>,
+    #[arg(long, value_parser = clap::value_parser!(u16).range(25..=65))]
+    detail_width: Option<u16>,
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=86400))]
+    job_stale_after: Option<u64>,
+    #[arg(long, value_parser = clap::value_parser!(u64).range(1..=86400))]
+    transfer_stale_after: Option<u64>,
+    #[arg(long)]
+    preferences: Option<PathBuf>,
+    #[arg(long, conflicts_with = "preferences")]
+    no_preferences: bool,
+    #[arg(long, conflicts_with = "snapshot")]
+    export: Option<PathBuf>,
     #[arg(long)]
     snapshot: bool,
     #[arg(long, default_value_t = 100, value_parser = clap::value_parser!(u16).range(40..=240))]
@@ -48,21 +71,87 @@ pub struct Options {
     height: u16,
 }
 
+fn query_argument(value: &str) -> Result<String, String> {
+    if value.chars().count() <= 80
+        && !value.chars().any(char::is_control)
+        && crate::model::clean(value) == value
+    {
+        Ok(value.trim().into())
+    } else {
+        Err("La recherche doit contenir au plus 80 caractères imprimables.".into())
+    }
+}
+
 fn run() -> io::Result<()> {
     let options = Options::parse();
-    if !options.snapshot && (!io::stdin().is_terminal() || !io::stdout().is_terminal()) {
+    if !options.snapshot
+        && options.export.is_none()
+        && (!io::stdin().is_terminal() || !io::stdout().is_terminal())
+    {
         return Err(io::Error::other(
             "Ouvrir un terminal interactif ou utiliser --snapshot.",
         ));
     }
-    let view = match options.view.as_str() {
-        "jobs" => View::Jobs,
-        "transfers" => View::Transfers,
-        "updates" => View::Updates,
-        "reports" => View::Reports,
-        _ => View::Overview,
+    let preference_path = if options.no_preferences || options.snapshot || options.export.is_some()
+    {
+        None
+    } else {
+        options.preferences.clone().or_else(|| {
+            preferences::directory().map(|root| {
+                root.join(if options.demo {
+                    "demo.json"
+                } else {
+                    "preferences.json"
+                })
+            })
+        })
+    };
+    let mut preferred = preferences::Preferences::default();
+    let mut preference_error = None;
+    if let Some(path) = &preference_path {
+        match preferences::load(path) {
+            Ok(value) => preferred = value,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(_) => {
+                preference_error = Some("Préférences illisibles ; réglages par défaut.".into())
+            }
+        }
+    }
+    let view = match options.view.as_deref() {
+        Some("jobs") => View::Jobs,
+        Some("transfers") => View::Transfers,
+        Some("updates") => View::Updates,
+        Some("reports") => View::Reports,
+        Some(_) => View::Overview,
+        None => preferred.view,
     };
     let mut app = App::new(view);
+    app.configure(&preferred);
+    app.view = view;
+    app.notice = preference_error;
+    if let Some(layout) = options.layout {
+        app.layout = layout;
+    }
+    if let Some(width) = options.detail_width {
+        app.detail_percent = width;
+    }
+    if let Some(after) = options.job_stale_after {
+        app.job_stale_after = after;
+    }
+    if let Some(after) = options.transfer_stale_after {
+        app.transfer_stale_after = after;
+    }
+    if let Some(sort) = &options.sort {
+        app.set_sort(
+            serde_json::from_value(serde_json::Value::String(sort.clone()))
+                .map_err(io::Error::other)?,
+        );
+    }
+    if !options.query.is_empty() {
+        app.set_query(options.query.clone());
+    }
+    app.set_page(options.page.saturating_sub(1) as usize);
+    let mut last_preferences = preferred;
     app.data.demo = options.demo;
     app.refresh_seconds = options.refresh;
     app.palette = options
@@ -72,15 +161,32 @@ fn run() -> io::Result<()> {
     let mut reader = None;
     let mut last_refresh = Instant::now();
     request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
-    if options.snapshot {
-        let data = reader
+    if options.snapshot || options.export.is_some() {
+        let reader = reader
             .as_ref()
-            .ok_or_else(|| io::Error::other("Le lecteur local n'a pas pu demarrer."))?
-            .responses
-            .recv_timeout(Duration::from_secs(10))
-            .map_err(|_| io::Error::other("Le lecteur local ne répond pas."))?
-            .map_err(io::Error::other)?;
+            .ok_or_else(|| io::Error::other("Le lecteur local n'a pas pu demarrer."))?;
+        let mut contact = Instant::now();
+        let data = loop {
+            if reader.progress().is_some() {
+                contact = Instant::now();
+            }
+            match reader.responses.recv_timeout(Duration::from_millis(100)) {
+                Ok(result) => break result.map_err(io::Error::other)?,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(io::Error::other("Lecteur local arrêté."))
+                }
+                Err(_) if contact.elapsed() >= Duration::from_secs(10) => {
+                    return Err(io::Error::other("Le lecteur local ne répond pas."))
+                }
+                Err(_) => {}
+            }
+        };
         app.apply(data);
+        if let Some(path) = &options.export {
+            local::export(path, &ui::summary(&app))?;
+            println!("Résumé exporté : {}", path.display());
+            return Ok(());
+        }
         let mut terminal = Terminal::new(TestBackend::new(options.width, options.height)).unwrap();
         terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
         let buffer = terminal.backend().buffer();
@@ -95,14 +201,24 @@ fn run() -> io::Result<()> {
     ratatui::run(|terminal| {
         let mut last_draw = Instant::now();
         let mut dirty = true;
+        let mut last_contact = Instant::now();
         loop {
+            if let Some(progress) = reader.as_ref().and_then(Reader::progress) {
+                last_contact = Instant::now();
+                if progress.request_id == app.revision {
+                    app.read_phase = Some(progress.label());
+                }
+                dirty = true;
+            }
             let mut reader_failed = false;
             while let Some(result) = reader
                 .as_ref()
                 .and_then(|reader| reader.responses.try_recv().ok())
             {
                 match result {
-                    Ok(data) => app.apply(data),
+                    Ok(data) => {
+                        app.apply(data);
+                    }
                     Err(message) => {
                         app.error = Some(message);
                         app.loading = false;
@@ -114,7 +230,7 @@ fn run() -> io::Result<()> {
             if reader_failed {
                 reader.take();
             }
-            if app.loading && last_refresh.elapsed() >= Duration::from_secs(10) {
+            if app.loading && last_contact.max(last_refresh).elapsed() >= Duration::from_secs(10) {
                 reader.take();
                 app.loading = false;
                 app.error = Some("Le lecteur local ne répond pas (10 s).".into());
@@ -126,6 +242,20 @@ fn run() -> io::Result<()> {
                 && last_refresh.elapsed() >= Duration::from_secs(options.refresh)
             {
                 request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
+            }
+            if app.pending_read && !app.loading && app.error.is_none() {
+                request_refresh(&mut reader, &options, &mut app, &mut last_refresh);
+            }
+            if let Some(path) = &preference_path {
+                let preferred = app.preferences();
+                if preferred != last_preferences {
+                    if preferences::save(path, &preferred).is_err() {
+                        app.notice = Some(
+                            "Préférences non sauvegardées ; vérifier le dossier local.".into(),
+                        );
+                    }
+                    last_preferences = preferred;
+                }
             }
             if dirty || last_draw.elapsed() >= Duration::from_secs(1) {
                 terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -148,6 +278,37 @@ fn run() -> io::Result<()> {
                                 }
                             }
                             Action::None => {}
+                            Action::Copy(path) => {
+                                app.notice = Some(match app.copy_value(path) {
+                                    Some(value) => match local::copy(&value) {
+                                        Ok(()) => if path {
+                                            "Chemin copié."
+                                        } else {
+                                            "Identifiant copié."
+                                        }
+                                        .into(),
+                                        Err(_) => {
+                                            "Presse-papiers indisponible ; e exporte un résumé."
+                                                .into()
+                                        }
+                                    },
+                                    None => "Aucune valeur à copier dans cette vue.".into(),
+                                });
+                            }
+                            Action::Export => {
+                                app.notice = Some(match local::export_path() {
+                                    Some(path) => match local::export(&path, &ui::summary(&app)) {
+                                        Ok(()) => format!("Résumé exporté : {}", path.display()),
+                                        Err(_) => {
+                                            "Export impossible ; vérifier le dossier local.".into()
+                                        }
+                                    },
+                                    None => {
+                                        "Dossier utilisateur absent ; utiliser --export CHEMIN."
+                                            .into()
+                                    }
+                                });
+                            }
                         }
                         dirty = true;
                     }
@@ -177,8 +338,12 @@ fn request_refresh(
             }
         }
     }
-    app.loading = reader.as_ref().is_some_and(Reader::refresh);
+    app.loading = reader
+        .as_ref()
+        .is_some_and(|reader| reader.refresh(&app.read_request()));
     if app.loading {
+        app.pending_read = false;
+        app.force_read = false;
         *started = Instant::now();
     } else {
         app.error = Some("Lecteur local indisponible ; r pour reconnecter.".into());

@@ -53,7 +53,9 @@ jobs:
       - name: Verifier le format Rust
         run: cargo +${{ matrix.rust }} fmt --manifest-path terminal/Cargo.toml -- --check
       - name: Tester le lecteur Python sans MCP ni cluster
-        run: python tests/test_terminal.py
+        run: |
+          python tests/test_terminal.py
+          python tests/test_terminal_catalog.py
       - name: Tester le rendu et la navigation
         run: cargo +${{ matrix.rust }} test --locked --manifest-path terminal/Cargo.toml
       - name: Verifier le code Rust

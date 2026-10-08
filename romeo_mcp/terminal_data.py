@@ -60,8 +60,13 @@ def registry_path() -> Path:
 
 
 def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
+    return list(iter_jobs(path, limit, warnings))
+
+
+def iter_jobs(path: Path, limit: int | None, warnings: list[str]):
+    """Stream bounded records, not raw observations, from one read-only SQL snapshot."""
     if not path.is_file():
-        return []
+        return
     connection = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=0.2)
     try:
         connection.row_factory = sqlite3.Row
@@ -78,11 +83,15 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
                 "LEFT JOIN job_observations c ON c.rowid = "
                 "(SELECT rowid FROM job_observations WHERE job_id=('checkpoint:' || j.job_id) "
                 "ORDER BY observed_at DESC, rowid DESC LIMIT 1)" if has_observations else "")
+        has_script = any(row[1] == "script" for row in connection.execute("PRAGMA table_info(jobs)"))
+        script = "substr(j.script, 1, 65536)" if has_script else "NULL"
         rows = connection.execute(
             f"SELECT j.job_id, j.name, j.partition, j.submitted_at, j.last_state, {observation} "
-            f"FROM jobs j {join} ORDER BY j.submitted_at DESC, j.job_id DESC LIMIT ?",
-            (MAX_OBSERVATION + 1, MAX_OBSERVATION + 1, limit) if has_observations else (limit,)).fetchall()
-        result = []
+            f", {script} AS recorded_script FROM jobs j {join} "
+            "ORDER BY j.submitted_at DESC, j.job_id DESC LIMIT ?",
+            (MAX_OBSERVATION + 1, MAX_OBSERVATION + 1, limit if limit is not None else -1)
+            if has_observations else (limit if limit is not None else -1,))
+        from .terminal_hpc import resources
         for row in rows:
             payload = {}
             if row["payload"]:
@@ -101,7 +110,7 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
                 checkpoint_info = checkpoint(row["checkpoint_payload"], row["job_id"])
             except (ValueError, TypeError, KeyError):
                 warnings.append("Une observation de checkpoint est illisible ou associee a un autre calcul.")
-            result.append({
+            yield {
                 "id": text(row["job_id"]), "name": text(row["name"]),
                 "partition": text(row["partition"]),
                 "state": text(payload.get("state") or row["last_state"] or "UNKNOWN"),
@@ -111,47 +120,74 @@ def read_jobs(path: Path, limit: int, warnings: list[str]) -> list[dict]:
                 "exit_code": text(payload.get("exit_code")),
                 "result_validated": payload.get("result_validated") is True,
                 "checkpoint": checkpoint_info,
-            })
-        return result
+                "resources": resources(row["recorded_script"], payload),
+            }
     finally:
         connection.close()
 
 
-def read_transfers(root: Path, limit: int, warnings: list[str]) -> list[dict]:
+def read_transfers(root: Path, limit: int | None, warnings: list[str], cache=None) -> list[dict]:
     if not root.is_dir():
         return []
     candidates = []
-    with os.scandir(root) as entries:
-        for index, entry in enumerate(entries):
-            if index >= MAX_DIRECTORIES:
-                warnings.append("Inventaire des transferts limité aux 1 000 premières entrées locales.")
-                break
-            if IDENTIFIER.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False):
-                candidates.append((entry.stat(follow_symlinks=False).st_mtime, Path(entry.path)))
+    if cache is not None:
+        candidates = [(0, directory) for directory in cache.directories(root)]
+    else:
+        with os.scandir(root) as entries:
+            for index, entry in enumerate(entries):
+                if limit is not None and index >= MAX_DIRECTORIES:
+                    warnings.append("Inventaire des transferts limité aux 1 000 premières entrées locales.")
+                    break
+                if IDENTIFIER.fullmatch(entry.name) and entry.is_dir(follow_symlinks=False):
+                    candidates.append((entry.stat(follow_symlinks=False).st_mtime, Path(entry.path)))
     result = []
-    for _, directory in sorted(candidates, reverse=True)[:limit]:
+    selected = candidates if limit is None else sorted(candidates, reverse=True)[:limit]
+    for _, directory in selected:
         try:
-            plan = read_json(directory / "plan.json")
-            status = read_json(directory / "status.json")
-            if plan.get("id") != directory.name or (status and status.get("transfer_id") != directory.name):
-                raise ValueError()
-            keys = ("id", "direction", "local_path", "remote_path", "recursive", "verify", "target", "created_at")
-            sealed = hashlib.sha256(json.dumps({key: plan[key] for key in keys}, sort_keys=True).encode()).hexdigest()
-            if plan.get("sha256") != sealed:
-                raise ValueError()
-            result.append({
-                "id": directory.name, "name": text(plan.get("local_path")),
-                "direction": text(plan.get("direction")), "state": text(status.get("state", "prepared")),
-                "phase": text(status.get("phase")),
-                "observed_at": timestamp(status.get("heartbeat_at")),
-                "local_path": text(plan.get("local_path")), "remote_path": text(plan.get("remote_path")),
-                "result_validated": status.get("ok") is True and status.get("result_validated") is True,
-                "cancel_requested": (directory / "cancel.json").is_file(),
-                "progress": progress(status),
-            })
+            result.append(read_transfer(directory, cache))
         except (OSError, ValueError, TypeError, KeyError):
             warnings.append("Un dossier de transfert est incomplet ou illisible.")
     return result
+
+
+def read_transfer(directory: Path, cache=None) -> dict:
+    """Read and validate one saved transfer without exposing its SSH target."""
+    reader = cache.read if cache is not None else read_json
+    plan = reader(directory / "plan.json")
+    status = reader(directory / "status.json")
+    if plan.get("id") != directory.name or (status and status.get("transfer_id") != directory.name):
+        raise ValueError()
+    keys = ("id", "direction", "local_path", "remote_path", "recursive", "verify", "target", "created_at")
+    sealed = hashlib.sha256(json.dumps({key: plan[key] for key in keys}, sort_keys=True).encode()).hexdigest()
+    if plan.get("sha256") != sealed or plan.get("direction") not in {"upload", "download"}:
+        raise ValueError()
+    return {
+        "id": directory.name, "name": text(plan.get("local_path")),
+        "direction": text(plan.get("direction")), "state": text(status.get("state", "prepared")),
+        "phase": text(status.get("phase")), "created_at": timestamp(plan.get("created_at")),
+        "observed_at": timestamp(status.get("heartbeat_at")),
+        "local_path": text(plan.get("local_path")), "remote_path": text(plan.get("remote_path")),
+        "result_validated": status.get("ok") is True and status.get("result_validated") is True,
+        "cancel_requested": (directory / "cancel.json").is_file(), "progress": progress(status),
+    }
+
+
+def read_runtime(path: Path, warnings: list[str]) -> dict:
+    configured, profile = False, "full"
+    try:
+        config = read_json(config_path())
+        from .config import FIELDS
+        if any(key not in FIELDS or not isinstance(value, str) for key, value in config.items()):
+            raise ValueError()
+        configured = bool(os.environ.get("ROMEO_ACCOUNT", config.get("ROMEO_ACCOUNT", "")))
+        profile = os.environ.get("ROMEO_TOOL_PROFILE", config.get("ROMEO_TOOL_PROFILE", "full"))
+        if profile not in {"essential", "full", "expert"}:
+            raise ValueError()
+    except (OSError, ValueError, TypeError):
+        profile = "unknown"
+        warnings.append("Configuration locale illisible.")
+    return {"version": __version__, "profile": profile, "configured": configured,
+            "registry_present": path.is_file()}
 
 
 def read_updates(warnings: list[str]) -> dict:
@@ -280,8 +316,20 @@ def bridge() -> None:
     parser.add_argument("--db", type=Path)
     parser.add_argument("--limit", type=int, default=40)
     args = parser.parse_args()
-    while line := sys.stdin.readline(65):
-        if line.strip() != "snapshot":
-            return
-        print(json.dumps(snapshot(db=args.db, limit=args.limit, demo=args.demo),
-                         ensure_ascii=True, allow_nan=False), flush=True)
+    from .terminal_catalog import Catalog
+    catalog = None
+    try:
+        while line := sys.stdin.readline(4097):
+            if len(line) > 4096 or not line.endswith("\n"):
+                return
+            if line.strip() == "snapshot":  # Compatibility for an already-running 0.3 viewer.
+                response = snapshot(db=args.db, limit=args.limit, demo=args.demo)
+            else:
+                if catalog is None:
+                    catalog = Catalog(db=args.db, limit=args.limit, demo=args.demo,
+                                      progress=lambda value: print(json.dumps(value), flush=True))
+                response = catalog.snapshot(json.loads(line))
+            print(json.dumps(response, ensure_ascii=True, allow_nan=False), flush=True)
+    finally:
+        if catalog is not None:
+            catalog.close()

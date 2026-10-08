@@ -60,6 +60,8 @@ SUITES = [
      "accord persistant, filtrage, GitHub simule, doublons et publication incertaine", False),
     ("terminal", "tests/test_terminal.py",
      "tableau Ratatui optionnel, lecture seule, traces datees et isolation", False),
+    ("terminal-catalog", "tests/test_terminal_catalog.py",
+     "historique complet, pagination, caches, ressources et preuves locales", False),
     # `protocol` appelle romeo_status a travers le protocole : la poignee de
     # main est hors ligne, l'appel d'outil ne l'est pas. Le classer hors ligne
     # rendait un checkout neuf rouge pour une raison qui n'est pas un defaut.

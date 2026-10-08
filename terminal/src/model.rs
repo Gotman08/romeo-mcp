@@ -14,6 +14,76 @@ pub struct Snapshot {
     pub updates: Updates,
     pub reports: Reports,
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub request_id: u64,
+    #[serde(default)]
+    pub coverage: Coverage,
+    #[serde(default)]
+    pub attention: Vec<Alert>,
+    #[serde(default)]
+    pub recent_jobs: Vec<Job>,
+    #[serde(default)]
+    pub active_jobs: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Coverage {
+    pub jobs: Page,
+    pub transfers: Page,
+    pub reports: Page,
+    pub alerts: Page,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Page {
+    pub page: usize,
+    pub pages: usize,
+    pub loaded: usize,
+    pub matched: usize,
+    pub total: usize,
+    pub page_size: usize,
+}
+
+impl Page {
+    fn valid(&self, loaded: usize) -> bool {
+        (1..=100).contains(&self.page_size)
+            && self.loaded == loaded
+            && self.loaded <= self.page_size
+            && self.total >= self.matched
+            && self.matched >= self.loaded
+            && self.pages == self.matched.div_ceil(self.page_size).max(1)
+            && self.page < self.pages
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Alert {
+    pub kind: String,
+    pub id: String,
+    pub name: String,
+    pub state: String,
+    pub reason: String,
+    pub observed_at: Option<f64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Resources {
+    #[serde(default)]
+    pub requested: Allocation,
+    #[serde(default)]
+    pub observed: Allocation,
+}
+
+#[derive(Clone, Debug, Deserialize, Default)]
+pub struct Allocation {
+    pub nodes: Option<u64>,
+    pub tasks: Option<u64>,
+    pub tasks_per_node: Option<u64>,
+    pub cpus_per_task: Option<u64>,
+    pub omp_threads: Option<u64>,
+    pub gpus: Option<u64>,
+    pub gpus_per_node: Option<u64>,
+    pub gpus_per_task: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -37,6 +107,8 @@ pub struct Job {
     pub exit_code: String,
     pub result_validated: bool,
     pub checkpoint: Option<Checkpoint>,
+    #[serde(default)]
+    pub resources: Resources,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
@@ -47,6 +119,8 @@ pub struct Transfer {
     pub state: String,
     pub phase: String,
     pub observed_at: Option<f64>,
+    #[serde(default)]
+    pub created_at: Option<f64>,
     pub local_path: String,
     pub remote_path: String,
     pub result_validated: bool,
@@ -126,11 +200,19 @@ impl Snapshot {
         let value: Self = serde_json::from_str(line).map_err(|_| {
             "Relevé local illisible ; les dernières données restent affichées.".to_owned()
         })?;
-        if value.schema != 2
+        if !matches!(value.schema, 2 | 3)
             || value.jobs.len() > 100
             || value.transfers.len() > 100
             || value.reports.items.len() > 100
             || value.warnings.len() > 100
+            || value.attention.len() > 100
+            || value.recent_jobs.len() > 4
+            || (value.schema == 3
+                && (!value.coverage.jobs.valid(value.jobs.len())
+                    || !value.coverage.transfers.valid(value.transfers.len())
+                    || !value.coverage.reports.valid(value.reports.items.len())
+                    || !value.coverage.alerts.valid(value.attention.len())
+                    || value.active_jobs > value.coverage.jobs.total))
             || !value.generated_at.is_finite()
             || value.generated_at <= 0.0
         {
@@ -138,6 +220,14 @@ impl Snapshot {
         }
         Ok(value)
     }
+}
+
+pub fn timestamp_exact(timestamp: Option<f64>) -> String {
+    timestamp
+        .filter(|time| time.is_finite() && *time > 0.0 && *time < i64::MAX as f64)
+        .and_then(|time| chrono::DateTime::from_timestamp(time as i64, 0))
+        .map(|time| time.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+        .unwrap_or_else(|| "non observé ou date invalide".into())
 }
 
 pub fn now() -> f64 {
@@ -215,7 +305,7 @@ mod tests {
     #[test]
     fn reject_incompatible_schema_and_non_json() {
         assert!(Snapshot::parse("not-json").is_err());
-        let mut value = serde_json::json!({"schema":3, "generated_at":1.0, "demo":false,
+        let mut value = serde_json::json!({"schema":4, "generated_at":1.0, "demo":false,
             "runtime":{"version":"1", "profile":"full", "configured":false,"registry_present":false},
             "jobs":[], "transfers":[], "updates":{"version":"1", "next_version":"1",
             "latest_version":"", "checked_at":null, "automatic_enabled":false,

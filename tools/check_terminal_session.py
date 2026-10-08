@@ -32,7 +32,7 @@ def session(binary: Path, exit_key: bytes) -> dict:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 100, 0, 0))
         before = termios.tcgetattr(slave)
         process = subprocess.Popen([str(binary), "--python", sys.executable, "--package-root", str(ROOT),
-                                    "--demo", "--refresh", "1"], stdin=slave, stdout=slave, stderr=slave,
+                                    "--demo", "--no-preferences", "--refresh", "1"], stdin=slave, stdout=slave, stderr=slave,
                                    env={**os.environ, "TERM": "xterm-256color"}, start_new_session=True)
         screen_height = 30
 
@@ -169,7 +169,7 @@ def color_session(binary: Path, mode: str, no_color: bool, expected_color: bool)
         if no_color:
             environment["NO_COLOR"] = "1"
         process = subprocess.Popen([str(binary), "--python", sys.executable, "--package-root", str(ROOT),
-                                    "--demo", "--color", mode], stdin=slave, stdout=slave, stderr=slave,
+                                    "--demo", "--no-preferences", "--color", mode], stdin=slave, stdout=slave, stderr=slave,
                                    env=environment, start_new_session=True)
         output = bytearray()
         deadline = time.monotonic() + 10

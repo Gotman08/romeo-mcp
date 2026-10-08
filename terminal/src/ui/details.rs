@@ -2,7 +2,7 @@
 use super::{line, progress, state_style, tone_style, ACCENT};
 use crate::{
     app::{App, View},
-    model::{age, bytes, present, report_state, transfer_state},
+    model::{age, bytes, present, report_state, timestamp_exact, transfer_state, Allocation},
     status::{job_state, job_validation, Tone},
 };
 use ratatui::{
@@ -31,14 +31,14 @@ pub fn lines(app: &App) -> Vec<Line<'static>> {
         View::Jobs => job(app),
         View::Transfers => transfer(app),
         View::Reports => report(app),
-        _ => vec![],
+        View::Updates => super::updates::lines(app),
     }
 }
 
 fn job(app: &App) -> Vec<Line<'static>> {
     let jobs = app.jobs();
     let Some(job) = jobs.get(app.jobs_table.selected().unwrap_or(0)) else {
-        return vec![Line::from(if app.data.jobs.is_empty() {
+        return vec![Line::from(if app.page_info(0).total == 0 {
             "Aucun job local. Les soumissions du MCP alimentent ce registre."
         } else {
             "Aucun job ne correspond au filtre. Échap : effacer."
@@ -59,10 +59,24 @@ fn job(app: &App) -> Vec<Line<'static>> {
         line("Durée écoulée", present(&job.elapsed)),
         line("Temps restant", present(&job.remaining)),
         line("Observé il y a", age(job.observed_at)),
+        freshness_line(job.observed_at, app.job_stale_after),
+        line("Observation exacte", timestamp_exact(job.observed_at)),
         line("Soumis il y a", age(job.submitted_at)),
+        line("Soumission exacte", timestamp_exact(job.submitted_at)),
         Line::from(""),
-        section("Checkpoint"),
+        section("Ressources HPC"),
     ];
+    allocation(
+        &mut lines,
+        "Demandées · script enregistré",
+        &job.resources.requested,
+    );
+    allocation(
+        &mut lines,
+        "Observées · Slurm enregistré",
+        &job.resources.observed,
+    );
+    lines.extend([Line::from(""), section("Checkpoint")]);
     if let Some(checkpoint) = &job.checkpoint {
         lines.extend([
             line(
@@ -103,6 +117,7 @@ fn job(app: &App) -> Vec<Line<'static>> {
                 },
             ),
             line("Preuve datant de", age(checkpoint.observed_at)),
+            line("Preuve exacte", timestamp_exact(checkpoint.observed_at)),
         ]);
     } else {
         lines.push(Line::from("Aucune observation enregistrée"));
@@ -123,7 +138,7 @@ fn job(app: &App) -> Vec<Line<'static>> {
 fn transfer(app: &App) -> Vec<Line<'static>> {
     let transfers = app.transfers();
     let Some(transfer) = transfers.get(app.transfers_table.selected().unwrap_or(0)) else {
-        return vec![Line::from(if app.data.transfers.is_empty() {
+        return vec![Line::from(if app.page_info(1).total == 0 {
             "Aucun transfert local. Les plans du MCP apparaîtront ici."
         } else {
             "Aucun transfert ne correspond au filtre. Échap : effacer."
@@ -191,6 +206,9 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
     }
     lines.extend([
         line("Observé il y a", age(transfer.observed_at)),
+        freshness_line(transfer.observed_at, app.transfer_stale_after),
+        line("Observation exacte", timestamp_exact(transfer.observed_at)),
+        line("Plan créé", timestamp_exact(transfer.created_at)),
         Line::from(""),
         section("Validation"),
         marked(
@@ -222,10 +240,42 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
+fn freshness_line(timestamp: Option<f64>, after: u64) -> Line<'static> {
+    let freshness = crate::status::freshness(timestamp, crate::model::now(), after as f64);
+    marked(
+        "Fraîcheur",
+        format!("{} · seuil {} s", freshness.label(), after),
+        tone_style(freshness.tone()),
+    )
+}
+
+fn allocation(lines: &mut Vec<Line<'static>>, title: &'static str, allocation: &Allocation) {
+    lines.push(Line::from(title));
+    let mut any = false;
+    for (label, value) in [
+        ("Nœuds", allocation.nodes),
+        ("Tâches Slurm", allocation.tasks),
+        ("Tâches / nœud", allocation.tasks_per_node),
+        ("CPU / tâche", allocation.cpus_per_task),
+        ("Threads OpenMP", allocation.omp_threads),
+        ("GPU", allocation.gpus),
+        ("GPU / nœud", allocation.gpus_per_node),
+        ("GPU / tâche", allocation.gpus_per_task),
+    ] {
+        if let Some(value) = value {
+            lines.push(line(label, value.to_string()));
+            any = true;
+        }
+    }
+    if !any {
+        lines.push(Line::from("Aucune valeur numérique enregistrée"));
+    }
+}
+
 fn report(app: &App) -> Vec<Line<'static>> {
     let reports = app.reports();
     let Some(report) = reports.get(app.reports_table.selected().unwrap_or(0)) else {
-        return vec![Line::from(if app.data.reports.items.is_empty() {
+        return vec![Line::from(if app.page_info(2).total == 0 {
             "Aucun rapport local. L'assistant utilise mcp_issue_report."
         } else {
             "Aucun rapport ne correspond au filtre. Échap : effacer."
@@ -245,6 +295,7 @@ fn report(app: &App) -> Vec<Line<'static>> {
         Line::from(""),
         section("Temps"),
         line("Dernière preuve", age(report.observed_at)),
+        line("Date exacte", timestamp_exact(report.observed_at)),
         Line::from(""),
         section("Validation"),
         marked(
