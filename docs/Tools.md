@@ -77,8 +77,8 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
 | `essential` | 40 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
-| `full` | 95 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
-| `expert` | 98 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `full` | 96 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
+| `expert` | 99 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -164,7 +164,7 @@ Voir le [guide des rapports publics et de l'autorisation persistante](issue-repo
 | [`job_profile_prepare`](tools/job_profile_prepare.md) | Préparer une capture Nsight Systems bornée. | `full`, `expert` |
 | [`job_profile_submit`](tools/job_profile_submit.md) | Soumettre un job de profilage GPU à partir du plan relu. | `full`, `expert` |
 | [`profile_report`](tools/profile_report.md) | Résumer le rapport d’un job de profilage. | `full`, `expert` |
-| [`job_energy_footprint`](tools/job_energy_footprint.md) | Estimer l’énergie et l’empreinte carbone d’un job. | `full`, `expert` |
+| [`job_energy_footprint`](tools/job_energy_footprint.md) | Lire l’énergie disponible et calculer une estimation carbone sourcée. | `full`, `expert` |
 
 ### Services et allocations
 
@@ -526,21 +526,17 @@ Cet outil réserve des GPU avec `srun` : il n’est pas en lecture seule.
 Le mode `nccl` est désactivé avant toute connexion ou allocation, car aucun
 benchmark NCCL n’est implémenté. `check_type="gpu"` est le seul mode disponible.
 
-## Énergie : un modèle, pas une mesure
+## Énergie et carbone
 
-ROMEO n'active **aucun greffon de comptabilité énergétique SLURM** :
-`AcctGatherEnergyType = (null)`, et `ConsumedEnergyRaw` vaut zéro sur tous les
-jobs. [`job_energy_footprint`](tools/job_energy_footprint.md) ne peut donc rien mesurer : il modélise, et le dit.
+[`job_energy_footprint`](tools/job_energy_footprint.md) lit les compteurs Slurm.
+Une énergie absente ou nulle reste inconnue, et une allocation exclusive vérifiée
+est nécessaire pour attribuer un compteur positif au job.
 
-- Sur un job **en cours**, la puissance GPU réelle est relevée par la sonde
-  superposée : l'incertitude se réduit fortement.
-- Sur un job **terminé**, l'estimation part des ressources allouées et d'un
-  facteur de charge, et rend une **fourchette** plutôt qu'un chiffre unique.
-- L'intensité carbone par défaut est celle du mix français (56 gCO2e/kWh,
-  réglable par `ROMEO_CARBONE_G_KWH`) ; elle varie du simple au triple selon
-  l'heure et la saison. Le refroidissement n'est pas compté.
-
-Si le greffon est activé un jour, l'outil bascule automatiquement sur la mesure.
+Le modèle est facultatif (`estimate_if_unavailable=true`) et reste séparé de la
+mesure. Le facteur fixe de 56 gCO2e/kWh a été retiré : RTE fournit un facteur daté
+sur la période du calcul, ou l'appelant fournit un facteur avec sa référence.
+L'émission reste estimée, avec son périmètre et ses limites, sans la présenter
+comme un capteur de CO2. Voir [Mesures et carbone](energy.md).
 
 ## Hygiène des jobs
 

@@ -75,7 +75,7 @@ stages accepte de 1 à 32 étapes. Chaque étape exige un name unique et une com
 
 [`plan_get`](plan_get.md) · [`job_pipeline_submit`](job_pipeline_submit.md) · [`job_array_prepare`](job_array_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L967) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L997) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

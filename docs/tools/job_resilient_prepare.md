@@ -77,7 +77,7 @@ Votre programme doit savoir sauvegarder et reprendre ses checkpoints. Un segment
 
 [`plan_get`](plan_get.md) · [`job_resilient_submit`](job_resilient_submit.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L701) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L716) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

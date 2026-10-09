@@ -21,6 +21,8 @@ Interroge le catalogue logiciel de l’architecture choisie, mis en cache par le
 | `search` | `str` | Non | `""` | Filtre de recherche dans le catalogue logiciel ou les modules. |
 | `arch` | `str` | Non | `"armgpu"` | Architecture cible : x64cpu ou armgpu. null laisse la préparation la déduire lorsque l’outil l’accepte. |
 | `limit` | `int` | Non | `40` | Nombre maximal d’entrées ou de lignes à restituer. |
+| `max_age_seconds` | `int` | Non | `300` | Âge maximal du catalogue conservé en cache ; `0` demande une nouvelle lecture. |
+| `refresh` | `bool` | Non | `false` | Forcer une nouvelle lecture du catalogue, indépendamment de son âge. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -52,7 +54,7 @@ Les catalogues x64cpu et armgpu diffèrent. L’absence d’un programme dans le
 
 [`job_prepare`](job_prepare.md) · [`python_env_prepare`](python_env_prepare.md) · [`romeo_modules`](romeo_modules.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L207) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L226) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

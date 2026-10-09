@@ -17,3 +17,7 @@ Les preuves sont historiques, datées par `updated_at` : cet appel ne vérifie
 pas l'existence actuelle de l'issue. `publishing` peut désigner une opération
 interrompue ; seul `result_validated=true` établit une publication observée.
 `mcp_issue_publish` réconcilie un résultat incertain avec une lecture GitHub.
+
+[Code de l’outil](../../romeo_mcp/outils_issues.py#L44)
+
+Tous les paramètres sont facultatifs : `{}` consulte les vingt derniers rapports locaux.

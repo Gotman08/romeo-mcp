@@ -19,3 +19,5 @@ relit l'issue créée. Le résultat distingue `created` et `result_validated`.
 Une création incertaine n'est jamais repostée automatiquement, même après une
 nouvelle confirmation. `retry_after` doit être respecté ; aucune boucle de
 tentatives. Cet outil n'accepte ni autre dépôt, ni texte brut à envoyer.
+
+[Code de l’outil](../../romeo_mcp/outils_issues.py#L39)

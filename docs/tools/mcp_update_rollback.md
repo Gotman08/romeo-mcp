@@ -5,6 +5,14 @@
 Vérifie puis sélectionne la version précédente en arrière-plan. Disponible
 dans les trois profils ; un retour exige `confirm=true`.
 
+## Paramètres
+
+| Paramètre | Type | Obligatoire | Défaut | Explication |
+|---|---|---|---|---|
+| `confirm` | `bool` | Non | `false` | Autoriser explicitement le retour vers la version précédente. |
+
+## Exemple
+
 ```json
 {"confirm": true}
 ```
@@ -25,3 +33,5 @@ Si le MCP ne démarre plus, utiliser le CLI d'origine :
 `python -m romeo_mcp update --rollback --yes`, puis reconnecter.
 
 [Code](../../romeo_mcp/outils_updates.py) · [Transaction](../../romeo_mcp/updates.py).
+
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L24)

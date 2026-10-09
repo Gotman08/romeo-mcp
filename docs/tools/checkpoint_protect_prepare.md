@@ -33,3 +33,5 @@ Les identifiants et chemins sont illustratifs.
 ## Resultat et limites
 
 Lire `ok`, les preuves applicatives et leur date. Une commande acceptee ne prouve pas son resultat. Le [guide du protocole](../checkpoints.md) explique les champs et le parcours complet.
+
+[Code de l’outil](../../romeo_mcp/outils_checkpoints.py#L38)

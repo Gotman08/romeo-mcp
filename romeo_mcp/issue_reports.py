@@ -9,7 +9,8 @@ import sys
 import time
 
 from . import __version__
-from .issue_github import GitHubClient, GitHubError, authentication, marker
+from .issue_github import GitHubClient, GitHubError, authentication
+from . import issue_public
 from .issue_privacy import private_values, public_text
 from .issue_store import MAX_PER_DAY, MIN_INTERVAL, PublicationDelay, ReportStore
 from .updates import REPOSITORY
@@ -17,7 +18,7 @@ from .updates import REPOSITORY
 CATEGORIES = ("bug", "performance", "maintainability", "documentation")
 _TOOL = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _ERROR_MESSAGES = {
-    "github_authentication_missing": "Configurer gh auth login ou ROMEO_GITHUB_TOKEN ; le rapport reste local.",
+    "github_authentication_missing": "Configurer la connexion personnelle ou le jeton local du bot ; le rapport reste local.",
     "github_credentials_invalid": "Identifiant GitHub invalide ; le rapport reste local.",
     "github_http_401": "Authentification GitHub refusee ; verifier la connexion sans joindre ses identifiants.",
     "github_http_403": "GitHub refuse l'action ou limite les requetes ; verifier les droits Issues et attendre retry_after.",
@@ -26,6 +27,7 @@ _ERROR_MESSAGES = {
     "github_http_422": "GitHub refuse ce rapport ou limite les creations ; conserver le rapport local.",
     "github_http_429": "Limite GitHub atteinte ; attendre retry_after.",
     "github_lookup_limit": "Historique GitHub trop volumineux ou trop lent pour exclure un doublon ; aucun envoi.",
+    "github_issue_content_mismatch": "Issue retrouvee mais titre ou contenu different : verifier GitHub manuellement ; aucun nouvel envoi.",
 }
 
 
@@ -41,7 +43,10 @@ def policy_get(*, store: ReportStore | None = None) -> dict:
     return {"ok": True, "repository": REPOSITORY, "automatic_enabled": enabled,
             "policy_source": "environment" if override is not None else "saved", **saved,
             "authentication": authentication(), "max_new_issues_per_24h": MAX_PER_DAY,
-            "min_seconds_between_creations": MIN_INTERVAL, "background_collection": False}
+            "min_seconds_between_creations": MIN_INTERVAL, "background_collection": False,
+            "publication_privacy": {"schema": 2, "free_text_transmitted": False,
+                                    "local_identifier_transmitted": False,
+                                    "github_author_visible": True}}
 
 
 def policy_set(automatic: bool, confirm: bool = False, *, store: ReportStore | None = None) -> dict:
@@ -65,11 +70,13 @@ def _version(distribution: str) -> str:
 
 
 def document(tool_name: str, summary: str, observed: str, expected: str, steps: list[str] | None = None,
-             category: str = "bug", error_code: str = "") -> dict:
-    if not isinstance(tool_name, str) or not _TOOL.fullmatch(tool_name) or tool_name.startswith("mcp_issue_"):
-        raise ValueError("Nom d'outil MCP attendu ; ne pas auto-signaler les outils de rapport eux-memes.")
+             category: str = "bug", error_code: str = "", diagnostic: str = "unexpected_behavior") -> dict:
+    if not isinstance(tool_name, str) or not _TOOL.fullmatch(tool_name) or tool_name not in issue_public.PUBLIC_TOOLS:
+        raise ValueError("Outil du catalogue public attendu ; ne pas auto-signaler les outils de rapport eux-memes.")
     if category not in CATEGORIES:
         raise ValueError("Categorie attendue : bug, performance, maintainability ou documentation.")
+    if diagnostic not in issue_public.DIAGNOSTICS:
+        raise ValueError("Diagnostic technique inconnu ; utiliser le catalogue de mcp_issue_report.")
     if steps is None:
         steps = []
     if not isinstance(steps, list) or len(steps) > 8:
@@ -96,29 +103,12 @@ def document(tool_name: str, summary: str, observed: str, expected: str, steps: 
                           "os": system if system in ("Windows", "Linux", "Darwin") else "unknown",
                           "architecture": machine if machine in ("amd64", "x86_64", "arm64", "aarch64") else "unknown"}
     content["redaction_applied"] = redacted
+    content.update(diagnostic=diagnostic, publication_schema=2)
     return content
 
 
-def _literal(text: str) -> str:
-    # Toute description est du texte cite, pas une commande ni un lien actif.
-    return "\n".join("    " + line for line in text.splitlines())
-
-
 def render(record: dict) -> tuple[str, str]:
-    doc = record["report"]
-    title = f"[ROMEO MCP/{doc['category']}] {doc['tool_name']}: {doc['summary']}"
-    context = "\n".join(f"- {key}: `{value}`" for key, value in doc["context"].items())
-    steps = "\n".join(f"{index}. {step}" for index, step in enumerate(doc["steps"], 1)) or "Non fournies."
-    body = ("Rapport genere par un assistant via ROMEO MCP. Le diagnostic doit etre verifie par un mainteneur.\n\n"
-            f"## Outil\n\n`{doc['tool_name']}` — `{doc['category']}`\n\n"
-            f"## Probleme observe\n\n{_literal(doc['observed'])}\n\n"
-            f"## Comportement attendu\n\n{_literal(doc['expected'])}\n\n"
-            f"## Reproduction minimale\n\n{_literal(steps)}\n\n"
-            f"## Code d'erreur\n\n{_literal(doc['error_code'] or 'Non fourni.')}\n\n"
-            f"## Versions du client\n\n{context}\n\n"
-            "Les arguments d'outils, scripts, journaux, fichiers, identifiants SSH et donnees scientifiques ne sont pas collectes.\n\n"
-            + marker(record["fingerprint"]))
-    return title, body
+    return issue_public.render(record["report"])
 
 
 def _result(record: dict, *, created: bool = False, message: str = "") -> dict:
@@ -129,10 +119,11 @@ def _result(record: dict, *, created: bool = False, message: str = "") -> dict:
 
 
 def report(tool_name: str, summary: str, observed: str, expected: str, steps: list[str] | None = None,
-           category: str = "bug", error_code: str = "", *, store: ReportStore | None = None) -> dict:
+           category: str = "bug", error_code: str = "", diagnostic: str = "unexpected_behavior",
+           *, store: ReportStore | None = None) -> dict:
     store = store or ReportStore()
     policy = policy_get(store=store)
-    record = store.save(document(tool_name, summary, observed, expected, steps, category, error_code))
+    record = store.save(document(tool_name, summary, observed, expected, steps, category, error_code, diagnostic))
     if policy["automatic_enabled"]:
         return publish(record["report_id"], store=store)
     return _result(record, message="Rapport filtre conserve localement. Publication automatique desactivee.")
@@ -162,23 +153,30 @@ def publish(report_id: str, confirm: bool = False, *, store: ReportStore | None 
                                   last_error=record["last_error"] or "publication_delayed", retry_after=retry_after)
             return _result(record, message="Attendre retry_after ; aucune requete GitHub lancee.")
         was_uncertain = record["state"] in ("publication_unknown", "publishing")
+        if was_uncertain and record["report"].get("publication_schema") != 2:
+            record = store.update(report_id, "publication_unknown", issue_number=record["issue_number"],
+                                  issue_url=record["issue_url"], last_error="legacy_publication_unknown")
+            return _result(record, message="Ancien envoi incertain : verifier GitHub manuellement, sans transmettre l'ancienne empreinte privee.")
         creation_observed = False
         try:
+            # La projection et le titre sont valides AVANT d'obtenir un credential.
+            digest = issue_public.digest(record["report"])
+            title, body = render(record)
             client = client or GitHubClient()
-            digest = record["fingerprint"]
             existing = client.get(record["issue_number"], digest) if record["issue_number"] else client.find(digest)
             if existing:
-                if record["issue_number"]:
-                    title, body = render(record)
-                    if existing["title"] != title or existing["body"].replace("\r\n", "\n").strip() != body.strip():
-                        raise GitHubError("github_creation_unconfirmed", uncertain=True)
+                if existing["title"] != title or existing["body"].replace("\r\n", "\n").strip() != body.strip():
+                    # Conserver le lien retrouve meme avant toute creation : une
+                    # reconnexion doit relire cette issue, jamais creer un doublon.
+                    store.update(report_id, "publication_unknown", issue_number=existing["number"],
+                                 issue_url=existing["url"], last_error="github_issue_content_mismatch")
+                    raise GitHubError("github_issue_content_mismatch", uncertain=True)
                 state = "published" if record["issue_number"] else "duplicate"
                 record = store.update(report_id, state, issue_number=existing["number"], issue_url=existing["url"])
                 return _result(record, message="Issue observee sur GitHub ; aucun doublon cree.")
             if was_uncertain:
                 record = store.update(report_id, "publication_unknown", last_error="github_creation_unconfirmed")
                 return _result(record, message="Envoi precedent incertain et issue non retrouvee. Verifier GitHub manuellement ; aucun nouvel envoi automatique.")
-            title, body = render(record)
             if not confirm and not policy_get(store=store)["automatic_enabled"]:
                 return _result(record, message="Autorisation automatique retiree ; aucun envoi effectue.")
             store.start_attempt(report_id)
@@ -203,7 +201,7 @@ def publish(report_id: str, confirm: bool = False, *, store: ReportStore | None 
                                   issue_number=current["issue_number"], issue_url=current["issue_url"],
                                   last_error=exc.code, retry_after=retry_after)
             message = _ERROR_MESSAGES.get(exc.code, "GitHub indisponible ou reponse non verifiable ; le rapport reste local.")
-            if uncertain:
+            if uncertain and exc.code != "github_issue_content_mismatch":
                 message += " Creation incertaine : ne pas annoncer de succes et ne pas renvoyer automatiquement."
             return _result(record, message=message)
 

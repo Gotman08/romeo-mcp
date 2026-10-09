@@ -26,3 +26,5 @@ ne fait aucun accès SSH et peut écrire son cache local hors Git.
 Voir [`mcp_update_policy`](mcp_update_policy.md),
 [`mcp_update_start`](mcp_update_start.md) et le
 [code](../../romeo_mcp/outils_updates.py).
+
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L9)

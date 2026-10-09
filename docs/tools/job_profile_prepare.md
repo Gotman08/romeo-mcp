@@ -63,7 +63,7 @@ delay_seconds est borné de 0 à 3600 et duration_seconds de 5 à 600. warmup_st
 
 [`plan_get`](plan_get.md) · [`job_profile_submit`](job_profile_submit.md) · [`profile_report`](profile_report.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L516) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L514) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

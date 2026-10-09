@@ -48,7 +48,7 @@ L’annulation agit sur le calcul. Vérifier ensuite l’état avec job_status ;
 
 [`list_jobs`](list_jobs.md) · [`job_status`](job_status.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L472) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L486) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

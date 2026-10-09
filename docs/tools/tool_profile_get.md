@@ -26,7 +26,7 @@ Arguments JSON à transmettre à `tool_profile_get` depuis votre client MCP :
 {}
 ```
 
-Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
+Cet appel ne contient aucun identifiant ni valeur à remplacer.
 
 ## Résultat
 
@@ -47,3 +47,5 @@ Les profils organisent la découverte des outils ; ils ne remplacent pas les aut
 ---
 
 [↑ Haut de page](#tool_profile_get) · [Profil et documentation](../Tools.md#profil-et-documentation) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
+
+Cet outil ne prend aucun argument : `{}` est l’objet JSON attendu.

@@ -56,7 +56,7 @@ Le corpus est une copie datée. Suivre next_call pour parcourir tous les résult
 
 [`read_doc`](read_doc.md) · [`romeo_software`](romeo_software.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L444) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L482) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

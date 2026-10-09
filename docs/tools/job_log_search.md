@@ -57,7 +57,7 @@ La recherche n’est pas exhaustive : au plus 1 Mio par fichier par défaut et 1
 
 [`job_log_tail`](job_log_tail.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L280) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L259) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -18,3 +18,5 @@ Après cet accord initial, le modèle peut signaler les défauts du MCP pendant 
 tâche sans redemander l'autorisation. `automatic=false` suffit pour désactiver.
 La réponse indique la politique effective et son éventuelle surcharge par
 `ROMEO_AUTO_ISSUES`. Les issues déjà publiées restent présentes sur GitHub.
+
+[Code de l’outil](../../romeo_mcp/outils_issues.py#L19)

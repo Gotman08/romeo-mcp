@@ -55,7 +55,7 @@ L’estimation de démarrage peut être absente ou changer. COMPLETED indique la
 
 [`job_log_tail`](job_log_tail.md) · [`job_efficiency`](job_efficiency.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L184) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L197) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

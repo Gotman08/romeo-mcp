@@ -53,7 +53,7 @@ Cet appel consomme une allocation GPU et peut attendre des ressources. Seul chec
 
 [`romeo_status`](romeo_status.md) · [`job_live_metrics`](job_live_metrics.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L645) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L643) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

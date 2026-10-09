@@ -7,16 +7,14 @@ plante pas : il ralentit, et divise le debit de tout un job reparti sans qu'aucu
 erreur n'apparaisse. `nvidia-smi` expose la raison du bridage sous forme de champ
 de bits, que ce module traduit.
 
-**Estimer l'energie.** ROMEO n'active aucun greffon de comptabilite energetique
-(`AcctGatherEnergyType = (null)`, verifie le 2026-08-20), et `ConsumedEnergyRaw`
-vaut donc zero sur tous les jobs. Toute empreinte annoncee est un **modele**, pas
-une mesure : les fonctions ci-dessous le rendent explicite plutot que de laisser
-croire a un releve.
+**Estimer l'energie.** Ce modele facultatif utilise des hypotheses de puissance.
+Il ne mesure aucune energie ; la lecture des compteurs et de leur configuration
+courante est traitee separement dans `energy.py`.
 """
 
 from __future__ import annotations
 
-import os
+import math
 
 #: Champ de bits `clocks_throttle_reasons.active` de nvidia-smi.
 #: `grave` distingue un bridage subi d'un etat de fonctionnement normal.
@@ -32,16 +30,11 @@ RAISONS_THROTTLE: dict[int, tuple[str, bool]] = {
     0x0100: ("frequence d'affichage imposee", False),
 }
 
-#: Limite de puissance d'un module GH200, relevee par nvidia-smi.
+#: Reference du modele GPU, jamais un compteur de consommation du job.
 PUISSANCE_GPU_MAX_W = 900.0
 
 #: Puissance par coeur, faute de mesure : ordres de grandeur assumes.
 PUISSANCE_COEUR_W = {"armgpu": 3.5, "x64cpu": 2.5}
-
-#: Intensite carbone du mix electrique francais, en gCO2e par kWh.
-#: Surchargeable : elle varie fortement selon l'heure et la saison.
-INTENSITE_CARBONE_G_KWH = float(os.environ.get("ROMEO_CARBONE_G_KWH", "56"))
-
 
 def decoder_throttle(valeur: str) -> list[dict]:
     """Traduit le champ de bits de bridage en raisons lisibles."""
@@ -96,6 +89,7 @@ def estimer_energie(
     arch: str = "armgpu",
     puissance_gpu_mesuree: float | None = None,
     facteur_charge: float = 0.6,
+    intensite_carbone_g_kwh: float | None = None,
 ) -> dict:
     """Modelise la consommation d'un job, faute de compteur disponible.
 
@@ -104,8 +98,18 @@ def estimer_energie(
     du module, et le resultat est encadre par une fourchette : annoncer un
     chiffre unique donnerait une fausse impression de mesure.
     """
-    heures = max(0.0, secondes) / 3600.0
-    par_coeur = PUISSANCE_COEUR_W.get(arch, 2.5)
+    from .carbon import finite_factor
+    if any(type(value) is not int or value < 0 for value in (gpus, coeurs)):
+        raise ValueError("Ressources entieres positives ou nulles attendues.")
+    for value in (secondes, facteur_charge, puissance_gpu_mesuree):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                  or not math.isfinite(value) or value < 0):
+            raise ValueError("Puissances, duree et facteur de charge doivent etre finis et positifs.")
+    if not 0 <= facteur_charge <= 1 or arch not in PUISSANCE_COEUR_W:
+        raise ValueError("Architecture ou facteur de charge inconnu.")
+    intensity = finite_factor(intensite_carbone_g_kwh) if intensite_carbone_g_kwh is not None else None
+    heures = secondes / 3600.0
+    par_coeur = PUISSANCE_COEUR_W[arch]
 
     mesuree = puissance_gpu_mesuree is not None
     if mesuree:
@@ -113,8 +117,8 @@ def estimer_energie(
         basse = haute = puissance_gpu
     else:
         puissance_gpu = PUISSANCE_GPU_MAX_W * facteur_charge * gpus
-        basse = PUISSANCE_GPU_MAX_W * 0.25 * gpus
-        haute = PUISSANCE_GPU_MAX_W * 0.95 * gpus
+        basse = min(puissance_gpu, PUISSANCE_GPU_MAX_W * 0.25 * gpus)
+        haute = max(puissance_gpu, PUISSANCE_GPU_MAX_W * 0.95 * gpus)
 
     puissance_cpu = par_coeur * coeurs
 
@@ -123,40 +127,32 @@ def estimer_energie(
 
     centrale = _kwh(puissance_gpu)
     return {
-        # Deux drapeaux plutot qu'un seul, ambigu. L'ENERGIE n'est jamais
-        # mesuree ici : ROMEO n'expose aucun compteur. La PUISSANCE GPU, elle,
-        # peut avoir ete relevee sur le job en cours, ce qui resserre
-        # fortement l'estimation sans pour autant la transformer en mesure.
-        # Un unique `mesure_reelle` figé a False contredisait
-        # `puissance_gpu_source` dans la meme reponse.
+        # La puissance instantanee et l'energie integree sont distinctes :
+        # meme avec un releve de puissance, cette fonction reste un modele.
         "mesure_reelle": False,
         "puissance_gpu_mesuree": mesuree,
         "puissance_gpu_source": (
             "relevee sur le job en cours" if mesuree
-            else "modelisee a {:.0f} % de la limite de {:.0f} W".format(
+            else "modelisee a {:.0f} % de la reference de {:.0f} W".format(
                 facteur_charge * 100, PUISSANCE_GPU_MAX_W
             )
         ),
         "duree_heures": round(heures, 3),
         "puissance_gpu_w": round(puissance_gpu, 1),
         "puissance_cpu_w": round(puissance_cpu, 1),
-        "energie_kwh": round(centrale, 3),
-        "energie_kwh_fourchette": [round(_kwh(basse), 3), round(_kwh(haute), 3)],
-        "intensite_carbone_g_kwh": INTENSITE_CARBONE_G_KWH,
-        "co2e_g": round(centrale * INTENSITE_CARBONE_G_KWH, 1),
+        "energie_kwh": centrale,
+        "energie_kwh_fourchette": [_kwh(basse), _kwh(haute)],
+        "intensite_carbone_g_kwh": intensity,
+        "co2e_g": centrale * intensity if intensity is not None else None,
         "co2e_g_fourchette": [
-            round(_kwh(basse) * INTENSITE_CARBONE_G_KWH, 1),
-            round(_kwh(haute) * INTENSITE_CARBONE_G_KWH, 1),
-        ],
+            _kwh(basse) * intensity, _kwh(haute) * intensity,
+        ] if intensity is not None else None,
         "hypotheses": [
-            "ROMEO n'active aucun greffon de comptabilite energetique SLURM : "
-            "ConsumedEnergyRaw vaut zero, ces chiffres sont donc un modele et "
-            "non un releve.",
+            "Modele facultatif de puissance : aucune energie mesuree par cette fonction.",
             "Puissance CPU estimee a {} W par coeur sur {}.".format(par_coeur, arch),
-            "Intensite carbone de {} gCO2e/kWh (mix francais moyen) ; elle varie "
-            "du simple au triple selon l'heure et la saison.".format(
-                INTENSITE_CARBONE_G_KWH
-            ),
+            "La fourchette est une plage d'hypotheses GPU, pas un intervalle de confiance mesure.",
+            "Une puissance instantanee ne represente pas l'historique de puissance du calcul.",
+            "Sans facteur carbone explicite, l'empreinte carbone reste inconnue.",
             "La consommation du refroidissement et du reseau n'est pas comptee : "
             "le total reel du centre est superieur.",
         ],

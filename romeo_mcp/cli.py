@@ -54,10 +54,11 @@ def main() -> None:
     update.add_argument("--json", action="store_true", help="reponse structuree pour --check uniquement")
     issues = sub.add_parser("issues", help="autoriser les rapports GitHub automatiques ou relire les rapports locaux")
     issue_action = issues.add_mutually_exclusive_group()
-    issue_action.add_argument("--enable-automatic", action="store_true", help="accord durable pour publier des descriptions filtrees dans le depot public")
+    issue_action.add_argument("--enable-automatic", action="store_true", help="accord durable pour publier des diagnostics techniques minimaux dans le depot public")
     issue_action.add_argument("--disable-automatic", action="store_true", help="desactiver les nouveaux envois automatiques")
-    issues.add_argument("--yes", action="store_true", help="confirmer l'autorisation initiale des envois publics")
-    issues.add_argument("--report-id", default="", help="relire ce rapport sans reseau")
+    issue_action.add_argument("--delete-local", action="store_true", help="effacer les rapports locaux, sans supprimer les issues GitHub")
+    issues.add_argument("--yes", action="store_true", help="confirmer l'autorisation initiale des envois publics ou la suppression locale")
+    issues.add_argument("--report-id", default="", help="relire ou supprimer seulement ce rapport local sans reseau")
     args = parser.parse_args()
     try:
         if args.action == "tui":
@@ -67,7 +68,12 @@ def main() -> None:
             from . import issue_reports
             if args.report_id and (args.enable_automatic or args.disable_automatic):
                 parser.error("--report-id ne s'utilise pas avec une modification de politique")
-            if args.enable_automatic or args.disable_automatic:
+            if args.delete_local:
+                if not args.yes:
+                    parser.error("--delete-local exige --yes ; cette suppression est locale et ne retire pas les issues GitHub")
+                result = {"ok": True, "deleted_local": issue_reports.ReportStore().delete_local(args.report_id),
+                          "github_issues_deleted": False}
+            elif args.enable_automatic or args.disable_automatic:
                 result = issue_reports.policy_set(args.enable_automatic, args.yes)
             else:
                 result = {"policy": issue_reports.policy_get(), **issue_reports.status(args.report_id)}

@@ -14,3 +14,7 @@ La réponse expose `automatic_enabled`, `saved_automatic`, `policy_source`,
 indique une variable ou un CLI disponible : `verified=false` rappelle que la
 connexion n'a pas été vérifiée. La lecture d'une installation neuve ne crée
 pas de registre. `ROMEO_AUTO_ISSUES` a priorité sur l'accord enregistré.
+
+[Code de l’outil](../../romeo_mcp/outils_issues.py#L14)
+
+Cet outil ne prend aucun argument : `{}` est l’objet JSON attendu.

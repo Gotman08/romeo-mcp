@@ -48,6 +48,22 @@
 
 ## Non publié
 
+- Énergie et carbone : lecture des compteurs Slurm, attribution uniquement sur
+  allocation exclusive vérifiée, données absentes laissées inconnues. Modèle
+  facultatif séparé ; suppression du facteur fixe et de l'extrapolation d'une
+  puissance instantanée sur toute la durée. Facteur RTE daté, couverture complète
+  et périmètre explicite ; les émissions calculées restent une estimation.
+- Issues : bot configurable localement sans GitHub CLI, sélection personnelle
+  possible, aucun compte ou jeton partagé distribué. Publication limitée au
+  diagnostic technique contrôlé, outil, catégorie et versions majeures/mineures ;
+  textes libres et empreintes privées exclus. Suppression locale des rapports
+  sans effacer la politique ni les quotas de publication.
+  Une issue retrouvée dont le titre ou le contenu diffère reste non validée ;
+  son lien est conservé pour réconciliation sans nouvelle création.
+- Documentation : objets JSON vides expliqués, paramètres manquants complétés,
+  liens source et compteurs du catalogue corrigés ; audit des 99 contrats ajouté
+  aux vérifications hors ligne.
+
 - Interface terminal interne 0.5 : dossiers liés, reprise avec preuves séparées,
   efficacité demandée/mesurée, groupes Slurm et sessions datées. Favoris et notes
   privés, notifications facultatives sans répétition, présentation anonymisée

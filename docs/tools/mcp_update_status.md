@@ -28,3 +28,7 @@ prouve pas que cette même version est encore sélectionnée.
 Voir [`mcp_update_start`](mcp_update_start.md),
 [`mcp_update_rollback`](mcp_update_rollback.md) et le
 [code](../../romeo_mcp/update_service.py).
+
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L19)
+
+Tous les paramètres sont facultatifs : `{}` consulte la dernière opération de mise à jour.

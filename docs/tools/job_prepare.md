@@ -82,7 +82,7 @@ Le projet Slurm doit être configuré. Un aperçu hors ligne aux chemins illustr
 
 [`plan_get`](plan_get.md) · [`job_submit`](job_submit.md) · [`sbatch_validate`](sbatch_validate.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L85) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L86) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

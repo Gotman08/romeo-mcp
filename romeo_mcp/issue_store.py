@@ -61,6 +61,8 @@ class ReportStore:
                 db = sqlite3.connect(self.path.as_uri() + "?mode=ro", uri=True, timeout=0.2)
                 db.execute("PRAGMA query_only=ON")
             db.row_factory = sqlite3.Row
+            if write:
+                db.execute("PRAGMA secure_delete=ON")
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version not in (0, 1) or (not write and version != 1):
                 raise ValueError("Version du registre de rapports inconnue ; aucun envoi effectue.")
@@ -154,6 +156,20 @@ class ReportStore:
         with self.connect() as db:
             rows = db.execute("SELECT * FROM reports ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall() if db else []
         return [self._decode(row) for row in rows]
+
+    def delete_local(self, report_id: str = "") -> int:
+        """Supprime le contenu local choisi ; consentement et quotas restent distincts."""
+        if report_id:
+            validate_id(report_id)
+        with self.publication_lock(), self.connect(True) as db:
+            # Les dates suffisent au quota ; ne pas conserver l'empreinte du
+            # texte prive dans l'historique des tentatives apres suppression.
+            if report_id:
+                db.execute("UPDATE attempts SET report_id='' WHERE report_id=?", (report_id,))
+            else:
+                db.execute("UPDATE attempts SET report_id=''")
+            cursor = db.execute("DELETE FROM reports WHERE report_id=?", (report_id,)) if report_id else db.execute("DELETE FROM reports")
+            return cursor.rowcount
 
     def update(self, report_id: str, state: str, *, issue_number=None, issue_url=None,
                last_error=None, retry_after: float = 0) -> dict:

@@ -51,7 +51,7 @@ Le job doit être en cours et les outils de débogage doivent être disponibles.
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_system_health`](job_system_health.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L284) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L282) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

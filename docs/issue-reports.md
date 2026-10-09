@@ -31,6 +31,14 @@ Le jeton n'est jamais enregistré dans le registre, les rapports ou les
 arguments d'un sous-processus. L'issue est créée au nom du compte GitHub
 authentifié, et elle est **publique**.
 
+Un bot déjà créé peut être configuré **localement** avec `ROMEO_GITHUB_BOT_TOKEN`.
+`ROMEO_ISSUE_ACCOUNT=bot` l'impose ; `personal` sélectionne la connexion personnelle
+et exclut le bot. En mode `auto` (défaut), un jeton personnel prend priorité sur
+le bot local, puis le MCP essaie `gh`. Sans authentification, le rapport reste
+local. Aucun compte partagé ni jeton n'est fourni avec le logiciel. Le titulaire
+crée et protège son compte bot hors du MCP ; le logiciel n'invente pas de compte
+et ne demande pas de mot de passe GitHub dans la conversation.
+
 Le modèle dispose du parcours équivalent :
 
 ```json
@@ -55,7 +63,8 @@ Exemple d'arguments pour `mcp_issue_report` :
   "observed": "Le plan produit ne contient pas l'option demandée.",
   "expected": "Le plan conserve toutes les options validées.",
   "steps": ["Préparer un exemple fictif minimal.", "Relire le plan."],
-  "error_code": "PLAN_OPTION_MISSING"
+  "error_code": "PLAN_OPTION_MISSING",
+  "diagnostic": "missing_option"
 }
 ```
 
@@ -63,13 +72,22 @@ Cet exemple décrit le format, sans affirmer l'existence de ce défaut.
 `tool_name` doit désigner un outil du serveur ; `server` et `terminal` sont
 acceptés pour un défaut de démarrage ou de l'interface facultative.
 
-Le serveur ajoute uniquement les versions ROMEO/Python/SDK MCP, le système et
-l'architecture. Il ne joint **aucun** argument d'outil, journal, script, fichier,
-conversation ou contenu scientifique. Le modèle doit écrire une description
-technique avec des valeurs fictives dès le départ. Le filtrage retire ensuite
-les secrets reconnus, valeurs privées configurées, chemins, URLs, adresses,
-identifiants de jobs et mentions GitHub. Il ne peut pas reconnaître toute donnée
-confidentielle inconnue, par exemple un résultat de recherche collé en prose.
+Le rapport local conserve une description filtrée et un contexte. Le filtre
+retire les secrets reconnus, valeurs privées configurées, chemins, URLs,
+adresses, identifiants de jobs et mentions GitHub. Il ne peut pas reconnaître
+tout nom ou toute donnée de recherche inconnue : ne pas les fournir au modèle.
+
+**La publication n'utilise aucun de ces textes libres.** Une projection fermée
+construit le titre et le corps à partir du nom public de l'outil, de la catégorie,
+d'un diagnostic du catalogue et des versions majeures/mineures. Résumé, observation,
+attendu, reproduction, erreur libre, système, architecture, identifiant local et
+empreinte du texte privé ne sont pas transmis. Cela s'applique au compte personnel
+comme au bot local et aux anciens rapports encore non publiés.
+
+La contrepartie est un diagnostic public plus général. Deux descriptions privées
+différentes portant le même diagnostic et les mêmes versions retrouvent la même
+issue publique. Pour ajouter une reproduction détaillée, utiliser des données
+fictives et la publier volontairement après relecture.
 
 Un arrêt de calcul utilisateur, une erreur de mot de passe ou une ressource
 indisponible n'établit pas un défaut du MCP. Les erreurs internes inattendues
@@ -79,10 +97,9 @@ ne peuvent pas se signaler eux-mêmes et déclencher une boucle de rapports.
 
 ## Doublons et résultat vérifié
 
-L'empreinte porte sur le rapport structuré filtré et son contexte de versions.
-Des appels identiques retrouvent le même rapport local et incrémentent son
-nombre d'occurrences. Des descriptions différentes peuvent correspondre au
-même défaut : le modèle doit conserver une formulation stable.
+L'identifiant local porte sur le rapport filtré. L'empreinte publique porte
+uniquement sur la projection technique autorisée, sans texte privé. Des appels
+identiques retrouvent le même rapport local et incrémentent ses occurrences.
 
 Avant toute création, le serveur lit les issues ouvertes **et fermées**, en
 ignorant les PR, pour rechercher l'empreinte. Il ne dépend pas du délai
@@ -91,6 +108,10 @@ d'indexation de GitHub Search. Cette lecture est plafonnée à 1 000 entrées et
 Deux machines distinctes qui publient exactement au même instant peuvent
 encore créer deux issues : GitHub ne fournit pas de clé d'idempotence pour
 cette opération. Le verrou local protège les processus qui partagent le registre.
+
+Une issue retrouvée doit également conserver le titre et le corps techniques
+attendus. Si son contenu diffère, son lien est conservé pour vérification manuelle :
+`result_validated=false`, sans création d'un nouvel exemplaire après reconnexion.
 
 Après la création, le serveur relit l'issue par son numéro et vérifie son
 contenu. `result_validated=true` correspond à une observation réussie, datée
@@ -113,12 +134,17 @@ retrouvée, il ne fait **aucun deuxième POST**, même avec `confirm=true`.
 Il faut vérifier GitHub manuellement. Une confirmation n'est pas un moyen de
 contourner cette protection.
 
+Un ancien envoi incertain créé avant la projection publique fermée reste à
+vérifier manuellement : le MCP ne transmet pas son ancienne empreinte privée
+et ne recrée pas une nouvelle issue à sa place.
+
 ## Consulter ou arrêter
 
 ```sh
 python -m romeo_mcp issues
 python -m romeo_mcp issues --report-id IDENTIFIANT_DU_RAPPORT
 python -m romeo_mcp issues --disable-automatic
+python -m romeo_mcp issues --delete-local --report-id IDENTIFIANT_DU_RAPPORT --yes
 ```
 
 `mcp_issue_status` fournit le même historique local : vingt rapports récents ou
@@ -140,3 +166,26 @@ imposent aussi un délai, conservé après reconnexion. Le registre accepte
 Les rapports préexistants ne sont pas envoyés en masse lors de l'activation.
 Les signalements alimentent la maintenance ; ils n'appliquent aucune correction
 et ne déclenchent pas de fusion de code.
+
+## Confidentialité et suppression
+
+Les envois restent désactivés par défaut et peuvent être retirés. La politique
+expose `publication_privacy` pour rendre les champs transmis explicites.
+Le **pseudo GitHub de l'auteur reste public** ; utiliser son compte personnel
+n'est pas une publication anonyme. GitHub reçoit aussi les métadonnées nécessaires
+à la connexion HTTPS. Le MCP ne collecte pas d'identifiant de poste ou de suivi.
+
+`--delete-local --yes` efface tous les contenus locaux ; avec `--report-id`, seul
+ce rapport est effacé. Les quotas de tentatives et la politique sont conservés
+séparément pour éviter de contourner les protections anti-spam. Cette suppression
+locale ne supprime ni les issues publiques ni leurs copies éventuelles. Définir
+une durée de conservation adaptée au contexte et supprimer les descriptions
+locales qui ne sont plus nécessaires. Les copies et sauvegardes du registre
+doivent également être traitées.
+
+Ces protections techniques appliquent la minimisation ; elles ne constituent
+pas une certification juridique RGPD et ne garantissent pas l'anonymat du compte
+GitHub. Le responsable du déploiement doit informer les personnes, définir les
+finalités et traiter les demandes relatives aux publications publiques.
+Sources : [minimisation CNIL](https://www.cnil.fr/fr/minimiser-les-donnees-collectees),
+[guide RGPD du développeur](https://www.cnil.fr/fr/guide-rgpd-du-developpeur).
