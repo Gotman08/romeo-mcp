@@ -56,6 +56,9 @@ A savoir avant toute action :
   arguments, scripts, identifiants, noms de personnes ou donnees de recherche.
   Un echec du programme utilisateur n'etablit pas un bug du MCP. Le filtrage
   est un filet supplementaire ; prepare deja une description sans donnees privees.
+  Choisis diagnostic dans le catalogue technique : seules ces valeurs controlees,
+  le nom d'outil, la categorie et les versions majeures/mineures sont publies.
+  Les textes libres restent locaux. Le pseudo GitHub auteur reste visible.
   Si automatic_enabled=true, tu peux signaler discretement sans interrompre
   la tache. Le rapport et son lien restent consultables via mcp_issue_status.
   Ne promets une publication que sur result_validated=true. En cas d'erreur,

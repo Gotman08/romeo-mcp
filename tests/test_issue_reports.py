@@ -86,6 +86,11 @@ class ReportFixture(unittest.TestCase):
     def publish(self, report_id, **kwargs):
         return reports.publish(report_id, store=self.store, client=self.fake, **kwargs)
 
+    def existing_issue(self, record, number=41, state="open"):
+        title, body = reports.render(record["status"])
+        return {"number": number, "url": f"https://github.com/{REPOSITORY}/issues/{number}",
+                "state": state, "title": title, "body": body}
+
     def expire_backoff(self, report_id):
         current = self.store.get(report_id)
         self.store.update(report_id, current["state"], issue_number=current["issue_number"],
@@ -120,6 +125,24 @@ class ReportTests(ReportFixture):
             with self.assertRaises(ValueError):
                 reports.policy_get(store=self.store)
 
+    def test_automatic_report_without_gh_or_login_remains_local_without_http(self):
+        for executable in (None, "gh"):
+            with self.subTest(gh=executable), \
+                 patch.object(github, "gh_executable", return_value=executable), \
+                 patch.object(github.subprocess, "run", return_value=SimpleNamespace(
+                     returncode=1, stdout="", stderr="synthetic-private-auth-error")), \
+                 patch.object(github, "build_opener") as network:
+                self.authorize()
+                result = reports.report(**sample(summary=f"Diagnostic sans connexion {executable}"), store=self.store)
+                self.assertFalse(result["published"])
+                self.assertEqual(result["status"]["state"], "failed")
+                self.assertEqual(result["status"]["last_error"], "github_authentication_missing")
+                self.assertIsNone(result["issue_url"])
+                self.assertEqual(result["status"]["attempts"], 0)
+                self.assertNotIn("synthetic-private-auth-error", json.dumps(result))
+                self.assertEqual(reports.status(result["report_id"], store=ReportStore())["status"]["state"], "failed")
+                network.assert_not_called()
+
     def test_publication_requires_permission_before_any_network(self):
         record = self.local()
         with self.assertRaisesRegex(ValueError, "confirm=true"):
@@ -143,12 +166,36 @@ class ReportTests(ReportFixture):
 
     def test_existing_closed_issue_is_a_duplicate_not_a_new_creation(self):
         record = self.local()
-        self.fake.existing = {"number": 12, "url": f"https://github.com/{REPOSITORY}/issues/12", "state": "closed"}
+        self.fake.existing = self.existing_issue(record, 12, "closed")
         result = self.publish(record["report_id"], confirm=True)
         self.assertEqual(self.fake.calls, ["find"])
         self.assertEqual(result["status"]["state"], "duplicate")
         self.assertTrue(result["published"])
         self.assertFalse(result["created"])
+
+    def test_found_issue_with_changed_title_or_body_is_not_validated_or_reposted(self):
+        for field in ("title", "body"):
+            with self.subTest(field=field):
+                record = self.local(summary=f"Defaut fictif dans {field}")
+                self.fake.calls.clear()
+                original = self.existing_issue(record, 12)
+                self.fake.existing = {**original, field: original[field] + " modified"}
+                result = self.publish(record["report_id"], confirm=True)
+                self.assertFalse(result["result_validated"])
+                self.assertEqual(result["status"]["state"], "publication_unknown")
+                self.assertEqual(result["status"]["issue_number"], 12)
+                self.assertEqual(result["status"]["last_error"], "github_issue_content_mismatch")
+                self.assertEqual(self.fake.calls, ["find"])
+                self.expire_backoff(record["report_id"])
+                self.fake.issue = self.fake.existing
+                resumed = self.publish(record["report_id"], confirm=True)
+                self.assertFalse(resumed["result_validated"])
+                self.assertEqual(self.fake.calls, ["find", "get"])
+                self.expire_backoff(record["report_id"])
+                self.fake.issue = original
+                reconciled = self.publish(record["report_id"], confirm=True)
+                self.assertTrue(reconciled["result_validated"])
+                self.assertEqual(self.fake.calls, ["find", "get", "get"])
 
     def test_private_values_are_removed_before_storage_and_http(self):
         credential = "ghp_" + "a" * 36
@@ -179,16 +226,66 @@ class ReportTests(ReportFixture):
         self.assertNotIn("\x1b", body)
         self.assertNotIn("\u202e", body)
         self.assertNotIn("@person", body)
-        self.assertIn("    <img src='x'>", body)
+        self.assertNotIn("<img", body)
 
     def test_invalid_or_oversized_reports_do_not_write_or_connect(self):
         for changes in ({"summary": "x" * 161}, {"steps": "not-a-list"}, {"steps": ["x"] * 9},
                         {"category": "other"}, {"observed": ""}, {"tool_name": "mcp_issue_report"},
+                        {"tool_name": "private_person_name"},
                         {"error_code": "contains spaces"}):
             with self.assertRaises(ValueError), patch.object(reports, "GitHubClient") as client:
                 self.local(**changes)
             client.assert_not_called()
         self.assertFalse(self.store.path.exists())
+
+    def test_unrecognized_personal_prose_and_private_hash_never_leave_the_client(self):
+        record = self.local(summary="Rapport pour Alice Exemple", observed="Alice Exemple habite une rue privee.",
+                            expected="Attendu pour une personne privee", steps=["Dossier personnel confidentiel"],
+                            error_code="PRIVATE_USER_CODE", diagnostic="incorrect_measurement")
+        result = self.publish(record["report_id"], confirm=True)
+        wire = self.fake.issue["title"] + self.fake.issue["body"]
+        for private in ("Alice", "rue privee", "personne privee", "Dossier personnel", "PRIVATE_USER_CODE",
+                        record["status"]["fingerprint"], record["report_id"]):
+            self.assertNotIn(private, wire)
+        self.assertIn("Mesure ou calcul incorrect", wire)
+        self.assertTrue(result["published"])
+
+    def test_public_deduplication_excludes_private_descriptions_and_os(self):
+        from romeo_mcp import issue_public
+        first = self.local(summary="Description technique A")
+        second = self.local(summary="Description technique B")
+        self.assertNotEqual(first["report_id"], second["report_id"])
+        self.assertEqual(issue_public.digest(first["status"]["report"]), issue_public.digest(second["status"]["report"]))
+        public = issue_public.projection(first["status"]["report"])
+        self.assertNotIn("os", public["context"])
+        self.assertEqual(set(public), {"schema", "tool_name", "category", "diagnostic", "context"})
+
+    def test_unknown_tools_and_legacy_uncertain_reports_do_not_contact_github(self):
+        from romeo_mcp import issue_public
+        doc = reports.document(**sample())
+        doc["tool_name"] = "private_person_name"
+        with self.assertRaises(ValueError):
+            issue_public.projection(doc)
+        doc = reports.document(**sample())
+        doc.pop("publication_schema")
+        record = self.store.save(doc)
+        self.store.update(record["report_id"], "publishing")
+        result = self.publish(record["report_id"], confirm=True)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["status"]["state"], "publication_unknown")
+        self.assertEqual(self.fake.calls, [])
+
+    def test_local_erasure_keeps_consent_and_rate_limits_and_does_not_call_github(self):
+        first = self.local()
+        self.store.configure(True)
+        self.store.start_attempt(first["report_id"])
+        self.assertEqual(self.store.delete_local(first["report_id"]), 1)
+        self.assertTrue(self.store.policy()["saved_automatic"])
+        self.assertEqual(self.store.recent(), [])
+        with closing(sqlite3.connect(self.store.path)) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM attempts").fetchone()[0], 1)
+            self.assertEqual(db.execute("SELECT report_id FROM attempts").fetchone()[0], "")
+        self.assertEqual(self.fake.calls, [])
 
     def test_uncertain_post_is_reconciled_without_a_second_post(self):
         record = self.local()
@@ -201,7 +298,7 @@ class ReportTests(ReportFixture):
         again = self.publish(record["report_id"], confirm=True)
         self.assertEqual(again["status"]["state"], "publication_unknown")
         self.assertEqual(self.fake.calls.count("create"), 1)
-        self.fake.existing = {"number": 41, "url": f"https://github.com/{REPOSITORY}/issues/41"}
+        self.fake.existing = self.existing_issue(record)
         recovered = self.publish(record["report_id"], confirm=True)
         self.assertTrue(recovered["result_validated"])
         self.assertEqual(self.fake.calls.count("create"), 1)
@@ -284,7 +381,7 @@ class ReportTests(ReportFixture):
         self.assertEqual(limited["status"]["state"], "rate_limited")
         self.assertEqual(self.fake.calls.count("create"), 1)
         third = self.local(summary="Defaut deja signale ailleurs")
-        self.fake.existing = {"number": 41, "url": f"https://github.com/{REPOSITORY}/issues/41"}
+        self.fake.existing = self.existing_issue(third)
         self.assertTrue(self.publish(third["report_id"], confirm=True)["published"])
         self.assertEqual(self.fake.calls.count("create"), 1)
 
@@ -337,6 +434,24 @@ class ReportTests(ReportFixture):
         self.assertTrue(json.loads(enabled.stdout)["automatic_enabled"])
         disabled = cli("--disable-automatic")
         self.assertFalse(json.loads(disabled.stdout)["automatic_enabled"])
+
+    def test_cli_local_erasure_requires_confirmation_and_respects_the_selected_report(self):
+        def cli(*args):
+            return subprocess.run([sys.executable, "-m", "romeo_mcp", "issues", *args],
+                                  cwd=self.root, env=self.env, capture_output=True, text=True, timeout=15)
+        first = self.local()
+        second = self.local(summary="Autre incident fictif")
+        refused = cli("--delete-local", "--report-id", first["report_id"])
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertEqual(len(self.store.recent()), 2)
+        deleted = cli("--delete-local", "--report-id", first["report_id"], "--yes")
+        self.assertEqual(deleted.returncode, 0, deleted.stderr)
+        self.assertEqual(json.loads(deleted.stdout), {"ok": True, "deleted_local": 1, "github_issues_deleted": False})
+        self.assertEqual(self.store.recent()[0]["report_id"], second["report_id"])
+        all_deleted = cli("--delete-local", "--yes")
+        self.assertEqual(all_deleted.returncode, 0, all_deleted.stderr)
+        self.assertEqual(self.store.recent(), [])
+        self.assertEqual(self.fake.calls, [])
 
 
 class GitHubBoundaryTests(unittest.TestCase):
@@ -438,6 +553,32 @@ class GitHubBoundaryTests(unittest.TestCase):
         self.assertNotIn("shell", options)
         self.assertEqual(options["stdin"], subprocess.DEVNULL)
         self.assertEqual(opener.open.call_args.args[0].headers["Authorization"], "Bearer " + self.credential)
+
+    def test_bot_is_local_optional_and_personal_credentials_can_override_it(self):
+        bot = "synthetic-bot-token"
+        with patch.dict(os.environ, ROMEO_GITHUB_BOT_TOKEN=bot, ROMEO_ISSUE_ACCOUNT="auto", ROMEO_GITHUB_TOKEN=""):
+            self.assertEqual(github.authentication()["method"], "bot_environment")
+            self.assertEqual(github.GitHubClient()._token, bot)
+            with patch.dict(os.environ, ROMEO_GITHUB_TOKEN=self.credential):
+                self.assertEqual(github.authentication()["method"], "environment")
+                self.assertEqual(github.GitHubClient()._token, self.credential)
+            with patch.dict(os.environ, ROMEO_ISSUE_ACCOUNT="personal"), \
+                 patch.object(github, "gh_executable", return_value="gh"), \
+                 patch.object(github.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=self.credential, stderr="")):
+                self.assertEqual(github.GitHubClient()._token, self.credential)
+
+    def test_missing_bot_does_not_silently_use_the_personal_account(self):
+        with patch.dict(os.environ, ROMEO_ISSUE_ACCOUNT="bot", ROMEO_GITHUB_BOT_TOKEN=""), \
+             patch.object(github.subprocess, "run") as run:
+            self.assertFalse(github.authentication()["configured"])
+            with self.assertRaisesRegex(github.GitHubError, "authentication_missing"):
+                github.GitHubClient()
+            run.assert_not_called()
+
+    def test_invalid_account_mode_is_refused_before_credentials_are_read(self):
+        with patch.dict(os.environ, ROMEO_ISSUE_ACCOUNT="invalid"):
+            with self.assertRaises(ValueError):
+                github.GitHubClient()
 
 
 class ProtocolTests(ReportFixture):

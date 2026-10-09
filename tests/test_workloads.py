@@ -273,14 +273,14 @@ check("bridage thermique signale",
           dict(sain, throttle=hardware.decoder_throttle("0x40")))))
 
 print("\n-- modele energetique --")
-e = hardware.estimer_energie(gpus=4, coeurs=64, secondes=3600, arch="armgpu")
+e = hardware.estimer_energie(gpus=4, coeurs=64, secondes=3600, arch="armgpu", intensite_carbone_g_kwh=25)
 check("jamais presente comme une mesure", e["mesure_reelle"] is False)
 check("fourchette encadrant la valeur",
       e["energie_kwh_fourchette"][0] <= e["energie_kwh"] <= e["energie_kwh_fourchette"][1],
       (e["energie_kwh_fourchette"], e["energie_kwh"]))
 check("hypotheses explicitees", len(e["hypotheses"]) >= 3)
-check("absence de comptabilite rappelee",
-      any("comptabilite energetique" in h for h in e["hypotheses"]))
+check("modele et absence de mesure explicites",
+      any("aucune energie mesuree" in h for h in e["hypotheses"]))
 check("carbone derive de l'energie",
       abs(e["co2e_g"] - e["energie_kwh"] * e["intensite_carbone_g_kwh"]) < 0.5)
 mesure = hardware.estimer_energie(gpus=2, coeurs=32, secondes=3600,

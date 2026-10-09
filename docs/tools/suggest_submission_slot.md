@@ -52,7 +52,7 @@ La recommandation est indicative. Elle ne réserve aucune ressource et ne garant
 
 [`romeo_status`](romeo_status.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L845) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L875) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

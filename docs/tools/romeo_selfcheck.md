@@ -26,7 +26,7 @@ Arguments JSON à transmettre à `romeo_selfcheck` depuis votre client MCP :
 {}
 ```
 
-Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
+Cet appel ne contient aucun identifiant ni valeur à remplacer.
 
 ## Résultat
 
@@ -42,8 +42,10 @@ L’outil signale les écarts sans corriger le modèle. Il est utile après une 
 
 [`romeo_status`](romeo_status.md) · [`romeo_software`](romeo_software.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L607) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L645) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
 [↑ Haut de page](#romeo_selfcheck) · [Cluster et ordonnancement](../Tools.md#cluster-et-ordonnancement) · [Accueil](../../README.md) · [Documentation](../README.md) · [Catalogue Tools](../Tools.md)
+
+Cet outil ne prend aucun argument : `{}` est l’objet JSON attendu.

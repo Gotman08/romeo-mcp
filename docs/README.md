@@ -35,7 +35,7 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **98 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **99 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 
@@ -57,6 +57,7 @@ JSON, les résultats attendus et des liens vers les outils associés.
 | Comprendre un refus ou un échec | [Diagnostic des accès](configuration.md#diagnostic-en-lecture-seule) | [Diagnostic des jobs](Tools.md#diagnostic-des-échecs) |
 | Lire les journaux d’un job | [Lecture ciblée](Tools.md#lire-les-journaux) | [Fin du journal](tools/job_log_tail.md) · [Recherche dans les logs](tools/job_log_search.md) |
 | Examiner les performances | [Diagnostic système](Tools.md#diagnostic-système) | [Efficacité](tools/job_efficiency.md) · [Mesures en direct](tools/job_live_metrics.md) · [Rapport de profilage](tools/profile_report.md) |
+| Comprendre l'énergie et le carbone | [Mesures et limites](energy.md) | [Compteurs Slurm et facteur daté](tools/job_energy_footprint.md) |
 | Conserver les conditions d’une expérience | [Fiches de reproductibilité](reproducibility.md) | [Mesures et limites](reproducibility.md#ce-qui-est-réellement-mesuré) |
 | Exporter un relevé précis | [Collecter puis exporter](reproducibility.md#collecter-puis-exporter-après-le-calcul) | [Collecte](tools/job_report_collect.md) · [Export privé](tools/job_report_export.md) |
 
@@ -90,13 +91,14 @@ la provenance et les limites de cette copie. Le
 
 - [Configuration](configuration.md) : accès personnels, priorités des réglages,
   profils `essential`, `full` et `expert`, clients stdio, `doctor --live`, déplacement et WSL.
-- [Tools](Tools.md) : catalogue cliquable de 93 outils MCP, fiches par outil, MPI et GPU, logiciels,
+- [Tools](Tools.md) : catalogue cliquable de 99 outils MCP, fiches par outil, MPI et GPU, logiciels,
   stockage, diagnostics, mesures et limites de conception.
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
 - [Mises à jour](updates.md) : outils MCP, accord automatique durable, progression, activation et retour arrière.
 - [Tableau de bord terminal](terminal.md) : interface Ratatui facultative, démonstration et traces locales datées.
+- [Énergie et carbone](energy.md) : compteurs attribuables, valeurs inconnues et facteurs RTE datés.
 
 ## Lire un résultat dans son contexte
 

@@ -54,7 +54,7 @@ lines vaut de 1 à 500, max_files de 1 à 40 par flux et max_chars de 1 à 40000
 
 [`job_log_search`](job_log_search.md) · [`job_status`](job_status.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L264) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L243) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

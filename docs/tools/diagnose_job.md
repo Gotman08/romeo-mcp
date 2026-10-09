@@ -50,7 +50,7 @@ Les causes proposées reposent sur des motifs et des observations disponibles. U
 
 [`job_status`](job_status.md) · [`job_log_search`](job_log_search.md) · [`job_stack_trace`](job_stack_trace.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L56) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L54) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

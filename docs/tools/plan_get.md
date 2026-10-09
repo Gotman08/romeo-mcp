@@ -48,7 +48,7 @@ Relire le plan ne prolonge pas sa validité. Une préparation est soumettable pe
 
 [`job_prepare`](job_prepare.md) · [`job_submit`](job_submit.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L52) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L53) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

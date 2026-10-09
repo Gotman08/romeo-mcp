@@ -20,16 +20,19 @@ def mcp_issue_policy_set(automatic: bool, confirm: bool = False) -> dict[str, An
     return issue_reports.policy_set(automatic, confirm)
 
 
-@outil(annotations=REPORT, description="Tools Report : signale un defaut observe du MCP ROMEO, avec reproduction minimale sans donnees personnelles, logs bruts ni arguments secrets. Filtre et conserve le rapport localement ; publie sur GitHub seulement si l'accord automatique persistant existe. Cherche les doublons et relit l'issue creee. Ne pas signaler automatiquement un simple echec du programme utilisateur ou les outils mcp_issue_*.")
+@outil(annotations=REPORT, description="Signale un defaut observe du MCP ROMEO. diagnostic choisit un libelle technique controle : seules categorie, nom d'outil et versions majeures/mineures sont transmis sur GitHub. Resume, observation, attendu, reproduction et erreur libre restent filtres et locaux ; ne pas y mettre de donnees personnelles. Publication avec accord persistant seulement, recherche des doublons et relecture verifiee. Ne pas signaler les outils mcp_issue_* ou un simple echec du programme utilisateur.")
 def mcp_issue_report(tool_name: str, summary: str, observed: str, expected: str,
                      steps: list[str] | None = None,
                      category: Literal["bug", "performance", "maintainability", "documentation"] = "bug",
-                     error_code: str = "") -> dict[str, Any]:
+                     error_code: str = "",
+                     diagnostic: Literal["unexpected_behavior", "internal_error", "invalid_result", "missing_option",
+                                         "timeout", "connection_failure", "incorrect_measurement", "slow_operation",
+                                         "documentation_mismatch", "display_problem"] = "unexpected_behavior") -> dict[str, Any]:
     from . import server as assembled
     candidate = getattr(assembled, tool_name, None)
     if tool_name not in ("server", "terminal") and not (callable(candidate) and hasattr(candidate, "__wrapped__")):
         raise ValueError("Outil ROMEO inconnu ; utiliser le nom annonce dans tools/list, server ou terminal.")
-    return issue_reports.report(tool_name, summary, observed, expected, steps, category, error_code)
+    return issue_reports.report(tool_name, summary, observed, expected, steps, category, error_code, diagnostic)
 
 
 @outil(annotations=PUBLICATION, description="Publie ou reconcilie un rapport local filtre. confirm=true apres accord ponctuel, ou accord automatique deja enregistre. Relit GitHub avant toute creation, ne reposte jamais un envoi incertain et verifie l'issue apres creation. Aucun envoi n'est valide sur la seule intention ou sur une erreur reseau.")

@@ -19,6 +19,7 @@ Rassemble en un aller-retour SSH les partitions, les nœuds par architecture, le
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
 | `include_queue` | `bool` | Non | `true` | Inclure la file personnelle des jobs Slurm. |
+| `max_age_seconds` | `int` | Non | `0` | Âge maximal du relevé réutilisé depuis le cache ; `0` demande une nouvelle lecture. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -48,7 +49,7 @@ C’est un instantané : des ressources libres peuvent être attribuées entre c
 
 [`romeo_quota`](romeo_quota.md) · [`suggest_submission_slot`](suggest_submission_slot.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L46) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L50) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

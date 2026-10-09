@@ -48,7 +48,7 @@ Les données dépendent de la comptabilité Slurm. Le nombre de GPU alloués ne 
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_system_health`](job_system_health.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L443) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L432) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

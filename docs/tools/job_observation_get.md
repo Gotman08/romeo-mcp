@@ -27,3 +27,5 @@ Les chemins et identifiants sont illustratifs ; remplacer ceux-ci par les valeur
 ## Resultat
 
 Verifier `ok`, puis lire les champs de preuve, de fraicheur et d erreur decrits dans le [parcours](../observability.md). Une demande acceptee et une operation observee sont distinctes.
+
+[Code de l’outil](../../romeo_mcp/outils_diagnostics.py#L24)

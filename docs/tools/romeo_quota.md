@@ -18,7 +18,7 @@ Consulte les quotas GPFS avec mmlsquota pour le home, le scratch et les espaces 
 
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
-| `project` | `str` | Non | `""` | Projet dont les quotas doivent être consultés ; vide utilise le contexte configuré. |
+| `project` | `str` | Non | `""` | Groupe GPFS du projet à consulter en plus des quotas utilisateur ; omis ou vide, seul le relevé utilisateur est demandé. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -30,7 +30,20 @@ Arguments JSON à transmettre à `romeo_quota` depuis votre client MCP :
 {}
 ```
 
-Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser ceux de votre configuration et des réponses précédentes.
+`{}` est valide : tous les paramètres sont facultatifs. Cet appel lit les quotas
+de l'utilisateur connecté par SSH ; il ne sélectionne pas un groupe GPFS à
+partir du compte Slurm configuré.
+
+Pour demander aussi le quota d'un groupe projet identifié :
+
+```json
+{
+  "project": "GROUPE_GPFS_DU_PROJET"
+}
+```
+
+Remplacer ce groupe illustratif par le groupe GPFS réel. Il peut différer du
+compte Slurm ; ne pas le déduire du seul nom du projet.
 
 ## Résultat
 
@@ -46,7 +59,7 @@ L’espace libre global affiché par df ne correspond pas à votre quota. Les pl
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`audit_orphan_files`](audit_orphan_files.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L291) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L329) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

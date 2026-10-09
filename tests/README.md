@@ -25,6 +25,8 @@ python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
 python tests/run_all.py --only terminal
 python tests/run_all.py --only issue-reports
+python tests/run_all.py --only energy
+python tools/check_tool_docs.py
 ```
 
 Sans option, le lanceur exécute les suites hors ligne dans des processus séparés et
@@ -37,6 +39,13 @@ SSH au calculateur.
 La suite `issue-reports` vérifie les appels GitHub simulés, le filtrage avant
 stockage/envoi, les doublons, les coupures et l'accord persistant à travers un
 vrai client MCP stdio. Elle ne crée aucune issue réelle et n'utilise pas SSH.
+Elle vérifie aussi l'absence de texte libre et d'empreinte privée dans la
+publication, le choix du compte bot local ou personnel et la suppression locale.
+
+La suite `energy` vérifie la conversion des compteurs, l'attribution au job,
+les valeurs inconnues et la couverture temporelle du facteur RTE, avec des
+données fictives. `tool-docs` compare les exemples JSON, paramètres, défauts
+et liens source des 99 outils au catalogue MCP complet, sans appeler les outils.
 
 Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
 tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.
@@ -64,6 +73,9 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 | `accompagnement` | [test_accompagnement.py](test_accompagnement.py) | Profils d’outils, diagnostic simulé, filtrage et reproductibilité |
 | `updates` | [test_updates.py](test_updates.py) | Intégrité des releases, confirmation, installation isolée réelle sans réseau, stdio et retour arrière avec processus actif |
 | `update-tools` | [test_update_tools.py](test_update_tools.py) | Accord automatique, erreurs explicites, absence de doublons, interruptions, écartement après retour et outils par stdio |
+| `issue-reports` | [test_issue_reports.py](test_issue_reports.py) | Projection publique fermée, choix du compte et suppression locale ; GitHub simulé |
+| `energy` | [test_energy.py](test_energy.py) | Compteurs Slurm, exclusivité, unités, facteurs datés et absence de données |
+| `tool-docs` | [check_tool_docs.py](../tools/check_tool_docs.py) | Exemples, paramètres, défauts et liens comparés aux contrats MCP |
 | `corpus` | [verify_corpus.py](../tools/verify_corpus.py) | Liens, images, accessibilité et empreintes de la documentation |
 
 Les appuis partagés se trouvent dans [commun.py](commun.py) et

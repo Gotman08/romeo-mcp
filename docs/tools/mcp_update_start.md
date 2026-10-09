@@ -32,3 +32,5 @@ du worker sont privées et persistent après fermeture du client.
 
 [Code du contrat](../../romeo_mcp/outils_updates.py) ·
 [Transaction](../../romeo_mcp/updates.py).
+
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L14)

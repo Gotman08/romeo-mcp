@@ -48,7 +48,7 @@ Le job doit être en cours. La sonde est ponctuelle et porte sur un nœud de l�
 
 [`job_system_health`](job_system_health.md) · [`job_energy_footprint`](job_energy_footprint.md) · [`job_stack_trace`](job_stack_trace.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L138) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L136) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

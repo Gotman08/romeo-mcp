@@ -49,8 +49,15 @@ def gh_executable() -> str | None:
 
 
 def authentication() -> dict:
+    mode = os.environ.get("ROMEO_ISSUE_ACCOUNT", "auto")
+    if mode not in ("auto", "personal", "bot"):
+        raise ValueError("ROMEO_ISSUE_ACCOUNT doit valoir auto, personal ou bot.")
+    if mode == "bot":
+        return {"method": "bot_environment", "configured": bool(os.environ.get("ROMEO_GITHUB_BOT_TOKEN", "").strip()), "verified": False}
     if os.environ.get("ROMEO_GITHUB_TOKEN", "").strip():
         return {"method": "environment", "configured": True, "verified": False}
+    if mode == "auto" and os.environ.get("ROMEO_GITHUB_BOT_TOKEN", "").strip():
+        return {"method": "bot_environment", "configured": True, "verified": False}
     executable = gh_executable()
     return {"method": "gh" if executable else None, "configured": bool(executable), "verified": False}
 
@@ -66,7 +73,10 @@ def _json(raw: bytes | str, *, uncertain: bool) -> object:
 
 class GitHubClient:
     def __init__(self):
-        self._token = os.environ.get("ROMEO_GITHUB_TOKEN", "").strip()
+        method = authentication()["method"]
+        self._token = os.environ.get("ROMEO_GITHUB_BOT_TOKEN" if method == "bot_environment" else "ROMEO_GITHUB_TOKEN", "").strip()
+        if method == "bot_environment" and not self._token:
+            raise GitHubError("github_authentication_missing")
         if not self._token:
             executable = gh_executable()
             if not executable:

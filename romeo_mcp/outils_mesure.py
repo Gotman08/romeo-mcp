@@ -10,14 +10,12 @@ from .plans import submit_prepared
 
 import re
 import shlex
-from typing import Any
+from typing import Any, Literal
 from .cluster import format_slurm_time, require_account
 from .diagnostics import analyser, commande_recherche_checkpoints
 from .hardware import (
-    INTENSITE_CARBONE_G_KWH,
     analyser_gpu,
     decoder_throttle,
-    estimer_energie,
 )
 from .registry import registry
 from .sortie import premiere_ligne
@@ -776,72 +774,26 @@ def cluster_gpu_health_run(
 @outil(
     annotations=READ_ONLY,
     description=(
-        "Estime l'energie consommee et l'empreinte carbone d'un job. "
-        "ATTENTION : ROMEO n'active aucun greffon de comptabilite energetique "
-        "SLURM, le resultat est donc un MODELE et non une mesure. Sur un job en "
-        "cours, la puissance GPU reelle est relevee, ce qui reduit fortement "
-        "l'incertitude."
+        "Lit l'energie Slurm du job : un compteur absent/nul reste inconnu. "
+        "Une allocation exclusive verifiee est necessaire pour attribuer la mesure au job. "
+        "Le carbone est calcule avec un facteur RTE sur la periode du job, ou un facteur "
+        "manuel cite ; il reste une estimation des emissions, jamais une mesure de CO2. "
+        "estimate_if_unavailable=true active explicitement un modele separe."
     ),
 )
-def job_energy_footprint(job_id: str, gpu_load_factor: float = 0.6) -> dict[str, Any]:
-    """Modelise la consommation d'un job, en s'appuyant sur toute mesure disponible."""
-    s = session()
-    jid = str(job_id).strip()
-
+def job_energy_footprint(job_id: str, gpu_load_factor: float = 0.6,
+                         estimate_if_unavailable: bool = False,
+                         carbon_source: Literal["rte", "manual", "none"] = "rte",
+                         carbon_intensity_g_kwh: float | None = None,
+                         carbon_reference: str = "") -> dict[str, Any]:
+    """Mesure observee, modele facultatif et facteur carbone source sont distincts."""
+    from .energy import footprint
+    # Valider les arguments dans footprint avant la premiere lecture SSH.
+    def read(command, **options):
+        return _sh(session(), command, **options)
     try:
-        brut = _sh(
-            s,
-            "sacct -j {} -X -n -P -o JobID,State,ElapsedRaw,AllocCPUS,AllocTRES,"
-            "ConsumedEnergyRaw 2>/dev/null".format(shlex.quote(jid)),
-            timeout=45,
-        )
+        return footprint(job_id, read, estimate=estimate_if_unavailable,
+                         gpu_load_factor=gpu_load_factor, carbon_source=carbon_source,
+                         carbon_intensity=carbon_intensity_g_kwh, carbon_reference=carbon_reference)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-
-    ligne = next((l for l in brut.stdout.splitlines() if l.strip()), "")
-    champs = ligne.split("|")
-    if len(champs) < 6:
-        return _error("job {} inconnu de la comptabilite SLURM.".format(jid))
-
-    etat, secondes = champs[1], _entier(champs[2]) or 0
-    coeurs = _entier(champs[3]) or 0
-    gpus = gpus_from_tres(champs[4])
-    energie_slurm = _entier(champs[5]) or 0
-    arch = "armgpu" if gpus else "x64cpu"
-
-    # Si un jour le greffon est active, autant utiliser la vraie mesure.
-    if energie_slurm > 0:
-        kwh = energie_slurm / 3_600_000.0
-        return {
-            "ok": True, "job_id": jid, "etat": etat, "mesure_reelle": True,
-            "energie_kwh": round(kwh, 3),
-            "co2e_g": round(kwh * INTENSITE_CARBONE_G_KWH, 1),
-            "source": "compteur SLURM (ConsumedEnergyRaw)",
-        }
-
-    # Sur un job encore actif, la puissance instantanee vaut mieux qu'une
-    # hypothese : on la releve.
-    puissance = None
-    if etat == "RUNNING" and gpus:
-        mesures = job_live_metrics(jid)
-        if mesures.get("ok") and mesures.get("gpus"):
-            releves = [g["puissance_w"] for g in mesures["gpus"] if g["puissance_w"]]
-            if releves:
-                puissance = sum(releves) / len(releves)
-
-    modele = estimer_energie(
-        gpus=gpus, coeurs=coeurs, secondes=secondes, arch=arch,
-        puissance_gpu_mesuree=puissance,
-        facteur_charge=max(0.1, min(float(gpu_load_factor), 1.0)),
-    )
-    modele.update({"ok": True, "job_id": jid, "etat": etat,
-                   "gpus": gpus, "coeurs": coeurs, "duration_seconds": secondes})
-    modele["source"] = (
-        "modele, aucune comptabilite energetique n'etant activee sur ROMEO"
-    )
-    if puissance is None and etat == "RUNNING":
-        modele["hypotheses"].append(
-            "Le job est en cours : appelle a nouveau cet outil pour relever la "
-            "puissance GPU reelle et resserrer l'estimation."
-        )
-    return modele

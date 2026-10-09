@@ -26,3 +26,5 @@ distinction. Désactiver l'automatisme n'arrête pas un worker déjà lancé.
 Voir [`mcp_update_check`](mcp_update_check.md),
 [`mcp_update_status`](mcp_update_status.md) et le
 [code](../../romeo_mcp/update_service.py).
+
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L29)

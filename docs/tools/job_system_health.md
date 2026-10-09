@@ -48,7 +48,7 @@ Le job doit être actif. Les observations du nœud et les compteurs Slurm ont de
 
 [`job_efficiency`](job_efficiency.md) · [`job_live_metrics`](job_live_metrics.md) · [`inject_io_staging`](inject_io_staging.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L369) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L367) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
