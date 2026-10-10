@@ -48,6 +48,8 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Le délai maximal est de 20 secondes. Les calculs, compilations et installations sont refusés par défaut ; allow_heavy ne s’emploie que pour un cas explicitement autorisé par la documentation ROMEO.
 
+Les enveloppes reconnues (`env`, `command`, `timeout`, `nice`, `nohup`, `exec`, `sudo`, `stdbuf`, `setsid`, `time`) sont analysées jusqu'à la commande exécutée. Les formes littérales `bash -c` et `sh -c` sont également vérifiées. Les options inconnues, substitutions, commandes dynamiques, scripts shell opaques et constructions composées sont refusés. Les séparateurs cités dans un argument restent du texte. Les refus destructeurs restent actifs avec allow_heavy. Ce garde-fou ne constitue pas une sandbox : les formes courtes `python -c` restent réservées à l'inspection.
+
 ## Voir aussi
 
 [`compute_command_prepare`](compute_command_prepare.md) · [`search_docs`](search_docs.md) · [`list_dir`](list_dir.md)

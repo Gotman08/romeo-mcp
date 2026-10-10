@@ -50,11 +50,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Les catalogues x64cpu et armgpu diffèrent. L’absence d’un programme dans le PATH du login ne prouve pas son absence dans Spack.
 
+La capture du catalogue JSON, dépendances incluses, est plafonnée à 8 Mio de caractères ; la réponse est limitée à 200 spécifications. Une sortie tronquée, invalide ou en erreur n'est jamais mise en cache. Le cache conserve au plus huit observations, isolées par hôte, utilisateur et architecture, avec la durée de vie demandée.
+
 ## Voir aussi
 
 [`job_prepare`](job_prepare.md) · [`python_env_prepare`](python_env_prepare.md) · [`romeo_modules`](romeo_modules.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L226) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L229) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -59,7 +59,7 @@ L’espace libre global affiché par df ne correspond pas à votre quota. Les pl
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`audit_orphan_files`](audit_orphan_files.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L329) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L332) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

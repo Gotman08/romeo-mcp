@@ -210,6 +210,9 @@ def romeo_modules(search: str = "") -> dict[str, Any]:
 _SPACK_CACHE = ReadCache(capacity=8)
 _STATUS_CACHE = ReadCache(capacity=8)
 _SPACK_LOCK = threading.RLock()
+# Les catalogues --deps reels depassent 1,8 Mo. Garder une borne explicite
+# avec de la marge ; une observation tronquee n'est jamais mise en cache.
+_SPACK_MAX_CHARS = 8 * 1024 * 1024
 
 @outil(
     annotations=READ_ONLY,
@@ -250,13 +253,13 @@ def _software_catalog(s, key, node, cache_key, search, limit, max_age_seconds, r
             # vide, et un catalogue vide se figeait dans le cache pour toute la
             # vie du processus. L'outil affirmait alors qu'aucun logiciel
             # n'existe, exactement l'erreur qu'il devait empecher. stderr est
-            # deja fusionne par le transport, et le filtre sur « @ » ecarte le
-            # bruit.
+            # deja fusionne par le transport. Le parseur conserve les details
+            # JSON (empreintes, variantes et dependances).
             result = _sh(
                 s,
                 "{} >/dev/null || exit $?; spack find --json --deps".format(node["env_loader"]),
                 timeout=180,
-                max_chars=300_000,
+                max_chars=_SPACK_MAX_CHARS,
                 read_only=True,
             )
         except (SSHError, SSHTimeout) as exc:

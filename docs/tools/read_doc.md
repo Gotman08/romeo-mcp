@@ -54,7 +54,7 @@ Les lignes commencent à 1 et les bornes sont inclusives. Si truncated est vrai,
 
 [`search_docs`](search_docs.md) · [`romeo_quota`](romeo_quota.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L502) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L505) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

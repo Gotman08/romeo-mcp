@@ -180,7 +180,9 @@ class Result:
 
 def clamp(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> tuple[str, bool]:
     """Tronque au milieu en gardant la tete et la queue, plus parlantes."""
-    if max_chars <= 0 or len(text) <= max_chars:
+    if type(max_chars) is not int or max_chars < 1:
+        raise ValueError("max_chars doit etre un entier strictement positif.")
+    if len(text) <= max_chars:
         return text, False
     head = max_chars * 2 // 3
     tail = max_chars - head
@@ -243,17 +245,21 @@ class RomeoSession:
             for line in stream:
                 sink.put(line.decode("utf-8", "replace"))
         finally:
+            stream.close()
             sink.put(None)  # sentinelle de fin de flux
 
     def _pump_err(self, stream) -> None:
-        for raw in stream:
-            text = raw.decode("utf-8", "replace").rstrip("\r\n")
-            # La mise en garde post-quantique d'OpenSSH 10 est du bruit pur.
-            if "post-quantum" in text or "store now, decrypt later" in text:
-                continue
-            if text.strip() in ("", "**"):
-                continue
-            self._err.append(text)
+        try:
+            for raw in stream:
+                text = raw.decode("utf-8", "replace").rstrip("\r\n")
+                # La mise en garde post-quantique d'OpenSSH 10 est du bruit pur.
+                if "post-quantum" in text or "store now, decrypt later" in text:
+                    continue
+                if text.strip() in ("", "**"):
+                    continue
+                self._err.append(text)
+        finally:
+            stream.close()
 
     def _alive(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
@@ -347,6 +353,8 @@ class RomeoSession:
         max_chars: int = DEFAULT_MAX_CHARS,
     ) -> Result:
         """Execute ``command`` sur le noeud de login et attend son resultat."""
+        # Refuser une borne invalide avant de transmettre une commande.
+        clamp("", max_chars)
         token = uuid.uuid4().hex
         begin = "__ROMEO_B_{}__".format(token)
         end = "__ROMEO_E_{}__".format(token)
@@ -359,9 +367,10 @@ class RomeoSession:
         # consommerait les lignes de protocole de la session persistante et la
         # corromprait durablement.
         payload = (
-            "printf '%s\\n' {begin}\n"
-            "( {body} ) </dev/null 2>&1\n"
-            "printf '{end} %s\\n' \"$?\"\n"
+            "printf '\\n%s\\n' {begin}\n"
+            "(\n{body}\n) </dev/null 2>&1\n"
+            # $? est developpe avant printf : le separateur ne change pas rc.
+            "printf '\\n{end} %s\\n' \"$?\"\n"
         ).format(begin=shlex.quote(begin), body=body, end=end)
 
         encoded = payload.encode("utf-8")
@@ -381,7 +390,7 @@ class RomeoSession:
             started = time.monotonic()
             rc, lines = self._collect(begin, end, started, timeout)
 
-        text, truncated = clamp("".join(lines).rstrip("\n"), max_chars)
+        text, truncated = clamp("".join(lines), max_chars)
         self.timings.record("ssh_response_wait", time.monotonic() - started, rc != 0)
         return Result(
             rc=rc, stdout=text, duration=time.monotonic() - started, truncated=truncated
@@ -416,8 +425,13 @@ class RomeoSession:
                 if stripped == begin:
                     seen_begin = True
                 continue  # banniere MOTD et residus : ignores
-            if stripped.startswith(end):
-                return int(stripped[len(end):].strip() or 0), lines
+            status = stripped.removeprefix(end + " ")
+            if stripped.startswith(end + " ") and status.isascii() and status.isdecimal():
+                # Retirer exactement le LF ajoute par le protocole, meme si
+                # la commande avait elle-meme zero, un ou plusieurs LF finaux.
+                if lines and lines[-1].endswith("\n"):
+                    lines[-1] = lines[-1][:-1]
+                return int(status), lines
             lines.append(line)
 
     # -- commodites ----------------------------------------------------------

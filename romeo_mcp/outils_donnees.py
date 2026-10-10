@@ -7,11 +7,14 @@ from __future__ import annotations
 from . import workload_preparation
 
 import posixpath
+import json
 import re
 import shlex
-from typing import Any
+from typing import Annotated, Any
 from pathlib import Path
+from pydantic import Field
 from . import files
+from .remote_reads import LIST_DIRECTORY, READ_TEXT
 from .validation import validate_script
 from .file_operations import check_script_paths, create_file, replace_file
 from .plans import submit_prepared
@@ -23,6 +26,22 @@ from .noyau import MUTATING, DESTRUCTIVE, READ_ONLY, _error, _sh, outil
 # =============================================================================
 # Fichiers
 # =============================================================================
+CharacterBudget = Annotated[int, Field(strict=True, ge=1, le=64_000)]
+
+
+def _read_json(result):
+    """Ne jamais transformer une sonde incomplete en observation valide."""
+    if result.truncated:
+        raise ValueError("reponse de lecture distante incomplete : budget de transport depasse")
+    try:
+        payload = json.loads(result.stdout)
+    except ValueError as exc:
+        raise ValueError("reponse de lecture distante invalide") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("reponse de lecture distante invalide")
+    return payload
+
+
 @outil(
     annotations=READ_ONLY,
     description="Contenu d'un repertoire distant (taille et date incluses).",
@@ -37,43 +56,29 @@ def list_dir(path: str = ".", limit: int = 100) -> dict[str, Any]:
 
     limit = max(1, min(int(limit), 500))
     try:
-        # Le repertoire est teste avant d'etre liste : avec un simple
-        # `ls ... | head`, le code de retour lu est celui de `head`, toujours
-        # nul. Un chemin inexistant passait donc pour un succes, et le message
-        # « ls: cannot access ...: No such file or directory » etait decoupe en
-        # huit colonnes puis rendu comme une entree de fichier.
         result = _sh(
             s,
-            "test -d {q} || {{ echo INEXISTANT; exit 2; }}; "
-            "ls -lAh --time-style=long-iso {q} 2>&1 | head -n {n}".format(
-                q=shlex.quote(target), n=limit + 1
-            ),
+            "python3 -c {} {} {}".format(shlex.quote(LIST_DIRECTORY), shlex.quote(target), limit),
             timeout=40,
-            max_chars=20_000,
+            # 255 octets par nom POSIX, au plus six caracteres JSON par octet,
+            # plus les metadonnees. Aucun texte humain n'est decoupe.
+            max_chars=limit * (255 * 6 + 512) + 1024,
+            read_only=True,
         )
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-    if not result.ok or result.stdout.strip().startswith("INEXISTANT"):
+    if not result.ok:
         return _error(
             "repertoire introuvable ou illisible : {}".format(target),
             path=target,
             detail=result.stdout.strip()[:200],
         )
 
-    entries = []
-    for line in result.stdout.splitlines():
-        parts = line.split(None, 7)
-        if len(parts) < 8 or line.startswith("total"):
-            continue
-        entries.append(
-            {
-                "name": parts[7],
-                "size": parts[4],
-                "modified": "{} {}".format(parts[5], parts[6]),
-                "is_dir": line.startswith("d"),
-            }
-        )
-    return {"ok": True, "path": target, "count": len(entries), "entries": entries}
+    payload = _read_json(result)
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or len(entries) > limit or type(payload.get("truncated")) is not bool:
+        return _error("liste distante invalide", path=target)
+    return {"ok": True, "path": target, "count": len(entries), **payload}
 
 @outil(
     annotations=READ_ONLY,
@@ -83,9 +88,11 @@ def list_dir(path: str = ".", limit: int = 100) -> dict[str, Any]:
     ),
 )
 def read_remote_file(
-    path: str, offset: int = 1, limit: int = 200, max_chars: int = 8000
+    path: str, offset: int = 1, limit: int = 200, max_chars: CharacterBudget = 8000
 ) -> dict[str, Any]:
     """Lit `limit` lignes a partir de la ligne `offset` (1-indexee)."""
+    if type(max_chars) is not int or not 1 <= max_chars <= 64_000:
+        return _error("max_chars doit etre un entier compris entre 1 et 64000.")
     s = session()
     try:
         target = check_path(path, s.home, s.scratch, s.path_aliases)
@@ -97,29 +104,31 @@ def read_remote_file(
     try:
         result = _sh(
             s,
-            "sed -n '{start},{end}p' {path}".format(
-                start=offset, end=offset + limit - 1, path=shlex.quote(target)
+            "python3 -c {} {} {} {} {}".format(
+                shlex.quote(READ_TEXT), shlex.quote(target), offset, limit, max_chars
             ),
             timeout=45,
-            max_chars=max_chars * 2,
+            # Un caractere Unicode hors BMP occupe douze caracteres en JSON
+            # ASCII. La capture est bornee meme pour une tres longue ligne.
+            max_chars=12 * (max_chars + 1) + 1024,
+            read_only=True,
         )
-        total = _sh(s, "wc -l < {}".format(shlex.quote(target)), timeout=30)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
     if not result.ok:
         return _error(result.stdout.strip() or "fichier illisible", path=target)
 
-    content = result.stdout
-    truncated = len(content) > max_chars
-    if truncated:
-        content = content[:max_chars] + "\n[... tronque ...]"
+    payload = _read_json(result)
+    content, truncated = payload.get("content"), payload.get("truncated")
+    if not isinstance(content, str) or len(content) > max_chars or type(truncated) is not bool:
+        return _error("tranche distante invalide", path=target)
 
     return {
         "ok": True,
         "path": target,
         "offset": offset,
         "limit": limit,
-        "total_lines": total.stdout.strip() if total.ok else None,
+        "total_lines": payload.get("total_lines"),
         "truncated": truncated,
         "content": content,
     }

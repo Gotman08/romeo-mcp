@@ -48,7 +48,7 @@ Une validation textuelle ne vérifie pas l’existence des fichiers ni la dispon
 
 [`sbatch_check_paths`](sbatch_check_paths.md) · [`job_prepare`](job_prepare.md) · [`read_remote_file`](read_remote_file.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L375) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L384) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
