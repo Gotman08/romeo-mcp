@@ -31,6 +31,7 @@ from .registry import registry
 from .ssh import SSHError, SSHTimeout, session
 from . import __version__
 from .observability import TIMINGS
+from .errors import bound_error
 
 
 """Serveur MCP pour le supercalculateur ROMEO (URCA).
@@ -169,7 +170,7 @@ def outil(**options):
             try:
                 result = fonction(*args, **kwargs)
                 failed = result.get("ok", True) is False
-                return result
+                return bound_error(result)
             except (SSHError, SSHTimeout, ClusterError, GuardError, ValueError) as exc:
                 # Erreurs du domaine : leur message est deja redige pour le
                 # modele, inutile de le maquiller.
@@ -186,7 +187,7 @@ def outil(**options):
                 try:
                     result = await fonction(*args, **kwargs)
                     failed = result.get("ok", True) is False
-                    return result
+                    return bound_error(result)
                 except (SSHError, SSHTimeout, ClusterError, GuardError, ValueError) as exc:
                     return _error(str(exc))
                 except Exception as exc:

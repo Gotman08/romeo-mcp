@@ -7,6 +7,7 @@ ressources MCP et prompts. Aucun de ces outils ne modifie quoi que ce soit.
 from __future__ import annotations
 
 import shlex
+import re
 import time
 import threading
 from .observability import ReadCache
@@ -80,12 +81,27 @@ def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[s
 
     sections: dict[str, list[str]] = {}
     current = None
+    malformed = False
     for line in result.stdout.splitlines():
         if line.startswith("###"):
             current = line[3:].strip()
+            if current in sections:
+                malformed = True
             sections[current] = []
         elif current:
-            sections[current].append(line)
+            if line.strip():
+                sections[current].append(line)
+        elif line.strip():
+            malformed = True
+
+    expected = {"NODES": 3, "PART": 3, "SHARE": 3}
+    if include_queue:
+        expected["QUEUE"] = 7
+    if (malformed or set(sections) != set(expected)
+            or any(not sections.get(section) for section in ("NODES", "PART", "SHARE"))
+            or any(len(line.split('|')) < width or any(not cell.strip() for cell in line.split('|')[:width])
+                   for section, width in expected.items() for line in sections.get(section, []))):
+        return _error("Releve du cluster vide ou mal forme ; aucune absence de ressources n'est deduite.")
 
     # -- inventaire des noeuds, dedoublonne --------------------------------
     inventory: dict[str, dict] = {
@@ -115,6 +131,9 @@ def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[s
     for key, bucket in inventory.items():
         bucket["gpus_idle"] = bucket["idle"] * ARCHS[key]["gpus_per_node"]
         bucket["cpus_idle"] = bucket["idle"] * ARCHS[key]["cpus_per_node"]
+
+    if not seen:
+        return _error("Aucun noeud de l'architecture connue dans le releve ; etat du cluster inconnu.")
 
     # -- partitions ---------------------------------------------------------
     partitions = []
@@ -193,6 +212,9 @@ def romeo_modules(search: str = "") -> dict[str, Any]:
         result = _sh(s, "module -t avail 2>&1", timeout=40, max_chars=40_000)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
+
+    if not result.ok or result.truncated:
+        return _error("Catalogue des modules incomplet ou indisponible.", truncated=result.truncated)
 
     names = [
         line.strip()
@@ -337,7 +359,7 @@ def romeo_quota(project: str = "") -> dict[str, Any]:
     reels et l'etat du delai de grace.
     """
     s = session()
-    command = "mmlsquota --block-size auto gpfs 2>&1"
+    command = "mmlsquota --block-size auto gpfs 2>&1 || exit $?"
     if project.strip():
         command += "; echo '###PROJECT'; mmlsquota --block-size auto -g {} gpfs 2>&1".format(
             shlex.quote(project.strip())
@@ -347,9 +369,9 @@ def romeo_quota(project: str = "") -> dict[str, Any]:
         result = _sh(s, command, timeout=90, max_chars=12_000)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-    if not result.ok:
+    if not result.ok or result.truncated:
         return _error(
-            "mmlsquota indisponible : {}".format(result.stdout.strip()[:300])
+            "Releve mmlsquota incomplet ou indisponible.", truncated=result.truncated
         )
 
     filesets = []
@@ -357,10 +379,15 @@ def romeo_quota(project: str = "") -> dict[str, Any]:
     for line in result.stdout.splitlines():
         parts = line.split()
         # Format : Filesystem Fileset type blocks quota limit in_doubt grace ...
-        if len(parts) < 8 or parts[0] != "gpfs":
+        if not parts or parts[0] != "gpfs":
             continue
+        if len(parts) < 8 or parts[2] not in ('USR', 'GRP', 'FILESET'):
+            return _error("Releve mmlsquota mal forme ; quotas inconnus.")
         fileset, kind = parts[1], parts[2]
         blocks, soft, hard, in_doubt, grace = parts[3:8]
+        if any(not re.fullmatch(r'[0-9]+(?:\.[0-9]+)?(?:[KMGTPEZY](?:i?B)?)?', value, re.I)
+               for value in (blocks, soft, hard, in_doubt)):
+            return _error("Valeurs mmlsquota mal formees ; quotas inconnus.")
         entry = {
             "espace": fileset,
             "type": kind,
@@ -384,6 +411,11 @@ def romeo_quota(project: str = "") -> dict[str, Any]:
                 "`{}` : quota souple depasse, delai de grace en cours ({}). "
                 "Reviens sous {} avant expiration.".format(fileset, grace, soft)
             )
+
+    if not filesets:
+        return _error("Aucun quota exploitable dans le releve mmlsquota ; quotas inconnus.")
+    if project.strip() and not any(entry['type'] == 'GRP' for entry in filesets):
+        return _error("Aucun quota de groupe exploitable dans le releve mmlsquota ; quota projet inconnu.")
 
     return {
         "ok": True,

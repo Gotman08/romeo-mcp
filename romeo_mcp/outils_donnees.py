@@ -17,7 +17,7 @@ from . import files
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
 from .remote_paths import DIRECTORY_TARGET, directory_command, roots_for
 from .validation import validate_script
-from .file_operations import check_script_paths, create_file, replace_file
+from .file_operations import check_script_paths, create_file, replace_file, prepare_secret_file
 from .plans import submit_prepared
 from .guard import GuardError, check_path
 from .ssh import SSHError, SSHTimeout, session
@@ -542,21 +542,16 @@ def secret_env_prepare(name: str = "secrets.env") -> dict[str, Any]:
     dossier = posixpath.join(s.home, ".romeo-mcp")
     chemin = posixpath.join(dossier, name)
     try:
-        resultat = _sh(
-            s,
-            "umask 077; mkdir -p {d} && chmod 700 {d} && touch {f} && chmod 600 {f} && "
-            "stat -c '%a %n' {f}".format(d=shlex.quote(dossier), f=shlex.quote(chemin)),
-            timeout=45,
-        )
+        resultat = prepare_secret_file(s, name)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-    if not resultat.ok:
-        return _error(resultat.stdout.strip()[:200])
+    if not resultat.get('ok'):
+        return resultat
 
     return {
         "ok": True,
         "fichier": chemin,
-        "droits": resultat.stdout.strip(),
+        "droits": resultat['permissions'] + ' ' + chemin,
         "marche_a_suivre": [
             "Connecte-toi a ROMEO et edite ce fichier toi-meme, une ligne par "
             "variable : `MA_CLE=valeur`.",

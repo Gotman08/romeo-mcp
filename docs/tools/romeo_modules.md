@@ -42,13 +42,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+Un échec ou une troncature de module avail est refusé. Un catalogue vide est accepté seulement lorsque la commande a réussi.
+
 Cet outil liste les modules ; il ne les charge pas dans un environnement de calcul.
 
 ## Voir aussi
 
 [`romeo_software`](romeo_software.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L189) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L208) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

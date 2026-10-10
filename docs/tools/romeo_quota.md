@@ -53,13 +53,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+Un relevé échoué, tronqué ou sans quota GPFS exploitable est refusé. Une réponse sans données ne prouve pas l’absence d’alerte ; un projet demandé exige un quota de groupe.
+
 L’espace libre global affiché par df ne correspond pas à votre quota. Les plafonds sont propres à votre utilisateur et à vos projets.
 
 ## Voir aussi
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`audit_orphan_files`](audit_orphan_files.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L332) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L354) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

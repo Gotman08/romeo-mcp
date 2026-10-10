@@ -8,6 +8,7 @@ from __future__ import annotations
 from . import workload_preparation
 
 import hashlib
+import math
 import posixpath
 import shlex
 import time
@@ -759,6 +760,28 @@ def job_resilient_submit(plan_id: str, confirm: bool = False) -> dict[str, Any]:
 # =============================================================================
 # Ordonnancement : part d'usage et creneau
 # =============================================================================
+def _forecast_seconds(hours):
+    try:
+        value = float(hours)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("La duree doit etre un nombre fini representable en secondes.") from None
+    seconds = max(0.0, value) * 3600.0
+    if not math.isfinite(value) or not math.isfinite(seconds):
+        raise ValueError("La duree doit etre un nombre fini representable en secondes.")
+    return seconds
+
+
+def _forecast_count(count):
+    try:
+        value = int(count)
+        finite = math.isfinite(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError("Le nombre de ressources depasse les limites numeriques.") from None
+    if not finite:
+        raise ValueError("Le nombre de ressources depasse les limites numeriques.")
+    return max(0, value)
+
+
 @outil(
     annotations=READ_ONLY,
     description=(
@@ -771,6 +794,16 @@ def romeo_fairshare_forecast(
     simulated_cpus: int = 0, simulated_gpus: int = 0, duration_hours: float = 1.0
 ) -> dict[str, Any]:
     """Projette l'usage supplementaire sur la part d'ordonnancement."""
+    cpus = _forecast_count(simulated_cpus)
+    gpus = _forecast_count(simulated_gpus)
+    secondes = _forecast_seconds(duration_hours)
+    try:
+        ajout = cpus * secondes
+    except OverflowError:
+        raise ValueError("Charge simulee trop grande pour une projection numerique.") from None
+    if not math.isfinite(ajout):
+        raise ValueError("Charge simulee trop grande pour une projection numerique.")
+    heures = max(0.0, float(duration_hours))
     require_account()
     s = session()
     try:
@@ -783,34 +816,44 @@ def romeo_fairshare_forecast(
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
 
+    if not resultat.ok or resultat.truncated:
+        return _error("Releve sshare incomplet ou indisponible.", truncated=resultat.truncated)
     lignes = parse_pipe_table(resultat.stdout)
     if not lignes:
         return _error("sshare n'a rien renvoye pour le compte {}.".format(DEFAULT_ACCOUNT))
 
-    compte = next((l for l in lignes if not (l.get("User") or "").strip()), lignes[0])
+    required = {'Account', 'User', 'RawUsage', 'EffectvUsage', 'FairShare'}
+    if any(not required.issubset(line) for line in lignes):
+        return _error("Releve sshare mal forme ; usage courant inconnu.")
+    compte = next((l for l in lignes if l.get('Account', '').strip() == DEFAULT_ACCOUNT
+                   and not (l.get("User") or "").strip()), None)
+    if compte is None:
+        return _error("Compte absent du releve sshare ; usage courant inconnu.")
     moi = next((l for l in lignes if (l.get("User") or "").strip() == s.user), None)
 
     def _nombre(valeur):
         try:
-            return float(valeur)
+            value = float(valeur)
+            return value if math.isfinite(value) and value >= 0 else None
         except (TypeError, ValueError):
             return None
 
-    usage_brut = _nombre(compte.get("RawUsage")) or 0.0
-    usage_effectif = _nombre(compte.get("EffectvUsage")) or 0.0
+    usage_brut = _nombre(compte.get("RawUsage"))
+    usage_effectif = _nombre(compte.get("EffectvUsage"))
+    if usage_brut is None or usage_effectif is None:
+        return _error("Valeurs sshare absentes ou invalides ; usage courant inconnu.")
 
     # Aucune ponderation TRESBillingWeights n'est definie sur les partitions :
     # SLURM facture donc au coeur. Les GPU ne sont pas comptes a part, mais ils
     # imposent en pratique de reserver des coeurs.
-    cpus = max(0, int(simulated_cpus))
-    heures = max(0.0, float(duration_hours))
-    ajout = cpus * heures * 3600.0
-
     total_estime = usage_brut / usage_effectif if usage_effectif else None
     nouvel_effectif = (
         (usage_brut + ajout) / total_estime if total_estime else None
     )
     hausse_pct = (ajout / usage_brut * 100) if usage_brut else None
+    if any(value is not None and not math.isfinite(value)
+           for value in (total_estime, nouvel_effectif, hausse_pct)):
+        return _error("Projection numerique hors limites ; reduire la charge simulee.")
 
     lecture = []
     if hausse_pct is None:
@@ -832,11 +875,11 @@ def romeo_fairshare_forecast(
             "priorite de toute l'equipe. Envisage d'etaler le calcul, ou "
             "previens tes collegues.".format(hausse_pct)
         )
-    if simulated_gpus:
+    if gpus:
         lecture.append(
             "Les {} GPU demandes ne sont pas factures separement : aucune "
             "ponderation TRESBillingWeights n'est definie sur les partitions, "
-            "la facturation se fait au coeur.".format(simulated_gpus)
+            "la facturation se fait au coeur.".format(gpus)
         )
     lecture.append(
         "La formule exacte de priorite n'est pas publique : ces chiffres "
@@ -854,7 +897,7 @@ def romeo_fairshare_forecast(
             "fairshare": _nombre(moi.get("FairShare")) if moi else None,
         },
         "charge_simulee": {
-            "coeurs": cpus, "gpus": simulated_gpus, "heures": heures,
+            "coeurs": cpus, "gpus": gpus, "heures": heures,
             "cout_coeur_secondes": round(ajout),
         },
         "usage_effectif_projete": (
@@ -876,6 +919,11 @@ def suggest_submission_slot(
     nodes: int = 1, gpus_per_node: int = 0, hours: float = 1.0
 ) -> dict[str, Any]:
     """Compare les partitions pour la forme de job demandee."""
+    secondes = max(60, int(_forecast_seconds(hours)))
+    nodes = _forecast_count(nodes)
+    gpus_per_node = _forecast_count(gpus_per_node)
+    if nodes < 1:
+        return _error("nodes doit etre au moins egal a 1.")
     s = session()
     etat = romeo_status(include_queue=True)
     if not etat.get("ok"):
@@ -889,9 +937,16 @@ def suggest_submission_slot(
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
 
+    if not attente.ok or attente.truncated:
+        return _error("File PENDING incomplete ou indisponible ; recommandation impossible.",
+                      truncated=attente.truncated)
     file_par_partition: dict[str, int] = {}
     for ligne in attente.stdout.splitlines():
+        if not ligne.strip():
+            continue
         morceaux = ligne.split("|")
+        if len(morceaux) != 2 or not morceaux[0].strip() or not morceaux[1].strip().isdigit():
+            return _error("Releve PENDING mal forme ; recommandation impossible.")
         if morceaux and morceaux[0].strip():
             nom = morceaux[0].strip().rstrip("*")
             file_par_partition[nom] = file_par_partition.get(nom, 0) + 1
@@ -901,7 +956,6 @@ def suggest_submission_slot(
     libres = inventaire.get("idle", 0)
     partiels = inventaire.get("mixed", 0)
 
-    secondes = max(60, int(float(hours) * 3600))
     options = []
     for nom in PARTITION_ORDER:
         partition = PARTITIONS[nom]

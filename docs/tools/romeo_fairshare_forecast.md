@@ -46,13 +46,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+La durée et la charge doivent rester finies dans leur conversion en secondes et leur produit. Les entrées débordantes sont refusées avant SSH ; un relevé sshare incomplet ou mal formé ne devient pas un usage zéro.
+
 Le modèle encodé facture des cœur-secondes ; simulated_gpus est informatif et ne constitue pas une facturation GPU séparée. Le résultat ne prédit pas un rang ni une heure de démarrage.
 
 ## Voir aussi
 
 [`romeo_status`](romeo_status.md) · [`suggest_submission_slot`](suggest_submission_slot.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L770) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L793) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

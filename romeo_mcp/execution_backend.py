@@ -11,6 +11,7 @@ from .cluster import ClusterError, parse_duration
 from .ssh import SSHError, SSHTimeout, RomeoSession, session
 from .registry import registry
 from .validation import blocking_problems as _controle_du_script_genere
+from .errors import bound_error
 SEUIL_SESSION_LONGUE = 120
 FENETRE_DOUBLON_SECONDES = 900
 ETATS_ACTIFS = {"PENDING", "RUNNING", "CONFIGURING", "SUSPENDED", "SUBMITTED", "soumis"}
@@ -83,7 +84,7 @@ def _error(message: str, **extra) -> dict:
     """Erreur normalisee : le modele doit pouvoir corriger sans deviner."""
     payload = {"ok": False, "error": message}
     payload.update(extra)
-    return payload
+    return bound_error(payload)
 
 
 def _duree_job(minutes: int, time_limit: str | None, plafond_minutes: int) -> str:
