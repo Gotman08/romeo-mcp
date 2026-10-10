@@ -2,8 +2,31 @@
 
 from mcp.server import MCPServer, NotificationOptions
 from mcp.server.stdio import stdio_server
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.utilities.func_metadata import FuncMetadata
+from mcp.types import CallToolResult, TextContent
+from pydantic import ValidationError
 
 from .config import setting
+from .errors import bounded_message
+
+
+class _BoundedArguments(FuncMetadata):
+    """Intercepte la validation avant que le SDK formate chaque valeur rejetee."""
+
+    def validate_arguments(self, arguments_to_validate):
+        try:
+            return super().validate_arguments(arguments_to_validate)
+        except ValidationError as exc:
+            # errors() et str(exc) materialisent toutes les erreurs et leurs
+            # entrees. Le compteur suffit ; le schema reste dans tools/list.
+            message = ValueError(
+                "{} erreur(s) d'arguments ; relire le schema de l'outil dans tools/list."
+                .format(exc.error_count()))
+            raise ValidationError.from_exception_data("Arguments", [{
+                "type": "value_error", "loc": (), "input": None,
+                "ctx": {"error": message},
+            }]) from None
 
 
 PROFILES = ("essential", "full", "expert")
@@ -32,6 +55,23 @@ class ProfiledServer(MCPServer):
     def __init__(self, **kwargs):
         self.tool_profile = validate_profile(setting("ROMEO_TOOL_PROFILE", "full"))
         super().__init__(**kwargs)
+
+    def add_tool(self, fn, *args, **kwargs):
+        super().add_tool(fn, *args, **kwargs)
+        name = kwargs.get("name") or (args[0] if args else None) or fn.__name__
+        tool = self._tool_manager.get_tool(name)
+        metadata = tool.fn_metadata
+        tool.fn_metadata = _BoundedArguments(
+            arg_model=metadata.arg_model, output_schema=metadata.output_schema,
+            output_model=metadata.output_model, wrap_output=metadata.wrap_output)
+
+    async def call_tool(self, name, arguments, context=None):
+        # Borne aussi le nom d'un outil inconnu et les autres ToolError du SDK.
+        try:
+            return await super().call_tool(name, arguments, context)
+        except ToolError as exc:
+            return CallToolResult(content=[TextContent(type="text", text=bounded_message(str(exc)))],
+                                  is_error=True)
 
     async def list_tools(self):
         tools = await super().list_tools()

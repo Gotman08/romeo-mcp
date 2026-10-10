@@ -4,8 +4,10 @@ import re
 
 
 REDACTED = "[REDACTED]"
-_NAME = r"[\w.-]*(?:password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|access[_-]?key|private[_-]?key)[\w.-]*"
-_KEY = re.compile(_NAME, re.I)
+_SENSITIVE_NAME = r"(?:password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|access[_-]?key|private[_-]?key)"
+_NAME = r"[\w.-]*" + _SENSITIVE_NAME + r"[\w.-]*"
+# Chercher le mot, pas un prefixe gourmand repete a chaque position.
+_KEY = re.compile(_SENSITIVE_NAME, re.I)
 _PRIVATE = re.compile(r"-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----.*?(?:-----END (?:[A-Z ]+)?PRIVATE KEY-----|\Z)", re.S)
 _TOKEN = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|xox[baprs]-[A-Za-z0-9-]{10,})\b")
 _JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
@@ -13,8 +15,8 @@ _URL_AUTH = re.compile(r"(https?://)[^\s/@]+:[^\s/@]+@", re.I)
 _SIGNED_URL = re.compile(r"https?://[^\s<>\"']*[?&](?:token|key|sig|signature|x-amz-[\w-]+|x-goog-[\w-]+)=[^\s<>\"']*", re.I)
 _BEARER = re.compile(r"\b(?:Bearer|Basic)\s+[A-Za-z0-9+/=._-]+", re.I)
 _VALUE = r'''(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s;,]+)'''
-_ASSIGN = re.compile(r"(?P<key>\b" + _NAME + r"[\"']?\s*[:=]\s*)" + _VALUE, re.I)
-_OPTION = re.compile(r"(?P<key>--?" + _NAME + r"(?:=|\s+))" + _VALUE, re.I)
+_ASSIGN = re.compile(r"(?P<key>(?<![\w.-])" + _NAME + r"[\"']?\s*[:=]\s*)" + _VALUE, re.I)
+_OPTION = re.compile(r"(?P<key>(?<![\w.-])--?" + _NAME + r"(?:=|\s+))" + _VALUE, re.I)
 _HEREDOC = re.compile(r"<<-?\s*[\"']?([A-Za-z_][A-Za-z0-9_]*)[\"']?")
 
 

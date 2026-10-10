@@ -189,9 +189,10 @@ def observe_files(connection, code_dir: str, data_files: list[str]) -> dict:
     roots = [connection.home, connection.scratch, *connection.path_aliases, "/project"]
     normalized = []
     for name in [code_dir, *data_files]:
-        if not name or sensitive_path(name):
+        target = check_path(name, connection.home, connection.scratch, connection.path_aliases)
+        if sensitive_path(target):
             raise ValueError("Chemin absent ou sensible : choisir uniquement du code ou des donnees scientifiques.")
-        normalized.append(check_path(name, connection.home, connection.scratch, connection.path_aliases))
+        normalized.append(target)
     params = {"roots": roots, "code_dir": normalized[0], "data_files": normalized[1:], "max_bytes": MAX_HASH_BYTES}
     result = connection.run("timeout 25s python3 -I -S -c {} {}".format(shlex.quote(_PROBE), shlex.quote(json.dumps(params))),
                             timeout=30, max_chars=20000)

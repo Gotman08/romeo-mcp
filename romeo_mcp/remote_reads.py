@@ -40,7 +40,7 @@ finally:
 # Le decodage incremental preserve l'UTF-8 aux frontieres des blocs. Seule la
 # tranche demandee est conservee, plus un caractere pour prouver la troncature.
 READ_TEXT = CONFINED_PATHS + r'''
-import codecs, json, sys
+import codecs, json, stat, sys
 path, offset, limit, budget = sys.argv[1], *map(int, sys.argv[2:5])
 roots = json.loads(sys.argv[5])
 decoder = codecs.getincrementaldecoder("utf-8")("replace")
@@ -58,8 +58,14 @@ def consume(text):
             size += len(kept)
         if newline:
             line += 1
+descriptor = None
 try:
-    with os.fdopen(confined_open(path, roots, os.O_RDONLY), "rb") as stream:
+    descriptor = confined_open(path, roots, os.O_RDONLY | os.O_NONBLOCK)
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        raise OSError('La cible doit etre un fichier regulier ; les fichiers speciaux sont refuses.')
+    stream = os.fdopen(descriptor, "rb")
+    descriptor = None
+    with stream:
         while True:
             block = stream.read(65536)
             if not block:
@@ -74,4 +80,7 @@ try:
 except OSError as exc:
     print(json.dumps({"error": str(exc)}, ensure_ascii=True))
     sys.exit(2)
+finally:
+    if descriptor is not None:
+        os.close(descriptor)
 '''

@@ -42,6 +42,8 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+Le dossier privé et le fichier final sont ouverts par descripteurs sans suivre leurs liens symboliques. Les fichiers spéciaux et liens multiples sont refusés ; le contenu existant est conservé sans être lu.
+
 L’outil ne lit ni ne transporte les valeurs sensibles. Ne placer aucun jeton dans les arguments MCP, le script sbatch ou la conversation.
 
 ## Voir aussi

@@ -94,6 +94,52 @@ def replace_file(connection, path: str, content: str, expected_sha256=None) -> d
     return _write(connection, path, content, 'replace', expected_sha256)
 
 
+_SECRET = CONFINED_PATHS + r'''
+import json, os, stat, sys
+request = json.loads(sys.argv[1])
+home = directory = target = None
+try:
+    home = confined_open(request['home'], [request['home']], os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.mkdir('.romeo-mcp', 0o700, dir_fd=home)
+    except FileExistsError:
+        pass
+    directory = os.open('.romeo-mcp', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=home)
+    if os.fstat(directory).st_uid != os.getuid():
+        raise PermissionError('Le dossier prive doit appartenir a l\'utilisateur courant.')
+    # O_NONBLOCK empeche notamment l'attente sur une FIFO substituee.
+    target = os.open(request['name'], os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                     0o600, dir_fd=directory)
+    info = os.fstat(target)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+        raise PermissionError('La cible doit etre un fichier regulier prive, sans lien.')
+    os.fchmod(target, 0o600)
+    os.fchmod(directory, 0o700)
+    print(json.dumps({'ok': True, 'permissions': '600'}))
+except (OSError, ValueError) as exc:
+    print(json.dumps({'ok': False, 'error': str(exc)[:500]}))
+finally:
+    for descriptor in (target, directory, home):
+        if descriptor is not None:
+            os.close(descriptor)
+'''
+
+
+def prepare_secret_file(connection, name: str) -> dict:
+    """Cree ou securise le fichier par descripteur, sans lire ni tronquer son contenu."""
+    if name in {'.', '..'} or not re.fullmatch(r'[\w.-]{1,64}', name):
+        raise ValueError('Nom de fichier prive invalide.')
+    request = json.dumps({'home': connection.home, 'name': name})
+    response = connection.run('python3 -c {} {}'.format(shlex.quote(_SECRET), shlex.quote(request)),
+                              timeout=45, max_chars=4000)
+    if not response.ok or response.truncated:
+        return {'ok': False, 'error': 'Preparation du fichier prive non confirmee.'}
+    payload = json.loads(response.stdout)
+    if not isinstance(payload, dict) or payload.get('ok') not in (True, False):
+        raise ValueError('Reponse de preparation du fichier prive invalide.')
+    return payload
+
+
 def check_script_paths(connection, script: str) -> dict:
     if not script.strip():
         raise ValueError('script vide')

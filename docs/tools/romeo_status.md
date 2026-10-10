@@ -43,13 +43,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+Un relevé échoué, tronqué, vide ou mal formé est refusé et ne remplit pas le cache. Une file personnelle vide reste valide si les sections et l’inventaire sont complets.
+
 C’est un instantané : des ressources libres peuvent être attribuées entre cette lecture et la soumission de votre job.
 
 ## Voir aussi
 
 [`romeo_quota`](romeo_quota.md) · [`suggest_submission_slot`](suggest_submission_slot.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L50) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L51) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

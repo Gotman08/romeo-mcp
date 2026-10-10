@@ -46,13 +46,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
+La durée doit rester finie après conversion en secondes et le nombre de nœuds doit être positif. Une entrée débordante est refusée avant SSH ; un relevé PENDING échoué, tronqué ou mal formé empêche la recommandation.
+
 La recommandation est indicative. Elle ne réserve aucune ressource et ne garantit pas le délai d’attente.
 
 ## Voir aussi
 
 [`romeo_status`](romeo_status.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L875) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L918) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

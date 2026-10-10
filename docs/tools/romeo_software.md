@@ -56,7 +56,7 @@ La capture du catalogue JSON, dépendances incluses, est plafonnée à 8 Mio de 
 
 [`job_prepare`](job_prepare.md) · [`python_env_prepare`](python_env_prepare.md) · [`romeo_modules`](romeo_modules.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L229) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L251) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

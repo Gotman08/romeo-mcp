@@ -64,6 +64,94 @@ class ConfinedPaths(unittest.TestCase):
                        content=base64.b64encode(content.encode()).decode())
         return self.execute(file_operations._WRITE, [json.dumps(request)])
 
+    def secret(self, name='fictional.env'):
+        return self.execute(file_operations._SECRET, [json.dumps({'home': str(self.inside), 'name': name})])
+
+    def test_read_fifo_without_writer_is_refused_immediately(self):
+        fifo = self.inside/'fifo'
+        os.mkfifo(fifo)
+        result = subprocess.run([sys.executable, '-c', remote_reads.READ_TEXT,
+            str(fifo), '1', '100', '100', json.dumps(self.roots)],
+            capture_output=True, text=True, timeout=2)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('regulier', json.loads(result.stdout)['error'])
+        self.assertIn('error', self.read(self.inside))
+
+    def test_read_socket_and_device_are_refused(self):
+        import socket
+        with socket.socket(socket.AF_UNIX) as server:
+            path = self.inside/'socket'
+            # Le nom AF_UNIX est limite a environ 108 octets : les fixtures
+            # peuvent avoir un parent long. Le nom relatif reste le meme inode.
+            previous = os.getcwd()
+            try:
+                os.chdir(self.inside)
+                server.bind('socket')
+            finally:
+                os.chdir(previous)
+            self.assertIn('error', self.read(path))
+        self.roots.append('/dev')
+        self.assertIn('regulier', self.read('/dev/null')['error'])
+
+    def test_secret_creates_private_file_and_preserves_existing_content(self):
+        self.assertTrue(self.secret()['ok'])
+        private = self.inside/'.romeo-mcp'
+        target = private/'fictional.env'
+        self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        target.write_text('FICTIONAL_KEY=untouched\n')
+        target.chmod(0o644)
+        private.chmod(0o755)
+        self.assertTrue(self.secret()['ok'])
+        self.assertEqual(target.read_text(), 'FICTIONAL_KEY=untouched\n')
+        self.assertEqual(private.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+
+    def test_secret_parent_and_final_links_are_refused_without_outside_chmod(self):
+        private = self.inside/'.romeo-mcp'
+        private.symlink_to(self.outside, target_is_directory=True)
+        before = self.outside.stat().st_mode
+        self.assertFalse(self.secret()['ok'])
+        self.assertEqual(self.outside.stat().st_mode, before)
+        self.assertFalse((self.outside/'fictional.env').exists())
+        private.unlink()
+        private.mkdir()
+        target = private/'fictional.env'
+        target.symlink_to(self.outside/'file')
+        before = (self.outside/'file').stat().st_mode
+        self.assertFalse(self.secret()['ok'])
+        self.assertEqual((self.outside/'file').stat().st_mode, before)
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_secret_hardlink_and_fifo_are_refused(self):
+        private = self.inside/'.romeo-mcp'
+        private.mkdir()
+        target = private/'fictional.env'
+        os.link(self.outside/'file', target)
+        before = (self.outside/'file').stat().st_mode
+        self.assertFalse(self.secret()['ok'])
+        self.assertEqual((self.outside/'file').stat().st_mode, before)
+        target.unlink()
+        os.mkfifo(target)
+        self.assertFalse(self.secret()['ok'])
+
+    def test_secret_parent_swap_keeps_original_descriptor(self):
+        private = self.inside/'.romeo-mcp'
+        private.mkdir()
+        def swap():
+            private.rename(self.inside/'held-private')
+            private.symlink_to(self.outside, target_is_directory=True)
+        with self.swapped_open(lambda name, kw: name == 'fictional.env', swap):
+            self.assertTrue(self.secret()['ok'])
+        self.assertTrue((self.inside/'held-private'/'fictional.env').is_file())
+        self.assertFalse((self.outside/'fictional.env').exists())
+
+    def test_secret_root_alias_is_permitted(self):
+        alias = self.root/'home-alias'
+        alias.symlink_to(self.inside, target_is_directory=True)
+        result = self.execute(file_operations._SECRET, [json.dumps({'home': str(alias), 'name': 'fictional.env'})])
+        self.assertTrue(result['ok'])
+
     def test_distinct_whitespace_names_survive_read_create_and_replace(self):
         (self.inside/'file').write_text('plain')
         for name in ('file ', 'file\t', 'file\n', ' file', ' '):
