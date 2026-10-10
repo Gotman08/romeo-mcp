@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -16,7 +17,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline
-from romeo_mcp import guard, file_operations, remote_reads, files, confined_transfers
+from romeo_mcp import guard, file_operations, remote_reads, files, confined_transfers, remote_paths
 from romeo_mcp.ssh import SSHError
 
 
@@ -44,11 +45,15 @@ class ConfinedPaths(unittest.TestCase):
 
     def execute(self, code, args):
         output = io.StringIO()
+        handlers = {kind: signal.getsignal(kind) for kind in (signal.SIGTERM, signal.SIGHUP)}
         with patch.object(sys, 'argv', ['probe', *map(str, args)]), contextlib.redirect_stdout(output):
             try:
                 exec(compile(code, '<remote-probe>', 'exec'), {})
             except SystemExit:
                 pass
+            finally:
+                for kind, handler in handlers.items():
+                    signal.signal(kind, handler)
         return json.loads(output.getvalue())
 
     def read(self, path, budget=100):
@@ -78,6 +83,33 @@ class ConfinedPaths(unittest.TestCase):
         self.assertFalse(self.write(link/'file', 'replace')['ok'])
         self.assertFalse((self.outside/'new').exists())
         self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_directory_audit_refuses_physical_escape_before_shell_execution(self):
+        (self.inside/'escape').symlink_to(self.outside, target_is_directory=True)
+        request = dict(path=str(self.inside/'escape'), roots=self.roots,
+                       command="printf '%s' '{\"ok\":true}'", timeout=5)
+        self.assertFalse(self.execute(remote_paths.DIRECTORY_COMMAND, [json.dumps(request)])['ok'])
+        request['path'] = str(self.inside)
+        self.assertTrue(self.execute(remote_paths.DIRECTORY_COMMAND, [json.dumps(request)])['ok'])
+
+    def test_directory_audit_keeps_original_directory_after_parent_swap(self):
+        parent, swap = self.parent_fixture()
+        request = dict(path=str(parent), roots=self.roots,
+                       command='printf \'"\'; cat '+remote_paths.DIRECTORY_TARGET+'/file; printf \'"\'', timeout=5)
+        native_popen = subprocess.Popen
+        def swapped_popen(*args, **kwargs):
+            swap()
+            return native_popen(*args, **kwargs)
+        with patch.object(subprocess, 'Popen', side_effect=swapped_popen):
+            self.assertEqual(self.execute(remote_paths.DIRECTORY_COMMAND, [json.dumps(request)]), 'inside-original')
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_directory_audit_timeout_stops_its_process_group(self):
+        import time
+        request = dict(path=str(self.inside), roots=self.roots, command='sleep 10', timeout=.05)
+        start = time.monotonic()
+        self.assertFalse(self.execute(remote_paths.DIRECTORY_COMMAND, [json.dumps(request)])['ok'])
+        self.assertLess(time.monotonic()-start, 2)
 
     def test_final_symlink_escape_and_existing_symlink_writes_are_refused(self):
         path = self.inside/'escape'

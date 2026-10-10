@@ -45,6 +45,8 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 L’outil ne supprime rien. Vérifier l’utilité des fichiers avant d’exécuter une commande proposée.
 
+L’inventaire conserve un descripteur du répertoire physique autorisé pendant son parcours. Un lien parent vers une racine extérieure est refusé ; un changement de lien pendant l’inventaire ne redirige pas sa lecture.
+
 ## Voir aussi
 
 [`romeo_quota`](romeo_quota.md) · [`audit_orphan_files`](audit_orphan_files.md)

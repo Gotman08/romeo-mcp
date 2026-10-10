@@ -49,11 +49,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Un fichier sans job actif peut rester utile à une expérience. Cet inventaire ne supprime rien et ne prouve pas qu’un fichier est jetable.
 
+L’inventaire conserve un descripteur du répertoire physique autorisé pendant son parcours. Un lien parent vers une racine extérieure est refusé ; un changement de lien pendant l’inventaire ne redirige pas sa lecture.
+
 ## Voir aussi
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`romeo_quota`](romeo_quota.md) · [`list_jobs`](list_jobs.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L411) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L415) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

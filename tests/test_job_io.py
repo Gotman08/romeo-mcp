@@ -45,7 +45,13 @@ class LocalSession:
         self.root = root
         self.host = "synthetic.example"
         self.user = "tester"
-        self.scratch = self.shell("pwd -P").stdout.strip()
+        if os.name == 'nt':
+            # Le montage /tmp de Git Bash peut changer entre deux shells.
+            # Un chemin de lecteur absolu reste lie au meme dossier Windows.
+            resolved = root.resolve().as_posix()
+            self.scratch = '/' + resolved[0].lower() + resolved[2:]
+        else:
+            self.scratch = self.shell("pwd -P").stdout.strip()
         self.home = self.scratch
         self.path_aliases = []
         self.pending = []

@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import Field
 from . import files
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
-from .remote_paths import roots_for
+from .remote_paths import DIRECTORY_TARGET, directory_command, roots_for
 from .validation import validate_script
 from .file_operations import check_script_paths, create_file, replace_file
 from .plans import submit_prepared
@@ -277,7 +277,7 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         return _error(str(exc))
 
     top = max(3, min(int(top), 40))
-    q = shlex.quote(cible)
+    q = DIRECTORY_TARGET
     commande = (
         "echo '###DIRS'; du -x -h --max-depth=2 {q} 2>/dev/null | sort -rh | head -n {n}; "
         "echo '###GROS'; find {q} -xdev -type f -size +200M -printf '%s\\t%p\\n' "
@@ -286,11 +286,12 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         "-mtime +14 -printf '%s\\t%p\\n' 2>/dev/null | sort -rn | head -n {n}; "
         "echo '###VENVS'; find {q} -xdev -maxdepth 4 -type d -name 'site-packages' "
         "2>/dev/null | head -n {n}; "
-        "echo '###CACHES'; du -x -sh {q}/.cache {q}/ia 2>/dev/null"
+        "echo '###CACHES'; du -x -sh {q}/.cache {q}/ia 2>/dev/null || :"
     ).format(q=q, n=top)
 
     try:
-        resultat = _sh(s, commande, timeout=240, max_chars=20_000)
+        resultat = _sh(s, directory_command(s, cible, commande, 235),
+                       timeout=240, max_chars=20_000, read_only=True)
     except SSHTimeout:
         return _error(
             "l'inventaire a depasse le delai : cible un sous-repertoire precis "
@@ -298,6 +299,9 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         )
     except SSHError as exc:
         return _error(str(exc))
+
+    if not resultat.ok or resultat.truncated:
+        return _error('Inventaire distant refuse ou incomplet.', detail=resultat.stdout[:500])
 
     sections: dict[str, list[str]] = {}
     courant = None
@@ -421,7 +425,7 @@ def audit_orphan_files(
     days = max(1, min(int(days), 365))
     min_size_mb = max(1, min(int(min_size_mb), 100_000))
     top = max(5, min(int(top), 100))
-    q = shlex.quote(cible)
+    q = DIRECTORY_TARGET
 
     commande = (
         "echo '###ANCIENS'; find {q} -xdev -type f -size +{taille}M -mtime +{jours} "
@@ -435,7 +439,8 @@ def audit_orphan_files(
     ).format(q=q, taille=min_size_mb, jours=days, n=top)
 
     try:
-        resultat = _sh(s, commande, timeout=300, max_chars=25_000)
+        resultat = _sh(s, directory_command(s, cible, commande, 295),
+                       timeout=300, max_chars=25_000, read_only=True)
     except SSHTimeout:
         return _error(
             "l'inventaire a depasse le delai : cible un sous-repertoire avec "
@@ -443,6 +448,9 @@ def audit_orphan_files(
         )
     except SSHError as exc:
         return _error(str(exc))
+
+    if not resultat.ok or resultat.truncated:
+        return _error('Inventaire distant refuse ou incomplet.', detail=resultat.stdout[:500])
 
     sections: dict[str, list[str]] = {}
     courant = None

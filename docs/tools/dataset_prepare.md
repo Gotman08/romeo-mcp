@@ -59,7 +59,7 @@ Pour Hugging Face, fournir un venv de la même architecture avec huggingface_hub
 
 [`dataset_download`](dataset_download.md) · [`python_packages_prepare`](python_packages_prepare.md) · [`romeo_quota`](romeo_quota.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L363) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L367) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

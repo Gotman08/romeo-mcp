@@ -5,6 +5,9 @@ chaque composant est ouvert avec O_NOFOLLOW et conserve par des descripteurs :
 une substitution de lien entre verification et ouverture echoue au lieu de
 rediriger l'operation. Aucun module du paquet n'est requis sur le cluster.
 """
+import json
+import shlex
+
 from .guard import allowed_roots
 
 
@@ -69,3 +72,55 @@ def confined_open(path, roots, flags):
     finally:
         os.close(parent)
 '''
+
+
+DIRECTORY_TARGET = '__ROMEO_CONFINED_TARGET__'
+DIRECTORY_COMMAND = CONFINED_PATHS + r'''
+import json, shlex, signal, subprocess, sys
+request = json.loads(sys.argv[1])
+directory = None
+process = None
+def interrupted(*args):
+    raise RuntimeError('Inventaire distant interrompu.')
+
+def stop():
+    if process is not None and process.poll() is None:
+        os.killpg(process.pid, signal.SIGTERM)
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+
+signal.signal(signal.SIGTERM, interrupted)
+signal.signal(signal.SIGHUP, interrupted)
+try:
+    directory = confined_open(request['path'], request['roots'], os.O_RDONLY | os.O_DIRECTORY)
+    proxy = '/proc/{}/fd/{}/.'.format(os.getpid(), directory)
+    command = request['command'].replace('__ROMEO_CONFINED_TARGET__', shlex.quote(proxy))
+    process = subprocess.Popen(['bash', '-c', command], stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, start_new_session=True)
+    try:
+        output, _ = process.communicate(timeout=request['timeout'])
+    except subprocess.TimeoutExpired:
+        stop()
+        raise TimeoutError('Inventaire distant interrompu : delai depasse.')
+    text = output.decode('utf-8', 'replace').replace(proxy, request['path'])
+    print(text, end='')
+    sys.exit(process.returncode)
+except (OSError, ValueError, RuntimeError) as exc:
+    print(json.dumps({'ok': False, 'error': str(exc)[:500]}))
+    sys.exit(2)
+finally:
+    stop()
+    if process is not None and process.stdout is not None:
+        process.stdout.close()
+    if directory is not None:
+        os.close(directory)
+'''
+
+
+def directory_command(connection, path, command, timeout):
+    """Lie un inventaire en lecture seule au repertoire autorise pendant tout son parcours."""
+    request = json.dumps(dict(path=path, roots=roots_for(connection), command=command, timeout=timeout))
+    return 'python3 -c {} {}'.format(shlex.quote(DIRECTORY_COMMAND), shlex.quote(request))
