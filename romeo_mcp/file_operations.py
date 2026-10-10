@@ -5,51 +5,57 @@ import re
 import shlex
 
 from .guard import allowed_roots, check_path
+from .remote_paths import CONFINED_PATHS, roots_for
 
 
 # Execute par Python sur le login. Le verrou est partage entre les processus
 # MCP ; une publication atomique ne laisse jamais voir un fichier incomplet.
-_WRITE = r'''
-import base64, fcntl, hashlib, json, os, stat, sys, tempfile
+_WRITE = CONFINED_PATHS + r'''
+import base64, fcntl, hashlib, json, os, secrets, stat, sys
 request = json.loads(sys.argv[1])
 path = request['path']
-parent = os.path.dirname(path)
+parent = None
 temp = None
 try:
-    if not os.path.isdir(parent):
-        raise ValueError('Le repertoire parent doit exister.')
-    lock_fd = os.open(os.path.join(parent, '.romeo-mcp-files.lock'),
-                      os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    parent, name = confined_parent(path, request['roots'])
+    lock_fd = os.open('.romeo-mcp-files.lock',
+                      os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=parent)
     with os.fdopen(lock_fd, 'w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        exists = os.path.lexists(path)
+        try:
+            info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            info = None
+        exists = info is not None
         mode = 0o600
         if request['action'] == 'create':
             if exists:
                 raise ValueError('La cible existe deja ; utilise file_replace.')
         else:
-            if not exists or not stat.S_ISREG(os.lstat(path).st_mode):
+            if not exists or not stat.S_ISREG(info.st_mode):
                 raise ValueError('La cible doit etre un fichier regulier existant, sans lien symbolique.')
-            mode = stat.S_IMODE(os.lstat(path).st_mode)
+            mode = stat.S_IMODE(info.st_mode)
             expected = request.get('expected')
             if expected:
                 digest = hashlib.sha256()
-                with open(path, 'rb') as current:
+                with os.fdopen(os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=parent), 'rb') as current:
                     for block in iter(lambda: current.read(1048576), b''):
                         digest.update(block)
                 if digest.hexdigest() != expected:
                     raise ValueError('Empreinte differente : le fichier a change. Relis-le avant de remplacer.')
         data = base64.b64decode(request['content'])
-        fd, temp = tempfile.mkstemp(prefix='.romeo-write-', dir=parent)
+        candidate = '.romeo-write-' + secrets.token_hex(16)
+        fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+        temp = candidate
         with os.fdopen(fd, 'wb') as output:
             os.fchmod(output.fileno(), mode)
             output.write(data)
             output.flush()
             os.fsync(output.fileno())
         if request['action'] == 'create':
-            os.link(temp, path)
+            os.link(temp, name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
         else:
-            os.replace(temp, path)
+            os.replace(temp, name, src_dir_fd=parent, dst_dir_fd=parent)
             temp = None
         print(json.dumps({'ok': True, 'path': path, 'bytes': len(data),
                           'sha256': hashlib.sha256(data).hexdigest(), 'action': request['action']}))
@@ -57,7 +63,9 @@ except (OSError, ValueError) as exc:
     print(json.dumps({'ok': False, 'error': str(exc)}))
 finally:
     if temp is not None:
-        os.unlink(temp)
+        os.unlink(temp, dir_fd=parent)
+    if parent is not None:
+        os.close(parent)
 '''
 
 
@@ -69,7 +77,8 @@ def _write(connection, path, content, action, expected=None):
         raise ValueError('Contenu texte limite a 64 Kio par appel.')
     target = check_path(path, connection.home, connection.scratch, connection.path_aliases)
     request = json.dumps({'path': target, 'content': base64.b64encode(raw).decode(),
-                          'action': action, 'expected': expected.lower() if expected else None})
+                          'action': action, 'expected': expected.lower() if expected else None,
+                          'roots': roots_for(connection)})
     response = connection.run('python3 -c {} {}'.format(shlex.quote(_WRITE), shlex.quote(request)),
                               timeout=60, max_chars=4000)
     if not response.ok or response.truncated:

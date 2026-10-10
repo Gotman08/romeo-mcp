@@ -122,6 +122,16 @@ Le scratch contient les données des calculs en cours.
             with self.assertRaises(ValueError):
                 docsearch.read_page(self.root, "stockage.md", **kwargs)
 
+    def test_unknown_page_errors_do_not_reflect_large_or_invalid_inputs(self):
+        for page in ('x' * 1024, 'x' * 1025, 'x' * 65536 + '.md', '😀' * 1048576,
+                     'x\x00.md', 'missing\npage.md', ''):
+            with self.subTest(size=len(page)), patch.dict(os.environ, {'ROMEO_DOCS_DIR': str(self.root)}):
+                result = outils_contexte.read_doc(page, max_chars=500)
+                self.assertFalse(result['ok'])
+                self.assertLess(len(result['error']), 250)
+                self.assertLess(len(json.dumps(result)), 1000)
+                self.assertLess(len(outils_contexte.docs_page(page)), 250)
+
     def test_match_near_end_of_very_long_line(self):
         text = "# Catalogue\n\n" + "A " * 1800 + "ciblerarefin\n"
         (self.root / "catalogue.md").write_text(text, encoding="utf-8")
@@ -194,6 +204,12 @@ Le scratch contient les données des calculs en cours.
                     self.assertIn("sommaire", result.contents[0].text.lower())
                     result = await session.read_resource("romeo://docs/ressources/romeo_2025/Logiciels/Architecture%20Aarch64.md")
                     self.assertIn("# Architecture Aarch64", result.contents[0].text)
+                    for size in (65536, 1048576):
+                        result = await session.call_tool('read_doc', {'page': 'x' * size + '.md', 'max_chars': 500})
+                        self.assertFalse(result.structured_content['ok'])
+                        self.assertLess(len(result.model_dump_json()), 1000)
+                    healthy = await session.call_tool('read_doc', {'page': STORAGE, 'max_chars': 500})
+                    self.assertTrue(healthy.structured_content['ok'])
 
         asyncio.run(run())
 

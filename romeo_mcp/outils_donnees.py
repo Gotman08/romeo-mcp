@@ -15,6 +15,7 @@ from pathlib import Path
 from pydantic import Field
 from . import files
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
+from .remote_paths import DIRECTORY_TARGET, directory_command, roots_for
 from .validation import validate_script
 from .file_operations import check_script_paths, create_file, replace_file
 from .plans import submit_prepared
@@ -58,7 +59,8 @@ def list_dir(path: str = ".", limit: int = 100) -> dict[str, Any]:
     try:
         result = _sh(
             s,
-            "python3 -c {} {} {}".format(shlex.quote(LIST_DIRECTORY), shlex.quote(target), limit),
+            "python3 -c {} {} {} {}".format(shlex.quote(LIST_DIRECTORY), shlex.quote(target), limit,
+                                          shlex.quote(json.dumps(roots_for(s)))),
             timeout=40,
             # 255 octets par nom POSIX, au plus six caracteres JSON par octet,
             # plus les metadonnees. Aucun texte humain n'est decoupe.
@@ -104,8 +106,9 @@ def read_remote_file(
     try:
         result = _sh(
             s,
-            "python3 -c {} {} {} {} {}".format(
-                shlex.quote(READ_TEXT), shlex.quote(target), offset, limit, max_chars
+            "python3 -c {} {} {} {} {} {}".format(
+                shlex.quote(READ_TEXT), shlex.quote(target), offset, limit, max_chars,
+                shlex.quote(json.dumps(roots_for(s)))
             ),
             timeout=45,
             # Un caractere Unicode hors BMP occupe douze caracteres en JSON
@@ -156,7 +159,8 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
     s = session()
     try:
         target = check_path(remote_path, s.home, s.scratch, s.path_aliases)
-        resultat = files.upload(s.host, local_path, target)
+        with files.confined_paths(roots_for(s), verify):
+            resultat = files.upload(s.host, local_path, target)
     except (GuardError, SSHError) as exc:
         return _error(str(exc))
 
@@ -173,13 +177,13 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
     # tard de facon opaque : mieux vaut le savoir maintenant.
     try:
         locale = files.empreinte_locale(source)
-        distante = _sh(s, files.commande_empreinte(target), timeout=300)
+        distante = None if 'remote_sha256' in resultat else _sh(s, files.commande_empreinte(target), timeout=300)
     except (OSError, SSHError, SSHTimeout) as exc:
         reponse["verifie"] = False
         reponse["avertissement"] = "controle impossible : {}".format(exc)
         return reponse
 
-    distante_hex = files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
+    distante_hex = (resultat.get('remote_sha256') or '') if distante is None else files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
     reponse["empreinte_locale"] = locale
     reponse["empreinte_distante"] = distante_hex
     # Empreinte illisible et empreintes differentes sont deux diagnostics
@@ -189,7 +193,7 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
         reponse["verifie"] = False
         reponse["avertissement"] = (
             "impossible de lire l'empreinte distante : {}".format(
-                distante.stdout.strip()[:200] or "aucune sortie"
+                distante.stdout.strip()[:200] if distante is not None else "aucune empreinte"
             )
         )
         return reponse
@@ -213,7 +217,8 @@ def download_from_romeo(
     s = session()
     try:
         source = check_path(remote_path, s.home, s.scratch, s.path_aliases)
-        resultat = files.download(s.host, source, local_path, recursive)
+        with files.confined_paths(roots_for(s), verify):
+            resultat = files.download(s.host, source, local_path, recursive)
     except (GuardError, SSHError) as exc:
         return _error(str(exc))
 
@@ -224,21 +229,21 @@ def download_from_romeo(
         return reponse
 
     try:
-        distante = _sh(s, files.commande_empreinte(source), timeout=300)
+        distante = None if 'remote_sha256' in resultat else _sh(s, files.commande_empreinte(source), timeout=300)
         locale = files.empreinte_locale(destination)
     except (OSError, SSHError, SSHTimeout) as exc:
         reponse["verifie"] = False
         reponse["avertissement"] = "controle impossible : {}".format(exc)
         return reponse
 
-    distante_hex = files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
+    distante_hex = (resultat.get('remote_sha256') or '') if distante is None else files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
     reponse["empreinte_locale"] = locale
     reponse["empreinte_distante"] = distante_hex
     if not distante_hex:
         reponse["verifie"] = False
         reponse["avertissement"] = (
             "impossible de lire l'empreinte distante : {}".format(
-                distante.stdout.strip()[:200] or "aucune sortie"
+                distante.stdout.strip()[:200] if distante is not None else "aucune empreinte"
             )
         )
         return reponse
@@ -272,7 +277,7 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         return _error(str(exc))
 
     top = max(3, min(int(top), 40))
-    q = shlex.quote(cible)
+    q = DIRECTORY_TARGET
     commande = (
         "echo '###DIRS'; du -x -h --max-depth=2 {q} 2>/dev/null | sort -rh | head -n {n}; "
         "echo '###GROS'; find {q} -xdev -type f -size +200M -printf '%s\\t%p\\n' "
@@ -281,11 +286,12 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         "-mtime +14 -printf '%s\\t%p\\n' 2>/dev/null | sort -rn | head -n {n}; "
         "echo '###VENVS'; find {q} -xdev -maxdepth 4 -type d -name 'site-packages' "
         "2>/dev/null | head -n {n}; "
-        "echo '###CACHES'; du -x -sh {q}/.cache {q}/ia 2>/dev/null"
+        "echo '###CACHES'; du -x -sh {q}/.cache {q}/ia 2>/dev/null || :"
     ).format(q=q, n=top)
 
     try:
-        resultat = _sh(s, commande, timeout=240, max_chars=20_000)
+        resultat = _sh(s, directory_command(s, cible, commande, 235),
+                       timeout=240, max_chars=20_000, read_only=True)
     except SSHTimeout:
         return _error(
             "l'inventaire a depasse le delai : cible un sous-repertoire precis "
@@ -293,6 +299,9 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         )
     except SSHError as exc:
         return _error(str(exc))
+
+    if not resultat.ok or resultat.truncated:
+        return _error('Inventaire distant refuse ou incomplet.', detail=resultat.stdout[:500])
 
     sections: dict[str, list[str]] = {}
     courant = None
@@ -416,7 +425,7 @@ def audit_orphan_files(
     days = max(1, min(int(days), 365))
     min_size_mb = max(1, min(int(min_size_mb), 100_000))
     top = max(5, min(int(top), 100))
-    q = shlex.quote(cible)
+    q = DIRECTORY_TARGET
 
     commande = (
         "echo '###ANCIENS'; find {q} -xdev -type f -size +{taille}M -mtime +{jours} "
@@ -430,7 +439,8 @@ def audit_orphan_files(
     ).format(q=q, taille=min_size_mb, jours=days, n=top)
 
     try:
-        resultat = _sh(s, commande, timeout=300, max_chars=25_000)
+        resultat = _sh(s, directory_command(s, cible, commande, 295),
+                       timeout=300, max_chars=25_000, read_only=True)
     except SSHTimeout:
         return _error(
             "l'inventaire a depasse le delai : cible un sous-repertoire avec "
@@ -438,6 +448,9 @@ def audit_orphan_files(
         )
     except SSHError as exc:
         return _error(str(exc))
+
+    if not resultat.ok or resultat.truncated:
+        return _error('Inventaire distant refuse ou incomplet.', detail=resultat.stdout[:500])
 
     sections: dict[str, list[str]] = {}
     courant = None

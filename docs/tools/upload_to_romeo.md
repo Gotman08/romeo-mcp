@@ -48,11 +48,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Le contrôle d’intégrité n’est pas appliqué aux répertoires. ok=true avec verifie=false ne démontre pas l’intégrité du contenu ; une destination existante peut être modifiée par le transfert.
 
+Le transfert MCP utilise SCP avec des descripteurs distants conservés pendant la copie. L’envoi passe par un dossier privé, supprimé après publication ou annulation, pour empêcher une substitution de lien de rediriger l’écriture. Les liens symboliques et fichiers spéciaux dans les répertoires publiés sont refusés. Les noms et alias GPFS autorisés sont conservés.
+
 ## Voir aussi
 
 [`list_dir`](list_dir.md) · [`download_from_romeo`](download_from_romeo.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L154) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L157) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

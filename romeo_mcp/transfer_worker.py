@@ -37,6 +37,10 @@ def run(plan_path):
             raise ValueError("Annulation d'un autre transfert")
         return True
 
+    def check_cancelled():
+        if cancelled():
+            raise TransferCancelled()
+
     def execute(argv, what):
         environment = dict(_environnement_ssh() or os.environ)
         environment["LC_ALL"] = "C"
@@ -96,7 +100,7 @@ def run(plan_path):
         if plan["target"] != {"host": connection.host, "user": connection.user, "account": DEFAULT_ACCOUNT}:
             raise ValueError("Cible SSH modifiee avant execution")
         from .outils_donnees import upload_to_romeo, download_from_romeo
-        with files.transfer_runner(execute):
+        with files.transfer_runner(execute, check_cancelled):
             if plan["direction"] == "upload":
                 response = upload_to_romeo.__wrapped__(plan["local_path"], plan["remote_path"], plan["verify"])
             else:

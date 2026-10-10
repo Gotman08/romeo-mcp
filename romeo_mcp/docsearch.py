@@ -19,6 +19,7 @@ from pathlib import Path
 
 
 _STOP = set("a au aux avec ce ces cet cette dans de des du en et est etre il la le les leur ne on ou par pas pour que quel quelle quelles quels qui se ses son sur un une vos votre the and for of to in is how what les comment pourquoi peux peut faire utiliser".split())
+MAX_PAGE_NAME = 1024
 
 
 def normalized(text: str) -> str:
@@ -33,14 +34,22 @@ def tokens(text: str) -> list[str]:
 
 
 def resolve_page(directory: Path, page: str) -> Path:
+    if not page or len(page) > MAX_PAGE_NAME:
+        raise ValueError("Nom de page vide ou trop long (maximum 1024 caracteres). Consulte romeo://docs.")
+    if "\x00" in page:
+        raise ValueError("Nom de page invalide. Consulte romeo://docs.")
     root = directory.resolve()
     if not root.is_dir():
         raise ValueError(f"Documentation absente en {root}. Reinstaller le paquet avec son corpus ou verifier ROMEO_DOCS_DIR.")
-    path = (root / page).resolve()
+    try:
+        path = (root / page).resolve()
+        is_page = path.suffix.lower() == ".md" and path.is_file()
+    except (OSError, ValueError, RuntimeError):
+        raise ValueError("Nom de page invalide. Consulte romeo://docs.") from None
     if not path.is_relative_to(root):
         raise ValueError("Chemin hors du dossier de documentation.")
-    if path.suffix.lower() != ".md" or not path.is_file():
-        raise ValueError(f"Page Markdown introuvable : {page}. Consulte romeo://docs.")
+    if not is_page:
+        raise ValueError("Page Markdown introuvable. Consulte romeo://docs.")
     return path
 
 

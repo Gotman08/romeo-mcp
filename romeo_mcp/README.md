@@ -61,7 +61,7 @@ complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 | Configuration personnelle et diagnostic | [config.py](config.py), [doctor.py](doctor.py) |
 | Mises à jour et lancement des versions | [updates.py](updates.py), [guide utilisateur](../docs/updates.md) |
 | Ressources et vérification du modèle | [cluster.py](cluster.py), [verification.py](verification.py) |
-| Transport et fichiers | [ssh.py](ssh.py), [files.py](files.py), [sortie.py](sortie.py) |
+| Transport et fichiers | [ssh.py](ssh.py), [files.py](files.py), [remote_paths.py](remote_paths.py), [confined_transfers.py](confined_transfers.py), [sortie.py](sortie.py) |
 | Validation locale | [validation.py](validation.py), [guard.py](guard.py) |
 | Plans et cycles de vie | [plans.py](plans.py), [services.py](services.py), [service_models.py](service_models.py) |
 | Opérations métier | [python_operations.py](python_operations.py), [workload_preparation.py](workload_preparation.py) |

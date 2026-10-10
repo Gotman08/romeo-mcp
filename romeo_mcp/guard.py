@@ -67,7 +67,7 @@ def allowed_roots(
     """
     roots = [home, scratch, "/project", "/gpfs/projet", "/apps", "/tmp"]
     for alias in extra:
-        candidat = (alias or "").strip()
+        candidat = alias or ""
         if candidat.startswith("/") and candidat not in roots:
             roots.append(posixpath.normpath(candidat))
     return roots
@@ -415,12 +415,18 @@ def check_login_command(command: str, allow_heavy: bool = False) -> None:
 def check_path(
     path: str, home: str, scratch: str, extra_roots: Sequence[str] = ()
 ) -> str:
-    """Normalise un chemin distant et verifie qu'il reste dans une racine permise."""
-    if not path or not path.strip():
+    """Valide le chemin litteral ; les sondes distantes confinent aussi sa cible physique."""
+    if not path:
         raise GuardError("chemin vide")
+    if len(path) > 4096 or "\x00" in path:
+        raise GuardError("chemin invalide ou trop long (maximum 4096 caracteres)")
+    try:
+        path.encode('utf-8')
+    except UnicodeError:
+        raise GuardError('chemin UTF-8 invalide') from None
 
-    raw = path.strip()
-    if raw.startswith("~"):
+    raw = path
+    if raw == "~" or raw.startswith("~/"):
         raw = home + raw[1:]
     if not raw.startswith("/"):
         raw = posixpath.join(scratch, raw)

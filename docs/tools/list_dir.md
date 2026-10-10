@@ -52,7 +52,7 @@ Les chemins doivent rester dans les racines autorisées. limit est ramené entre
 
 [`read_remote_file`](read_remote_file.md) · [`download_from_romeo`](download_from_romeo.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L49) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L50) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
