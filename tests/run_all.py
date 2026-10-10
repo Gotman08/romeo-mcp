@@ -34,6 +34,8 @@ SUITES = [
      "diagnostic, lanceurs, gabarits, materiel", False),
     ("regressions", "tests/test_regressions.py",
      "defauts constates : ils doivent rester corriges", False),
+    ("mcp-boundaries", "tests/test_mcp_boundaries.py",
+     "cadrage SSH, catalogues Spack, enveloppes shell et fichiers bornes", False),
     ("job-io", "tests/test_job_io.py",
      "tableaux concurrents dans un meme dossier et contenu reel des journaux", False),
     ("tool-actions", "tests/test_tool_actions.py",

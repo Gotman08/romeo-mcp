@@ -38,19 +38,21 @@ Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser 
 
 ## Résultat
 
-Les entrées disponibles du dossier, limitées au budget demandé.
+Les entrées disponibles du dossier, limitées au budget demandé, avec `name`, `size`, `modified`, `is_dir` et `is_symlink`. Le nom d'un lien ne contient pas sa cible. Les noms conservent notamment les espaces, tabulations, sauts de ligne et caractères Unicode. `truncated` indique si d'autres entrées existent.
+
+Pour un nom POSIX contenant des octets invalides en UTF-8, `name` est une représentation lisible avec caractères de remplacement et `name_bytes_base64` conserve les octets exacts. Les autres entrées restent accessibles.
 
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
 ## Prérequis et limites
 
-Les chemins doivent rester dans les racines autorisées. Une liste bornée peut ne pas contenir toutes les entrées du dossier.
+Les chemins doivent rester dans les racines autorisées. limit est ramené entre 1 et 500 entrées. La liste est triée par nom, sans parcours récursif, et utilise Python 3 sur le login. Un dossier absent ou illisible renvoie une erreur ; une réponse distante tronquée n'est pas présentée comme une liste valide.
 
 ## Voir aussi
 
 [`read_remote_file`](read_remote_file.md) · [`download_from_romeo`](download_from_romeo.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L30) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L49) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
