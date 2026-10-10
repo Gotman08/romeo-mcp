@@ -36,6 +36,8 @@ SUITES = [
      "defauts constates : ils doivent rester corriges", False),
     ("mcp-boundaries", "tests/test_mcp_boundaries.py",
      "cadrage SSH, catalogues Spack, enveloppes shell et fichiers bornes", False),
+    ("confined-paths", "tests/test_confined_paths.py",
+     "noms litteraux, liens symboliques, substitutions et transferts confines", False),
     ("job-io", "tests/test_job_io.py",
      "tableaux concurrents dans un meme dossier et contenu reel des journaux", False),
     ("tool-actions", "tests/test_tool_actions.py",

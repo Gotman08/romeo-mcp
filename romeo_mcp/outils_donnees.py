@@ -15,6 +15,7 @@ from pathlib import Path
 from pydantic import Field
 from . import files
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
+from .remote_paths import roots_for
 from .validation import validate_script
 from .file_operations import check_script_paths, create_file, replace_file
 from .plans import submit_prepared
@@ -58,7 +59,8 @@ def list_dir(path: str = ".", limit: int = 100) -> dict[str, Any]:
     try:
         result = _sh(
             s,
-            "python3 -c {} {} {}".format(shlex.quote(LIST_DIRECTORY), shlex.quote(target), limit),
+            "python3 -c {} {} {} {}".format(shlex.quote(LIST_DIRECTORY), shlex.quote(target), limit,
+                                          shlex.quote(json.dumps(roots_for(s)))),
             timeout=40,
             # 255 octets par nom POSIX, au plus six caracteres JSON par octet,
             # plus les metadonnees. Aucun texte humain n'est decoupe.
@@ -104,8 +106,9 @@ def read_remote_file(
     try:
         result = _sh(
             s,
-            "python3 -c {} {} {} {} {}".format(
-                shlex.quote(READ_TEXT), shlex.quote(target), offset, limit, max_chars
+            "python3 -c {} {} {} {} {} {}".format(
+                shlex.quote(READ_TEXT), shlex.quote(target), offset, limit, max_chars,
+                shlex.quote(json.dumps(roots_for(s)))
             ),
             timeout=45,
             # Un caractere Unicode hors BMP occupe douze caracteres en JSON
@@ -156,7 +159,8 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
     s = session()
     try:
         target = check_path(remote_path, s.home, s.scratch, s.path_aliases)
-        resultat = files.upload(s.host, local_path, target)
+        with files.confined_paths(roots_for(s), verify):
+            resultat = files.upload(s.host, local_path, target)
     except (GuardError, SSHError) as exc:
         return _error(str(exc))
 
@@ -173,13 +177,13 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
     # tard de facon opaque : mieux vaut le savoir maintenant.
     try:
         locale = files.empreinte_locale(source)
-        distante = _sh(s, files.commande_empreinte(target), timeout=300)
+        distante = None if 'remote_sha256' in resultat else _sh(s, files.commande_empreinte(target), timeout=300)
     except (OSError, SSHError, SSHTimeout) as exc:
         reponse["verifie"] = False
         reponse["avertissement"] = "controle impossible : {}".format(exc)
         return reponse
 
-    distante_hex = files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
+    distante_hex = (resultat.get('remote_sha256') or '') if distante is None else files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
     reponse["empreinte_locale"] = locale
     reponse["empreinte_distante"] = distante_hex
     # Empreinte illisible et empreintes differentes sont deux diagnostics
@@ -189,7 +193,7 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
         reponse["verifie"] = False
         reponse["avertissement"] = (
             "impossible de lire l'empreinte distante : {}".format(
-                distante.stdout.strip()[:200] or "aucune sortie"
+                distante.stdout.strip()[:200] if distante is not None else "aucune empreinte"
             )
         )
         return reponse
@@ -213,7 +217,8 @@ def download_from_romeo(
     s = session()
     try:
         source = check_path(remote_path, s.home, s.scratch, s.path_aliases)
-        resultat = files.download(s.host, source, local_path, recursive)
+        with files.confined_paths(roots_for(s), verify):
+            resultat = files.download(s.host, source, local_path, recursive)
     except (GuardError, SSHError) as exc:
         return _error(str(exc))
 
@@ -224,21 +229,21 @@ def download_from_romeo(
         return reponse
 
     try:
-        distante = _sh(s, files.commande_empreinte(source), timeout=300)
+        distante = None if 'remote_sha256' in resultat else _sh(s, files.commande_empreinte(source), timeout=300)
         locale = files.empreinte_locale(destination)
     except (OSError, SSHError, SSHTimeout) as exc:
         reponse["verifie"] = False
         reponse["avertissement"] = "controle impossible : {}".format(exc)
         return reponse
 
-    distante_hex = files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
+    distante_hex = (resultat.get('remote_sha256') or '') if distante is None else files.empreinte_depuis_sortie(distante.stdout) if distante.ok else ""
     reponse["empreinte_locale"] = locale
     reponse["empreinte_distante"] = distante_hex
     if not distante_hex:
         reponse["verifie"] = False
         reponse["avertissement"] = (
             "impossible de lire l'empreinte distante : {}".format(
-                distante.stdout.strip()[:200] or "aucune sortie"
+                distante.stdout.strip()[:200] if distante is not None else "aucune empreinte"
             )
         )
         return reponse

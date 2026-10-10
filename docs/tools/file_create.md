@@ -46,11 +46,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Toute cible existante, y compris un lien symbolique, est refusée. Le contenu est limité à 64 Kio ; utiliser file_replace pour un remplacement explicite.
 
+Le nom demandé est conservé exactement, y compris ses espaces finaux. Le parent physique doit rester dans les racines autorisées ; des descripteurs de répertoires empêchent un changement de lien de rediriger l’écriture. Les alias GPFS autorisés restent acceptés.
+
 ## Voir aussi
 
 [`file_replace`](file_replace.md) · [`read_remote_file`](read_remote_file.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L139) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L142) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

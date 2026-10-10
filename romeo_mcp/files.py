@@ -11,6 +11,7 @@ session persistante, dont le protocole a sentinelles est concu pour du texte.
 from __future__ import annotations
 
 import hashlib
+import posixpath
 import shlex
 import shutil
 import subprocess
@@ -22,15 +23,28 @@ from .ssh import SSHError
 
 _TRANSFER_TIMEOUT = 900  # 15 min : un resultat de simulation peut etre lourd.
 _RUNNER = ContextVar("romeo_transfer_runner", default=None)
+_CONFINEMENT = ContextVar("romeo_transfer_confinement", default=None)
+_CANCEL_CHECK = ContextVar("romeo_transfer_cancel_check", default=None)
 
 
 @contextmanager
-def transfer_runner(executor):
-    """Inject supervision in a detached worker without changing synchronous callers."""
-    token = _RUNNER.set(executor)
+def confined_paths(roots, verify=True):
+    token = _CONFINEMENT.set((roots, verify))
     try:
         yield
     finally:
+        _CONFINEMENT.reset(token)
+
+
+@contextmanager
+def transfer_runner(executor, cancellation_check=None):
+    """Inject supervision in a detached worker without changing synchronous callers."""
+    token = _RUNNER.set(executor)
+    cancel_token = _CANCEL_CHECK.set(cancellation_check)
+    try:
+        yield
+    finally:
+        _CANCEL_CHECK.reset(cancel_token)
         _RUNNER.reset(token)
 
 
@@ -109,6 +123,19 @@ def upload(host: str, local_path: str, remote_path: str) -> dict:
     if not source.exists():
         raise SSHError("fichier local introuvable : {}".format(source))
 
+    policy = _CONFINEMENT.get()
+    if policy is not None:
+        from .confined_transfers import TransferGuard
+        with TransferGuard(host, remote_path, policy[0], 'upload', source.name, source.is_dir(), policy[1]) as guard:
+            argv = ['scp', '-q', '-o', 'BatchMode=yes']
+            if source.is_dir():
+                argv.append('-r')
+            _run([*argv, str(source), '{}:{}'.format(host, guard.ready['proxy'])], 'envoi confine')
+            observed = guard.commit()
+        size = sum(f.stat().st_size for f in source.rglob('*') if f.is_file()) if source.is_dir() else source.stat().st_size
+        return {'sent': str(source), 'to': observed['actual_path'], 'bytes': size,
+                'transport': 'scp', 'remote_sha256': observed['sha256']}
+
     target = "{}:{}".format(host, remote_path)
     if _has_rsync():
         argv = ["rsync", "-az", "--partial", str(source), target]
@@ -138,6 +165,22 @@ def download(host: str, remote_path: str, local_path: str, recursive: bool = Fal
     """Rapatrie un fichier ou un repertoire depuis ROMEO."""
     destination = Path(local_path).expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
+
+    policy = _CONFINEMENT.get()
+    if policy is not None:
+        from .confined_transfers import TransferGuard
+        name = posixpath.basename(remote_path)
+        with TransferGuard(host, remote_path, policy[0], 'download', name, recursive, policy[1]) as guard:
+            if not guard.ready['is_dir'] and destination.is_dir():
+                destination = destination / name
+            argv = ['scp', '-q', '-o', 'BatchMode=yes']
+            if recursive:
+                argv.append('-r')
+            _run([*argv, '{}:{}'.format(host, guard.ready['proxy']), str(destination)], 'recuperation confinee')
+            observed = guard.commit()
+        return {'downloaded': remote_path, 'to': str(destination),
+                'bytes': destination.stat().st_size if destination.is_file() else None,
+                'transport': 'scp', 'remote_sha256': observed['sha256']}
 
     source = "{}:{}".format(host, remote_path)
     if _has_rsync():

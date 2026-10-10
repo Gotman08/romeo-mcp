@@ -64,6 +64,7 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 | `units` | [test_units.py](test_units.py) | Durées, ressources, partitions, scripts et garde-fous |
 | `workloads` | [test_workloads.py](test_workloads.py) | Lanceurs, gabarits, diagnostics et modèles matériels |
 | `regressions` | [test_regressions.py](test_regressions.py) | Corrections de défauts déjà rencontrés |
+| `confined-paths` | [test_confined_paths.py](test_confined_paths.py) | Noms exacts, racines physiques, changements de liens et transferts conservant leurs descripteurs ; cas POSIX exécutés sur Linux |
 | `job-io` | [test_job_io.py](test_job_io.py) | Huit tableaux soumis simultanément dans le même dossier, scripts isolés, empreintes et lecture des journaux |
 | `tool-actions` | [test_tool_actions.py](test_tool_actions.py) | Contrats MCP, effets annoncés, plans persistants, scripts exacts, appels concurrents et reprise après échec |
 | `lifecycles` | [test_lifecycles.py](test_lifecycles.py) | Parcours des services, allocations, environnements Python et fichiers |

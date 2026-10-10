@@ -166,7 +166,7 @@ class FileBudgetTests(unittest.TestCase):
                 remote.assert_not_called()
 
 
-@unittest.skipUnless(BASH, "bash local necessaire, aucun acces SSH")
+@unittest.skipUnless(BASH and os.name == 'posix', "sondes distantes POSIX avec dir_fd ; couvertes sur Linux")
 class DirectoryAndReadTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="romeo-boundaries-")

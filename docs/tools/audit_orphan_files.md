@@ -53,7 +53,7 @@ Un fichier sans job actif peut rester utile à une expérience. Cet inventaire n
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`romeo_quota`](romeo_quota.md) · [`list_jobs`](list_jobs.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L406) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L411) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -49,11 +49,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Les transferts récursifs ne sont pas contrôlés par empreinte. ok=true avec verifie=false indique un transfert sans preuve d’intégrité ; choisir la destination locale avec soin.
 
+Le transfert MCP utilise SCP depuis un descripteur distant conservé pendant la copie. Une lecture récursive passe par un instantané privé temporaire dans `/tmp`, qui demande un espace suffisant ; les liens symboliques et fichiers spéciaux de son contenu sont refusés. Cet instantané est supprimé après la copie ou son annulation. Les alias GPFS autorisés restent utilisables.
+
 ## Voir aussi
 
 [`list_dir`](list_dir.md) · [`read_remote_file`](read_remote_file.md) · [`upload_to_romeo`](upload_to_romeo.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L209) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L213) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

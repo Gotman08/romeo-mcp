@@ -49,11 +49,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 offset commence à 1 ; limit est ramené entre 1 et 2 000 lignes. Une valeur max_chars invalide est refusée avant SSH. Le contenu conserve les sauts de ligne et les caractères Unicode ; `truncated=true` signale que la tranche dépasse le budget, sans ajouter de marqueur au contenu. Le comptage inclut la dernière ligne même sans LF final. La sonde lit le fichier par blocs et ne conserve que la tranche bornée. Pour un gros fichier, choisir des tranches utiles ; utiliser download_from_romeo pour rapatrier le fichier.
 
+Les noms sont conservés exactement, espaces finaux inclus. Les liens vers une racine exclue sont refusés ; la cible physique est ouverte sans suivre un nouveau lien après vérification. Les alias GPFS autorisés restent utilisables.
+
 ## Voir aussi
 
 [`list_dir`](list_dir.md) · [`download_from_romeo`](download_from_romeo.md) · [`sbatch_validate`](sbatch_validate.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L90) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L92) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

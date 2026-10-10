@@ -220,6 +220,7 @@ class Reports(unittest.TestCase):
 
 
 class Files(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix', 'publication distante POSIX avec dir_fd ; couverte sur Linux')
     def test_create_replace_and_parallel_compare_and_swap_on_real_files(self):
         # Le programme distant POSIX est execute sur de vrais fichiers. Sous
         # Windows seuls flock et fchmod sont adaptes ; link/replace restent reels.

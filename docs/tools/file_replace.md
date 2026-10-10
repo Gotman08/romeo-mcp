@@ -48,11 +48,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Le contenu est limité à 64 Kio et les permissions sont conservées. Le verrou coordonne ces outils ; les autres programmes qui écrivent doivent respecter le même verrou.
 
+Le nom demandé est conservé exactement, y compris ses espaces finaux. Le parent physique est contrôlé et conservé par un descripteur pendant la publication. Un lien vers une racine exclue ne permet pas de remplacer son contenu.
+
 ## Voir aussi
 
 [`file_create`](file_create.md) · [`read_remote_file`](read_remote_file.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L147) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L150) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

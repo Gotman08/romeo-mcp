@@ -48,7 +48,7 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
-Les lignes commencent à 1 et les bornes sont inclusives. Si truncated est vrai, suivre next_call pour obtenir la suite exacte ; expected_sha256 détecte un changement de page.
+Les lignes commencent à 1 et les bornes sont inclusives. Si truncated est vrai, suivre next_call pour obtenir la suite exacte ; expected_sha256 détecte un changement de page. Le nom de page est limité à 1 024 caractères ; les erreurs restent compactes même pour une entrée surdimensionnée.
 
 ## Voir aussi
 
