@@ -292,6 +292,7 @@ class Reservations(unittest.TestCase):
                 self.assertTrue(entered.wait(10))
                 with self.assertRaises(ResourceBusy):
                     checkpoint_storage.protect(checkpoint, source, self.root/'backup-two', {})
+                self.assertFalse((self.root/'backup-two').exists())
             finally:
                 release.set()
             self.assertTrue(first.result(timeout=10)['ok'])

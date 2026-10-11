@@ -181,11 +181,12 @@ def protection_lock(path):
 
 def protect(checkpoint, root, backup_dir, quota, keep_last=3, timeout=900):
     run = no_symlinks(Path(backup_dir) / checkpoint["manifest"]["run_id"])
-    run.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = run / ".protection.lock"
     source_run = Path(root) / checkpoint['manifest']['run_id']
-    with ResourceLease([(source_run, True), (run, True)]), protection_lock(lock):
-        result = copy_verified(checkpoint, backup_dir, quota, timeout=timeout)
-        result["retention"] = retain_protected(root, backup_dir, checkpoint, keep_last, timeout=timeout)
-        atomic_json(run / "protection.json", result)
-        return result
+    with ResourceLease([(source_run, True), (run, True)]):
+        run.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with protection_lock(lock):
+            result = copy_verified(checkpoint, backup_dir, quota, timeout=timeout)
+            result["retention"] = retain_protected(root, backup_dir, checkpoint, keep_last, timeout=timeout)
+            atomic_json(run / "protection.json", result)
+            return result
