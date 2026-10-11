@@ -3,17 +3,20 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import errno
+import heapq
 import io
 import json
 import os
 from pathlib import Path
 import shlex
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline
@@ -29,6 +32,85 @@ class LiteralPaths(unittest.TestCase):
         for name in ('', 'x\x00', 'x' * 4097, '/elsewhere/file'):
             with self.assertRaises(guard.GuardError):
                 guard.check_path(name, '/home/test', '/scratch/test')
+
+
+class ListingSnapshots(unittest.TestCase):
+    """Run the listing body on Windows too; descriptor confinement is POSIX."""
+
+    def entry(self, name, error=None, kind=stat.S_IFREG):
+        entry = Mock()
+        entry.name = name
+        entry.stat.side_effect = error
+        entry.stat.return_value = os.stat_result((kind | 0o600, 1, 1, 1, 1, 1, 11, 0, 0, 0))
+        return entry
+
+    def listing(self, entries, limit, open_error=None):
+        code = remote_reads.LIST_DIRECTORY[len(remote_paths.CONFINED_PATHS):]
+        output, exit_code = io.StringIO(), 0
+        opened = Mock(return_value=123, side_effect=open_error)
+        with patch.object(sys, 'argv', ['probe', '/fixture', str(limit), '["/fixture"]']), \
+                patch.object(os, 'O_DIRECTORY', getattr(os, 'O_DIRECTORY', 0), create=True), \
+                patch.object(os, 'scandir', return_value=contextlib.nullcontext(iter(entries))), \
+                patch.object(os, 'close') as closed, contextlib.redirect_stdout(output):
+            try:
+                exec(compile(code, '<listing-body>', 'exec'), {'confined_open': opened})
+            except SystemExit as exc:
+                exit_code = exc.code
+        if open_error is None:
+            closed.assert_called_once_with(123)
+        else:
+            closed.assert_not_called()
+        return json.loads(output.getvalue()), exit_code
+
+    def test_disappeared_names_do_not_fail_or_refill_a_bounded_snapshot(self):
+        vanished = self.entry('a-gone', FileNotFoundError(errno.ENOENT, 'removed'))
+        present, beyond, last = (self.entry(name) for name in ('b-present', 'c-beyond', 'z-last'))
+        result, exit_code = self.listing([last, beyond, present, vanished], 2)
+        self.assertEqual(exit_code, 0)
+        self.assertEqual([entry['name'] for entry in result['entries']], ['b-present'])
+        self.assertEqual(result['disappeared_entries'], 1)
+        self.assertTrue(result['truncated'])
+        vanished.stat.assert_called_once_with(follow_symlinks=False)
+        present.stat.assert_called_once_with(follow_symlinks=False)
+        beyond.stat.assert_not_called()
+        last.stat.assert_not_called()
+
+    def test_all_selected_names_can_disappear_with_count_at_the_limit(self):
+        vanished = [self.entry(str(n), FileNotFoundError(errno.ENOENT, 'removed')) for n in range(3)]
+        beyond = self.entry('z-beyond')
+        result, exit_code = self.listing([beyond, *vanished], 3)
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result, {'entries': [], 'truncated': True, 'disappeared_entries': 3})
+        beyond.stat.assert_not_called()
+
+    def test_permission_and_other_stat_errors_remain_errors(self):
+        for error in (PermissionError(errno.EACCES, 'denied'), OSError(errno.EIO, 'I/O failure'),
+                      NotADirectoryError(errno.ENOTDIR, 'invalid parent')):
+            with self.subTest(error=type(error).__name__):
+                result, exit_code = self.listing([self.entry('file', error)], 1)
+                self.assertEqual(exit_code, 2)
+                self.assertEqual(set(result), {'error'})
+                self.assertIn(str(error), result['error'])
+
+    def test_directory_absence_is_not_a_successful_empty_snapshot(self):
+        result, exit_code = self.listing([], 5, FileNotFoundError(errno.ENOENT, 'absent directory'))
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(set(result), {'error'})
+
+    def test_stable_snapshot_preserves_names_and_metadata_with_zero_disappeared(self):
+        entries = [self.entry('file \n'), self.entry('directory', kind=stat.S_IFDIR),
+                   self.entry('symlink', kind=stat.S_IFLNK)]
+        result, exit_code = self.listing(entries, 3)
+        self.assertEqual(exit_code, 0)
+        self.assertFalse(result['truncated'])
+        self.assertEqual(result['disappeared_entries'], 0)
+        listed = {entry['name']: entry for entry in result['entries']}
+        self.assertEqual(set(listed), {'file \n', 'directory', 'symlink'})
+        self.assertEqual(listed['file \n']['size'], '11')
+        self.assertTrue(listed['directory']['is_dir'])
+        self.assertFalse(listed['directory']['is_symlink'])
+        self.assertTrue(listed['symlink']['is_symlink'])
+        self.assertFalse(listed['symlink']['is_dir'])
 
 
 @unittest.skipUnless(os.name == 'posix', 'descripteurs et liens POSIX ; aucun SSH dans cette suite')
@@ -58,6 +140,50 @@ class ConfinedPaths(unittest.TestCase):
 
     def read(self, path, budget=100):
         return self.execute(remote_reads.READ_TEXT, [path, 1, 100, budget, json.dumps(self.roots)])
+
+    def test_listing_survives_real_atomic_publication_after_enumeration(self):
+        stage, target = self.inside/'.romeo-write-fixture', self.inside/'target'
+        stage.write_text('complete-new-generation')
+        target.write_text('old')
+        native_nsmallest = heapq.nsmallest
+
+        def publish_after_snapshot(*args, **kwargs):
+            selected = native_nsmallest(*args, **kwargs)
+            self.assertIn(stage.name, [entry.name for entry in selected])
+            os.replace(stage, target)
+            return selected
+
+        with patch.object(heapq, 'nsmallest', side_effect=publish_after_snapshot):
+            result = self.execute(remote_reads.LIST_DIRECTORY, [self.inside, 10, json.dumps(self.roots)])
+        self.assertEqual([entry['name'] for entry in result['entries']], ['target'])
+        self.assertEqual(result['disappeared_entries'], 1)
+        self.assertFalse(result['truncated'])
+        self.assertEqual(int(result['entries'][0]['size']), target.stat().st_size)
+        self.assertEqual(target.read_text(), 'complete-new-generation')
+        stable = self.execute(remote_reads.LIST_DIRECTORY, [self.inside, 10, json.dumps(self.roots)])
+        self.assertEqual(stable['disappeared_entries'], 0)
+
+    def test_listing_absent_directory_and_scan_permission_errors_are_refusals(self):
+        args = [self.inside/'missing', 10, json.dumps(self.roots)]
+        self.assertIn('error', self.execute(remote_reads.LIST_DIRECTORY, args))
+        with patch.object(os, 'scandir', side_effect=PermissionError(errno.EACCES, 'denied')):
+            result = self.execute(remote_reads.LIST_DIRECTORY, [self.inside, 10, json.dumps(self.roots)])
+        self.assertIn('denied', result['error'])
+        self.assertNotIn('entries', result)
+
+    def test_listing_byte_names_and_symlinks_remain_exact(self):
+        raw_name = b'raw-\xff'
+        path = os.fsencode(self.inside) + b'/' + raw_name
+        with open(path, 'wb') as output:
+            output.write(b'bytes')
+        (self.inside/'link').symlink_to(self.outside/'file')
+        result = self.execute(remote_reads.LIST_DIRECTORY, [self.inside, 10, json.dumps(self.roots)])
+        byte_entry = next(entry for entry in result['entries'] if 'name_bytes_base64' in entry)
+        self.assertEqual(base64.b64decode(byte_entry['name_bytes_base64']), raw_name)
+        link_entry = next(entry for entry in result['entries'] if entry['name'] == 'link')
+        self.assertTrue(link_entry['is_symlink'])
+        self.assertFalse(link_entry['is_dir'])
+        self.assertEqual(result['disappeared_entries'], 0)
 
     def logs(self, path, **kwargs):
         request = dict(targets={'out': str(path)}, roots=self.roots, stream='out',

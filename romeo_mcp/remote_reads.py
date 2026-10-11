@@ -14,8 +14,14 @@ try:
     with os.scandir(directory) as scan:
         selected = heapq.nsmallest(limit + 1, scan, key=lambda entry: entry.name)
     entries = []
+    disappeared_entries = 0
     for entry in selected[:limit]:
-        info = entry.stat(follow_symlinks=False)
+        try:
+            info = entry.stat(follow_symlinks=False)
+        except FileNotFoundError:
+            # Une publication atomique peut retirer son staging apres le scan.
+            disappeared_entries += 1
+            continue
         raw_name = os.fsencode(entry.name)
         name = raw_name.decode("utf-8", "replace")
         item = {"name": name, "size": str(info.st_size),
@@ -27,7 +33,8 @@ try:
             # Garder aussi les octets exacts, sans faire echouer tout le dossier.
             item["name_bytes_base64"] = base64.b64encode(raw_name).decode("ascii")
         entries.append(item)
-    print(json.dumps({"entries": entries, "truncated": len(selected) > limit}, ensure_ascii=True))
+    print(json.dumps({"entries": entries, "truncated": len(selected) > limit,
+                      "disappeared_entries": disappeared_entries}, ensure_ascii=True))
 except OSError as exc:
     print(json.dumps({"error": str(exc)}, ensure_ascii=True))
     sys.exit(2)

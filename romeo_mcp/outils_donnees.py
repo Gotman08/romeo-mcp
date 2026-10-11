@@ -141,7 +141,7 @@ def read_remote_file(
     "Cree un fichier texte sur ROMEO. Refuse toute cible existante, y compris un lien symbolique. "
     "Le repertoire parent doit exister ; publication atomique du contenu, permissions 600."))
 def file_create(path: str, content: str) -> dict[str, Any]:
-    return create_file(session(), path, content)
+    return create_file(session(longue=True), path, content)
 
 
 @outil(annotations=DESTRUCTIVE, description=(
@@ -149,7 +149,7 @@ def file_create(path: str, content: str) -> dict[str, Any]:
     "expected_sha256 facultatif refuse un contenu modifie depuis sa lecture. Publication atomique ; permissions conservees. "
     "Le verrou coordonne les ecritures de ces outils ; les autres programmes doivent respecter ce verrou."))
 def file_replace(path: str, content: str, expected_sha256: str | None = None) -> dict[str, Any]:
-    return replace_file(session(), path, content, expected_sha256)
+    return replace_file(session(longue=True), path, content, expected_sha256)
 
 @outil(
     annotations=MUTATING,

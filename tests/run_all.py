@@ -51,6 +51,8 @@ SUITES = [
      "fraicheur, coupures SSH, operations persistantes, transferts et annulation", False),
     ("concurrency", "tests/test_concurrency.py",
      "reservations interprocessus, collisions, publication privee et recuperation apres arret", False),
+    ("context-concurrency", "tests/test_context_concurrency.py",
+     "lectures reservees, workers distincts, saturation stdio et annulations comptabilisees", False),
     ("checkpoints", "tests/test_checkpoints.py",
      "reprise prouvee, rangs/signaux, quotas, protection et ressources paralleles", False),
     ("ajouts", "tests/test_ajouts.py",
