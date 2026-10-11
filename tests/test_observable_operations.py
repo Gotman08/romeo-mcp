@@ -2,6 +2,7 @@
 import asyncio
 import json
 import os
+import shlex
 import shutil
 import sys
 import tempfile
@@ -171,6 +172,97 @@ class ObservableTests(unittest.TestCase):
             cancel = transfers.cancel(identity, True)
             self.assertFalse(cancel["cancellation_observed"])
         self.assertEqual(spawn.call_count, 1)
+
+    def test_corrupt_transfer_plans_are_domain_refusals_and_never_start(self):
+        source = self.root/'source.txt'
+        source.write_text('fictional')
+        identity = transfers.prepare('upload', str(source), '/scratch/test-user/copy')['transfer_id']
+        directory, plan = transfers.load(identity)
+        faults = [[], None, {}, *[{k: v for k, v in plan.items() if k != missing} for missing in plan]]
+        for key, value in [('local_path', ''), ('remote_path', []), ('direction', []),
+                           ('recursive', 1), ('verify', None), ('target', []),
+                           ('created_at', 'text'), ('created_at', True),
+                           ('created_at', 10**400), ('created_at', float('nan'))]:
+            bad = {**plan, key: value}
+            bad['sha256'] = transfers.seal(bad)
+            faults.append(bad)
+        with patch.object(transfers.subprocess, 'Popen') as spawn:
+            for bad in faults:
+                with self.subTest(bad=bad):
+                    (directory/'plan.json').write_text(json.dumps(bad))
+                    for function in (transfers.status, lambda value: transfers.start(value, True)):
+                        with self.assertRaises(ValueError):
+                            function(identity)
+                    self.assertFalse((directory/'started.claim').exists())
+            spawn.assert_not_called()
+        transfers.atomic(directory/'plan.json', plan)
+        self.assertEqual(transfers.status(identity)['state'], 'prepared')
+
+    def test_corrupt_transfer_states_and_timestamps_are_domain_refusals(self):
+        source = self.root/'source.txt'
+        source.write_text('fictional')
+        identity = transfers.prepare('upload', str(source), '/scratch/test-user/copy')['transfer_id']
+        directory, _ = transfers.load(identity)
+        base = {'ok': True, 'transfer_id': identity, 'state': 'running', 'result_validated': False}
+        faults = [[], None, {}, {**base, 'transfer_id': 'f'*32}, {**base, 'state': []},
+                  {**base, 'state': 'unknown'}, {**base, 'ok': 1}, {**base, 'result_validated': []},
+                  *[{**base, 'heartbeat_at': value} for value in
+                    ('text', [], {}, True, -1, 10**400, float('nan'), float('inf'))]]
+        for bad in faults:
+            with self.subTest(bad=bad):
+                (directory/'status.json').write_text(json.dumps(bad))
+                with self.assertRaises(ValueError):
+                    transfers.status(identity)
+                with self.assertRaises(ValueError):
+                    transfers.cancel(identity, True)
+                self.assertFalse((directory/'cancel.json').exists())
+        (directory/'status.json').write_text('invalid JSON')
+        with self.assertRaises(ValueError):
+            transfers.status(identity)
+        for state in ('launching', 'running', 'completed', 'completed_unverified',
+                      'failed', 'cancelled', 'launchFailed'):
+            transfers.atomic(directory/'status.json', {**base, 'state': state, 'heartbeat_at': time.time()})
+            self.assertEqual(transfers.status(identity)['state'], state)
+
+    def test_empty_local_source_refuses_before_ssh_plan_or_copy(self):
+        with patch.object(data, 'session') as connection, patch.object(files, '_run') as copy:
+            result = data.upload_to_romeo('', '/scratch/test-user/copy')
+            self.assertFalse(result['ok'])
+            result = data.download_from_romeo('/scratch/test-user/fictional', '')
+            self.assertFalse(result['ok'])
+            connection.assert_not_called()
+            with self.assertRaises(SSHError):
+                files.upload('fictional', '', '/scratch/test-user/copy')
+            with self.assertRaises(SSHError):
+                files.download('fictional', '/scratch/test-user/fictional', '')
+            for direction in ('upload', 'download'):
+                with self.assertRaises(ValueError):
+                    transfers.prepare(direction, '', '/scratch/test-user/copy')
+            copy.assert_not_called()
+        self.assertFalse((self.root/'transfers').exists())
+        literal = self.root/'file with spaces'
+        literal.write_text('fictional')
+        selected = Path(transfers.prepare('upload', str(literal), '/scratch/test-user/copy')['plan']['local_path'])
+        self.assertTrue(selected.samefile(literal))
+        self.assertEqual(selected.name, literal.name)
+        if os.name == 'posix':
+            trailing = self.root/'file '
+            trailing.write_text('fictional')
+            selected = Path(transfers.prepare('upload', str(trailing), '/scratch/test-user/copy')['plan']['local_path'])
+            self.assertTrue(selected.samefile(trailing))
+            self.assertEqual(selected.name, trailing.name)
+
+    def test_cleanup_suggestion_preserves_the_entire_literal_path(self):
+        for name in ('cleanup dir;literal', "quote'path", 'literal$(printf TEST)', 'line\npath'):
+            path = '/scratch/test-user/' + name
+            reply = Result(0, '###LOGS\n1\t' + path.replace('\n', '') + '/old.out\n', 0)
+            with patch.object(data, '_sh', return_value=reply):
+                result = data.storage_usage_audit(path)
+            self.assertTrue(result['ok'], result)
+            command = result['suggestions'][0].split(': ', 1)[1]
+            argv = shlex.split(command)
+            self.assertEqual(argv[0:2], ['find', path])
+            self.assertEqual(argv[-1], '-delete')
 
     def test_transfer_with_unverified_integrity_does_not_claim_verified_completion(self):
         source = self.root / "data.txt"

@@ -53,11 +53,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 La recherche n’est pas exhaustive : au plus 1 Mio par fichier par défaut et 16 Mio au maximum. max_matches est limité à 500 par fichier, max_files à 40 par flux et max_chars à 40000.
 
+Les chemins suivent le même confinement physique que `read_remote_file`. Le motif de nom de fichier ne déclenche aucune substitution shell ; les FIFO et sockets sont refusées. Le motif de recherche conserve la syntaxe de `grep -E`, exécuté avec des arguments distincts et un délai borné.
+
 ## Voir aussi
 
 [`job_log_tail`](job_log_tail.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L260) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L263) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

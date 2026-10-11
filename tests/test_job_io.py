@@ -224,6 +224,7 @@ class JobIOTests(unittest.TestCase):
                           stderr_glob=folder + "/job_*.err", script="")
         return folder
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_empty_or_missing_stderr_never_counts_its_header(self):
         for stderr in (None, ""):
             self.prepare_logs(stderr)
@@ -238,6 +239,7 @@ class JobIOTests(unittest.TestCase):
                     if stream == "auto":
                         self.assertEqual(result["stream"], "out")
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_whitespace_is_nonzero_bytes_but_auto_shows_useful_output(self):
         self.prepare_logs(" \t\n\n")
         result = jobs.job_log_tail("123")
@@ -245,6 +247,7 @@ class JobIOTests(unittest.TestCase):
         self.assertEqual(result["stream"], "out")
         self.assertIn("useful stdout", result["content"])
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_real_stderr_is_reported_even_when_only_stdout_is_requested(self):
         self.prepare_logs("warning from program\n")
         result = jobs.job_log_tail("123", stream="out")
@@ -255,6 +258,7 @@ class JobIOTests(unittest.TestCase):
         self.assertEqual(result["stream"], "err")
         self.assertIn("warning from program", result["content"])
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_grep_does_not_turn_headers_into_matches_or_hide_file_presence(self):
         self.prepare_logs("warning from program\n")
         result = jobs.job_log_search("123", pattern="useful")
@@ -265,6 +269,7 @@ class JobIOTests(unittest.TestCase):
         self.assertTrue(result["has_stderr_content"])
         self.assertEqual(result["content"], "(aucune sortie pour l'instant)")
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_multiple_logs_and_missing_final_newline_preserve_user_text(self):
         folder = self.prepare_logs("")
         message = "  ### Validation ###\n--- user text\nRuntimeError: fixture"
@@ -277,6 +282,7 @@ class JobIOTests(unittest.TestCase):
         self.assertIn("last error", result["content"])
         self.assertIn("useful stdout", result["content"])
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_tail_and_output_budget_remain_bounded(self):
         self.prepare_logs("\n".join("warning-{}".format(i) for i in range(200)))
         result = jobs.job_log_tail("123", lines=2)

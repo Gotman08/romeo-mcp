@@ -50,11 +50,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 lines vaut de 1 à 500, max_files de 1 à 40 par flux et max_chars de 1 à 40000. La présence de contenu stderr n’est pas un verdict d’échec.
 
+Les noms et motifs de fichiers sont traités comme des données. Les glob portent sur le nom du fichier, dans un répertoire littéral ; chaque ouverture reste dans les racines autorisées, y compris avec les alias GPFS. Les liens vers une cible extérieure et les fichiers spéciaux sont refusés. La lecture depuis la fin conserve une mémoire bornée même pour une ligne très longue.
+
 ## Voir aussi
 
 [`job_log_search`](job_log_search.md) · [`job_status`](job_status.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L244) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L247) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -48,6 +48,8 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Le contrôle d’intégrité n’est pas appliqué aux répertoires. ok=true avec verifie=false ne démontre pas l’intégrité du contenu ; une destination existante peut être modifiée par le transfert.
 
+`local_path` doit être choisi explicitement : la chaîne vide est refusée avant tout accès SSH. Un chemin explicite comme `.` reste accepté ; les espaces dans les noms sont conservés.
+
 Le transfert MCP utilise SCP avec des descripteurs distants conservés pendant la copie. L’envoi passe par un dossier privé, supprimé après publication ou annulation, pour empêcher une substitution de lien de rediriger l’écriture. Les liens symboliques et fichiers spéciaux dans les répertoires publiés sont refusés. Les noms et alias GPFS autorisés sont conservés.
 
 ## Voir aussi

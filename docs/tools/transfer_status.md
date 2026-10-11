@@ -29,4 +29,6 @@ Les chemins et identifiants sont illustratifs ; remplacer ceux-ci par les valeur
 
 Verifier `ok`, puis lire les champs de preuve, de fraicheur et d erreur decrits dans le [parcours](../observability.md). Une demande acceptee et une operation observee sont distinctes.
 
+Les plans et observations persistants sont validés avant utilisation. Un JSON corrompu, un champ obligatoire absent, un état inconnu ou un horodatage non fini produit un refus explicite ; la lecture ne démarre ni ne rejoue un transfert.
+
 [Code de l’outil](../../romeo_mcp/outils_transferts.py#L19)

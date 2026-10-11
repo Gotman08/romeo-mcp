@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import offline
-from romeo_mcp import guard, file_operations, remote_reads, files, confined_transfers, remote_paths
+from romeo_mcp import guard, file_operations, remote_reads, files, confined_transfers, remote_paths, remote_logs
 from romeo_mcp.ssh import SSHError
 
 
@@ -58,6 +58,96 @@ class ConfinedPaths(unittest.TestCase):
 
     def read(self, path, budget=100):
         return self.execute(remote_reads.READ_TEXT, [path, 1, 100, budget, json.dumps(self.roots)])
+
+    def logs(self, path, **kwargs):
+        request = dict(targets={'out': str(path)}, roots=self.roots, stream='out',
+                       lines=10, max_chars=1000, max_files=10, pattern=None, max_bytes_per_file=1024)
+        request.update(kwargs)
+        return self.execute(remote_logs.READ_LOGS, [json.dumps(request)])
+
+    def test_log_names_remain_data_and_cannot_execute_a_substitution(self):
+        empty = self.inside/'empty.err'
+        empty.touch()
+        names = ['log$(printf${IFS}INJECTED>${f}.marker)', "quote'log\"", 'line\nlog',
+                 '  spaces  ', 'literal[bracket]*']
+        for name in names:
+            path = self.inside/name
+            path.write_text('MATCH: fictional\n')
+            for pattern in (None, 'MATCH'):
+                result = self.logs(path, targets={'out': str(path), 'err': str(empty)}, pattern=pattern)
+                self.assertIn('MATCH: fictional', result['logs']['out'], result)
+                self.assertFalse((self.inside/'empty.err.marker').exists())
+                self.assertFalse(result['has_stderr_content'])
+
+    def test_logs_reject_final_parent_and_direct_escape_for_tail_and_search(self):
+        final, parent = self.inside/'final', self.inside/'parent'
+        final.symlink_to(self.outside/'file')
+        parent.symlink_to(self.outside, target_is_directory=True)
+        for path in (final, parent/'file', self.outside/'file'):
+            for pattern in (None, 'outside'):
+                result = self.logs(path, pattern=pattern)
+                self.assertIn('error', result)
+                self.assertNotIn('outside-original', json.dumps(result))
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_log_internal_alias_and_globs_preserve_limits_and_stderr_presence(self):
+        for index in range(3):
+            (self.inside/('job_%d.out' % index)).write_text('OLD\nMATCH-one\nMATCH-two\n')
+            (self.inside/('job_%d.err' % index)).write_text('stderr' if index == 2 else '')
+        alias = self.root/'gpfs-alias'
+        alias.symlink_to(self.inside, target_is_directory=True)
+        targets = {'out': str(alias/'job_*.out'), 'err': str(alias/'job_*.err')}
+        result = self.logs(alias/'job_*.out', targets=targets, max_files=1, lines=1, pattern='MATCH')
+        self.assertIn('MATCH-one', result['logs']['out'])
+        self.assertNotIn('MATCH-two', result['logs']['out'])
+        self.assertTrue(result['files_limited'])
+        self.assertTrue(result['has_stderr_content'])
+        self.assertNotIn('job_1.out', result['logs']['out'])
+
+    def test_log_fifo_socket_and_invalid_regex_are_bounded_refusals(self):
+        import socket
+        fifo = self.inside/'fifo'
+        os.mkfifo(fifo)
+        socket_path = self.inside/'socket'
+        with socket.socket(socket.AF_UNIX) as server:
+            previous = os.getcwd()
+            try:
+                os.chdir(self.inside)
+                server.bind('socket')
+            finally:
+                os.chdir(previous)
+            for path in (fifo, socket_path):
+                request = dict(targets={'out': str(path)}, roots=self.roots, stream='out', lines=10,
+                               max_chars=100, max_files=1, pattern=None, max_bytes_per_file=1024)
+                result = subprocess.run([sys.executable, '-c', remote_logs.READ_LOGS, json.dumps(request)],
+                                        capture_output=True, text=True, timeout=2)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('error', json.loads(result.stdout))
+        self.assertIn('error', self.logs(self.inside/'missing', pattern='['))
+
+    def test_log_tail_large_line_search_window_and_unicode_budget(self):
+        path = self.inside/'large'
+        path.write_text('OLD_MATCH\n' + '🧪' * 100000 + '\nNEW_MATCH\n')
+        result = self.logs(path, max_chars=40, lines=1)
+        self.assertIn('NEW_MATCH', result['logs']['out'])
+        self.assertNotIn('🧪', result['logs']['out'])
+        result = self.logs(path, max_chars=40, lines=2)
+        self.assertTrue(result['clipped']['out'])
+        self.assertLessEqual(len(result['logs']['out']), 40)
+        result = self.logs(path, pattern='MATCH', max_bytes_per_file=20)
+        self.assertIn('NEW_MATCH', result['logs']['out'])
+        self.assertNotIn('OLD_MATCH', result['logs']['out'])
+
+    def test_final_log_target_swap_cannot_redirect_the_read(self):
+        path = self.inside/'file'
+        path.write_text('inside-original')
+        def swap():
+            path.rename(self.inside/'held')
+            path.symlink_to(self.outside/'file')
+        with self.swapped_open(lambda name, kw: name == 'file' and 'dir_fd' in kw, swap):
+            result = self.logs(path)
+        self.assertIn('error', result)
+        self.assertNotIn('outside-original', json.dumps(result))
 
     def write(self, path, action='create', content='new', expected=None):
         request = dict(path=str(path), roots=self.roots, action=action, expected=expected,

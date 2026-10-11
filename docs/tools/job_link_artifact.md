@@ -29,4 +29,4 @@ l'intégrité de l'artefact ni la validité scientifique du calcul.
 L'effet est une écriture SQLite locale. Aucun SSH, transfert, soumission,
 publication GitHub ou changement d'état technique n'est exécuté.
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L464)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L417)

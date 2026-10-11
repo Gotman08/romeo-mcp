@@ -8,6 +8,7 @@ from __future__ import annotations
 from . import workload_preparation
 
 import hashlib
+import json
 import math
 import posixpath
 import shlex
@@ -27,6 +28,8 @@ from .cluster import (
 from .guard import GuardError, check_path
 from .registry import registry
 from .job_observation import parse_status, status_command
+from .remote_logs import READ_LOGS
+from .remote_paths import roots_for
 from .sortie import decouper, marqueur, nouveau_jeton
 from .pipeline import heriter, ordonner, valider_etapes
 from .slurm import JobSpec, TERMINAL_STATES, parse_pipe_table, plan_job, summarize_efficiency
@@ -307,81 +310,31 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
                 "soumis par ce serveur et SLURM ne le connait plus.".format(jid)
             )
 
-    targets = {}
-    for label, glob in (("err", err_glob), ("out", out_glob)):
-        if not glob:
-            continue
-        # Quoter le repertoire tout en laissant le motif s'etendre.
-        dossier = posixpath.dirname(glob)
-        motif = posixpath.basename(glob)
-        targets[label] = "{}/{}".format(shlex.quote(dossier), motif) if dossier else motif
-    if stream in ("out", "err"):
-        wanted = [stream]
-    elif stream == "both":
-        wanted = ["err", "out"]
-    else:  # auto : l'erreur d'abord si elle contient quelque chose
-        wanted = ["err", "out"]
-
-    read_cmd = ('tail -c {budget} -- "$f" | grep -aE -m {n} -- {pattern}'.format(
-        budget=max_bytes_per_file, n=lines, pattern=shlex.quote(pattern)) if pattern is not None
-        else 'tail -n {} -- "$f"'.format(lines))
-    # Seul outil a voir du texte utilisateur arbitraire : un journal contenant
-    # `### Validation ###` ou une banniere `##########` creait des sections
-    # parasites et faisait disparaitre la fin du journal, precisement la trace
-    # d'erreur recherchee. D'ou un marqueur a jeton, que le journal deja ecrit
-    # ne peut pas contenir.
-    jeton = nouveau_jeton()
-    parts = []
-    if pattern is not None:
-        # grep=1 signifie aucune correspondance ; grep=2 est une erreur de
-        # motif. La distinguer avant que les pipelines ne masquent son code.
-        parts.append("grep -E -- {} </dev/null >/dev/null; romeo_grep_rc=$?; "
-                     "if [ $romeo_grep_rc -gt 1 ]; then exit $romeo_grep_rc; fi"
-                     .format(shlex.quote(pattern)))
-    if "err" in targets:
-        # Sonder les fichiers avant tout extrait : ni les en-tetes, ni grep,
-        # ni le budget d'affichage ne doivent changer cet indicateur.
-        parts.append(
-            "echo '{marqueur}'; for f in {cible}; do "
-            'if [ -f "$f" ] && [ -s "$f" ]; then echo 1; break; fi; done'.format(
-                marqueur=marqueur(jeton, "stderr_nonempty"), cible=targets["err"],
-            )
-        )
-    for label in wanted:
-        if label not in targets:
-            continue
-        # Une section par fichier : la premiere ligne porte le chemin, les
-        # suivantes uniquement le contenu. Ajouter les en-tetes cote Python.
-        parts.append(
-            'romeo_log_index=0; for f in {cible}; do [ -f "$f" ] || continue; '
-            'if [ "$romeo_log_index" -ge {max_files} ]; then echo "{limited}"; break; fi; '
-            'printf \'%s\\n\' "{marqueur}_$romeo_log_index" "$f"; '
-            '{read}; printf \'\\n\'; '
-            'romeo_log_index=$((romeo_log_index + 1)); done'.format(
-                marqueur=marqueur(jeton, label), cible=targets[label],
-                read=read_cmd, max_files=max_files, limited=marqueur(jeton, "files_limited"),
-            )
-        )
-
     try:
+        targets = {label: check_path(path, s.home, s.scratch, s.path_aliases)
+                   for label, path in (("err", err_glob), ("out", out_glob)) if path}
+        request = dict(targets=targets, roots=roots_for(s), stream=stream, lines=lines,
+                       pattern=pattern, max_chars=max_chars, max_files=max_files,
+                       max_bytes_per_file=max_bytes_per_file)
         result = _sh(
-            s, "; ".join(parts), timeout=60, max_chars=max(max_chars * 2, 4000)
+            s, "python3 -c {} {}".format(shlex.quote(READ_LOGS), shlex.quote(json.dumps(request))),
+            timeout=60, max_chars=24 * max_chars + 8192, read_only=True,
         )
-    except (SSHError, SSHTimeout) as exc:
+    except (GuardError, SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-    if not result.ok:
+    if not result.ok or result.truncated:
         return _error("Lecture ou motif de recherche invalide : " + result.stdout.strip()[:500])
-
-    sections = decouper(result.stdout, jeton)
-    logs = {"err": [], "out": []}
-    for key, file_lines in sections.items():
-        label = key.rpartition("_")[0]
-        if label in logs and file_lines:
-            payload = "\n".join(file_lines[1:]).rstrip()
-            if payload.strip():
-                logs[label].append("--- {}\n{}".format(file_lines[0], payload))
-    err_text = "\n".join(logs["err"])
-    out_text = "\n".join(logs["out"])
+    try:
+        observed = json.loads(result.stdout)
+        logs, clipped = observed["logs"], observed["clipped"]
+        if not all(isinstance(logs[label], str) and len(logs[label]) <= max_chars
+                   and type(clipped[label]) is bool for label in ("err", "out")):
+            raise ValueError("Journaux distants invalides")
+        if any(type(observed[key]) is not bool for key in ("files_limited", "has_stderr_content")):
+            raise ValueError("Indicateurs distants invalides")
+    except (ValueError, KeyError, TypeError) as exc:
+        return _error("Observation des journaux invalide : " + str(exc)[:500])
+    err_text, out_text = logs["err"], logs["out"]
 
     if stream == "auto":
         chosen = "err" if err_text else "out"
@@ -393,7 +346,7 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
         chosen = stream
         body = err_text if stream == "err" else out_text
 
-    truncated = len(body) > max_chars or result.truncated
+    truncated = len(body) > max_chars or (any(clipped.values()) if chosen == "both" else clipped[chosen])
     if len(body) > max_chars:
         body = body[-max_chars:]
 
@@ -407,8 +360,8 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
                    **({"max_matches_per_file": lines, "max_bytes_per_file": max_bytes_per_file,
                        "search_window": "end_of_file"} if pattern is not None else {"lines_per_file": lines})},
         "truncated": truncated,
-        "files_limited": "files_limited" in sections,
-        "has_stderr_content": "1" in sections.get("stderr_nonempty", []),
+        "files_limited": observed["files_limited"],
+        "has_stderr_content": observed["has_stderr_content"],
         "content": (body or "(aucune sortie pour l'instant)")[:max_chars],
     }
     if pattern is None:

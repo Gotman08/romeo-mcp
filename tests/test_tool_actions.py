@@ -254,6 +254,7 @@ class PreparedSubmissionTests(unittest.TestCase):
         self.assertEqual(retry["previous_result"]["job_ids"], result["job_ids"])
         self.assertEqual(len(self.session.pending), 1)
 
+    @unittest.skipUnless(os.name == 'posix', 'lecteur distant POSIX ; couvert sur Linux et ROMEO')
     def test_log_search_validates_patterns_and_bounds_files_bytes_and_matches(self):
         folder = io.JobIOTests.prepare_logs(self, "", "old-match\n" + "x" * 1000 + "\nmatch-one\nmatch-two\n")
         self.assertFalse(jobs.job_log_search("123", "")["ok"])
