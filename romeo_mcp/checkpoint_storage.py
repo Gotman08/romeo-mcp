@@ -4,9 +4,15 @@ from __future__ import annotations
 import math
 import os
 import shutil
+import stat
 import subprocess
 import time
 import uuid
+from contextlib import contextmanager
+try:
+    from .resource_locks import ResourceLease
+except ImportError:
+    from resource_locks import ResourceLease
 from pathlib import Path
 
 try:
@@ -149,16 +155,38 @@ def retain_protected(root, backup_dir, checkpoint, keep_last, *, timeout=900):
             "backup_retention": "Les copies protegees sont conservees ; aucune suppression automatique de la derniere copie."}
 
 
+@contextmanager
+def protection_lock(path):
+    """Keep the lock inode; the kernel releases ownership after a crash."""
+    path = no_symlinks(path)
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, 'O_NOFOLLOW', 0)
+                         | getattr(os, 'O_NONBLOCK', 0), 0o600)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise ValueError('Le verrou de protection doit etre un fichier regulier sans lien.')
+        if os.name == 'nt':
+            import msvcrt
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b'0')
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def protect(checkpoint, root, backup_dir, quota, keep_last=3, timeout=900):
     run = no_symlinks(Path(backup_dir) / checkpoint["manifest"]["run_id"])
-    run.mkdir(parents=True, exist_ok=True, mode=0o700)
     lock = run / ".protection.lock"
-    descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    os.close(descriptor)
-    try:
-        result = copy_verified(checkpoint, backup_dir, quota, timeout=timeout)
-        result["retention"] = retain_protected(root, backup_dir, checkpoint, keep_last, timeout=timeout)
-        atomic_json(run / "protection.json", result)
-        return result
-    finally:
-        lock.unlink()
+    source_run = Path(root) / checkpoint['manifest']['run_id']
+    with ResourceLease([(source_run, True), (run, True)]):
+        run.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with protection_lock(lock):
+            result = copy_verified(checkpoint, backup_dir, quota, timeout=timeout)
+            result["retention"] = retain_protected(root, backup_dir, checkpoint, keep_last, timeout=timeout)
+            atomic_json(run / "protection.json", result)
+            return result

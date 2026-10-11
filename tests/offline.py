@@ -4,6 +4,7 @@ import os
 import tempfile
 _TEST_STATE = tempfile.TemporaryDirectory(prefix="romeo-offline-")
 os.environ["ROMEO_MCP_DB"] = os.path.join(_TEST_STATE.name, "jobs.db")
+os.environ["ROMEO_CONCURRENCY_ROOT"] = os.path.join(_TEST_STATE.name, "concurrency")
 
 os.environ.update(
     ROMEO_ACCOUNT="test-project", ROMEO_HOST="invalid-offline-host", ROMEO_QOS="normal",

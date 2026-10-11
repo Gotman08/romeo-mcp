@@ -49,7 +49,7 @@ Le dossier d’export doit être hors d’un dépôt Git. Les secrets reconnaiss
 
 [`job_report_collect`](job_report_collect.md) · [`job_report_get`](job_report_get.md) · [`job_report_from_record`](job_report_from_record.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L58) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L64) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

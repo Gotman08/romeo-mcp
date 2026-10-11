@@ -14,6 +14,7 @@ from typing import Annotated, Any
 from pathlib import Path
 from pydantic import Field
 from . import files
+from .resource_locks import ResourceLease
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
 from .remote_paths import DIRECTORY_TARGET, directory_command, roots_for
 from .validation import validate_script
@@ -155,6 +156,13 @@ def file_replace(path: str, content: str, expected_sha256: str | None = None) ->
     description="Envoie un fichier ou un repertoire local vers ROMEO.",
 )
 def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> dict[str, Any]:
+    if not local_path:
+        return _error("local_path doit designer explicitement une source locale.")
+    with ResourceLease([(Path(local_path).expanduser(), False)]):
+        return _upload_to_romeo(local_path, remote_path, verify)
+
+
+def _upload_to_romeo(local_path, remote_path, verify):
     """Transfert montant, avec controle d'integrite de bout en bout."""
     if not local_path:
         return _error("local_path doit designer explicitement une source locale.")
@@ -215,6 +223,13 @@ def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> d
 def download_from_romeo(
     remote_path: str, local_path: str, recursive: bool = False, verify: bool = True
 ) -> dict[str, Any]:
+    if not local_path:
+        return _error("local_path doit designer explicitement une destination locale.")
+    with ResourceLease([(files._destination(remote_path, local_path), True)]):
+        return _download_from_romeo(remote_path, local_path, recursive, verify)
+
+
+def _download_from_romeo(remote_path, local_path, recursive, verify):
     """Transfert descendant, avec controle d'integrite de bout en bout."""
     if not local_path:
         return _error("local_path doit designer explicitement une destination locale.")

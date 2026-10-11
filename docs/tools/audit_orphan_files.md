@@ -55,7 +55,7 @@ L’inventaire conserve un descripteur du répertoire physique autorisé pendant
 
 [`storage_usage_audit`](storage_usage_audit.md) · [`romeo_quota`](romeo_quota.md) · [`list_jobs`](list_jobs.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L419) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L434) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

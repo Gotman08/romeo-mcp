@@ -6,6 +6,7 @@ from mcp.server.mcpserver import Context
 
 from .noyau import MUTATING, READ_ONLY, outil, server
 from .reproducibility import collect_report, export_snapshot, report_get
+from .resource_locks import ResourceBusy
 
 
 @outil(annotations=READ_ONLY, description=(
@@ -23,18 +24,23 @@ async def tool_profile_set(profile: Literal["essential", "full", "expert"],
                            ctx: Context | None = None) -> dict[str, Any]:
     if profile not in {"essential", "full", "expert"}:
         raise ValueError("Profil inconnu : essential, full ou expert.")
-    changed = profile != server.tool_profile
-    server.tool_profile = profile
-    notified = False
-    if changed and ctx is not None:
-        try:
-            await ctx.session.send_tool_list_changed()
-            notified = True
-        except Exception:
-            # Le choix est applique, meme si le client ne recoit plus les notifications.
-            pass
-    return {**await tool_profile_get(), "changed": changed, "client_notified": notified,
-            "next_step": "Relire tools/list. Pour conserver ce choix au prochain lancement : configure --profile essential, full ou expert."}
+    if not server._profile_change.acquire(blocking=False):
+        raise ResourceBusy('Conflit de concurrence : un changement de profil est deja en cours.')
+    try:
+        changed = profile != server.tool_profile
+        server.tool_profile = profile
+        notified = False
+        if changed and ctx is not None:
+            try:
+                await ctx.session.send_tool_list_changed()
+                notified = True
+            except Exception:
+                # Le choix est applique, meme si le client ne recoit plus les notifications.
+                pass
+        return {**await tool_profile_get(), "changed": changed, "client_notified": notified,
+                "next_step": "Relire tools/list. Pour conserver ce choix au prochain lancement : configure --profile essential, full ou expert."}
+    finally:
+        server._profile_change.release()
 
 
 @outil(annotations=MUTATING, description=(

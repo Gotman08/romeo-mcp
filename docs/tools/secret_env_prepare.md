@@ -50,7 +50,7 @@ L’outil ne lit ni ne transporte les valeurs sensibles. Ne placer aucun jeton d
 
 [`job_prepare`](job_prepare.md) · [`service_prepare`](service_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L540) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L555) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

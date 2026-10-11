@@ -96,7 +96,8 @@ class DoctorTests(unittest.TestCase):
 
 class ProfileTests(unittest.TestCase):
     def test_configuration_preserves_existing_access(self):
-        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, ROMEO_CONFIG=str(Path(temp) / "config.json")):
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ,
+                ROMEO_CONFIG=str(Path(temp) / "config.json"), ROMEO_CONCURRENCY_ROOT=str(Path(temp) / 'concurrency')):
             config.save({"ROMEO_ACCOUNT": "test-project", "ROMEO_HOST": "example-host"})
             config.save({"ROMEO_TOOL_PROFILE": "essential"})
             self.assertEqual(config.load()["ROMEO_ACCOUNT"], "test-project")

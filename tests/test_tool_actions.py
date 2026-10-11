@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 from types import SimpleNamespace
 import unittest
@@ -112,7 +113,7 @@ class PreparedSubmissionTests(unittest.TestCase):
         self.enterContext(patch.dict(os.environ, ROMEO_SCRATCH="", ROMEO_HOME=""))
 
     def prepare(self, **kwargs):
-        response = jobs.job_prepare(name="prepared", command="echo original", workdir=self.workdir,
+        response = jobs.job_prepare(name="prepared", command=kwargs.pop('command', 'echo original'), workdir=self.workdir,
                                     arch="x64cpu", **kwargs)
         self.assertTrue(response["ok"], response)
         return response
@@ -179,6 +180,96 @@ class PreparedSubmissionTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=len(stores)) as pool:
             claims = list(pool.map(lambda store: store.claim_submission(preview["plan_id"]), stores))
         self.assertEqual(sum(claims), 1)
+
+    def test_distinct_plan_ids_for_the_same_intent_cannot_race(self):
+        previews = [self.prepare() for _ in range(12)]
+        self.assertEqual(len({p['plan_id'] for p in previews}), 12)
+        entered, release = threading.Event(), threading.Event()
+        original = self.session.run
+        def held_reply(command, **kwargs):
+            if command.startswith('sbatch '):
+                entered.set()
+                self.assertTrue(release.wait(10))
+            return original(command, **kwargs)
+        with patch.object(self.session, 'run', side_effect=held_reply), ThreadPoolExecutor(12) as pool:
+            first = pool.submit(jobs.job_submit, previews[0]['plan_id'], confirm=True)
+            try:
+                self.assertTrue(entered.wait(10))
+                others = list(pool.map(lambda p: jobs.job_submit(p['plan_id'], confirm=True), previews[1:]))
+                self.assertTrue(all(not value['ok'] for value in others), others)
+            finally:
+                release.set()
+            self.assertTrue(first.result(timeout=10)['ok'])
+        self.assertEqual(len(self.session.pending), 1)
+
+    def test_intent_claim_is_atomic_across_separate_registry_connections(self):
+        previews = [self.prepare() for _ in range(16)]
+        stores = [Registry(self.store.path) for _ in previews]
+        for store in stores:
+            self.addCleanup(store.close)
+        with ThreadPoolExecutor(16) as pool:
+            claims = list(pool.map(lambda pair: pair[0].claim_submission(pair[1]['plan_id'], 'same-intent'),
+                                   zip(stores, previews)))
+        self.assertEqual(sum(claims), 1)
+
+    def test_uncertain_intent_blocks_a_fresh_plan_but_known_refusal_can_retry(self):
+        for failure in (SSHTimeout('accuse perdu'), None):
+            command = 'echo uncertain' if failure else 'echo known-refusal'
+            preview = self.prepare(command=command)
+            original = self.session.run
+            def failed_reply(command, **kwargs):
+                if command.startswith('sbatch '):
+                    if failure:
+                        original(command, **kwargs)
+                        raise failure
+                    return Result(1, 'refus explicite simule', 0)
+                return original(command, **kwargs)
+            with patch.object(self.session, 'run', side_effect=failed_reply):
+                self.assertFalse(jobs.job_submit(preview['plan_id'], confirm=True)['ok'])
+            state = self.store.prepared_submission(preview['plan_id'])['state']
+            self.assertEqual(state, 'uncertain' if failure else 'failed')
+            retry = self.prepare(command=command)
+            if failure:
+                self.assertFalse(jobs.job_submit(retry['plan_id'], confirm=True)['ok'])
+            else:
+                self.assertTrue(jobs.job_submit(retry['plan_id'], confirm=True)['ok'])
+        self.assertEqual(len(self.session.pending), 2)
+
+    def test_success_reply_without_id_is_uncertain_and_blocks_fresh_intent(self):
+        preview = self.prepare()
+        original = self.session.run
+        def lost_id(command, **kwargs):
+            value = original(command, **kwargs)
+            return Result(0, 'identifiant absent', 0) if command.startswith('sbatch ') else value
+        with patch.object(self.session, 'run', side_effect=lost_id):
+            first = jobs.job_submit(preview['plan_id'], confirm=True)
+        self.assertEqual(first['submission_outcome'], 'unknown')
+        self.assertFalse(first['retry_safe'])
+        self.assertEqual(self.store.prepared_submission(preview['plan_id'])['state'], 'uncertain')
+        self.assertFalse(jobs.job_submit(self.prepare()['plan_id'], confirm=True)['ok'])
+        self.assertEqual(len(self.session.pending), 1)
+
+    def test_known_active_intent_blocks_retry_until_terminal_job_state_is_observed(self):
+        first = self.prepare()
+        submitted = jobs.job_submit(first['plan_id'], confirm=True)
+        self.assertTrue(submitted['ok'], submitted)
+        other = self.prepare()
+        self.assertFalse(jobs.job_submit(other['plan_id'], confirm=True)['ok'])
+        self.store.set_state(submitted['job_id'], 'COMPLETED')
+        self.assertTrue(jobs.job_submit(other['plan_id'], confirm=True)['ok'])
+        self.assertEqual(len(self.session.pending), 2)
+
+    def test_active_identical_script_is_found_beyond_twenty_recent_jobs(self):
+        preview = self.prepare()
+        saved = self.store.prepared_submission(preview['plan_id'])
+        script = saved['payload']['entries'][0]['plan']['script']
+        for number in range(28):
+            self.store.record(str(100000 + number), 'fixture', 'x64cpu', 'x64cpu', self.workdir, '', '',
+                              script if number == 0 else 'different-' + str(number))
+        response = jobs.job_submit(preview['plan_id'], confirm=True)
+        self.assertFalse(response['ok'])
+        self.assertEqual(response['duplicate_of'], '100000')
+        self.assertEqual(self.session.pending, [])
 
     def test_all_pipeline_scripts_are_checked_before_any_write(self):
         preview = jobs.job_pipeline_prepare(name="lint", stages=[

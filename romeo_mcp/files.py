@@ -15,11 +15,14 @@ import posixpath
 import shlex
 import shutil
 import subprocess
+import os
+import tempfile
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 
 from .ssh import SSHError
+from .resource_locks import ResourceLease
 
 _TRANSFER_TIMEOUT = 900  # 15 min : un resultat de simulation peut etre lourd.
 _RUNNER = ContextVar("romeo_transfer_runner", default=None)
@@ -129,11 +132,12 @@ def upload(host: str, local_path: str, remote_path: str) -> dict:
     if policy is not None:
         from .confined_transfers import TransferGuard
         with TransferGuard(host, remote_path, policy[0], 'upload', source.name, source.is_dir(), policy[1]) as guard:
+            expected = empreinte_locale(source) if policy[1] and source.is_file() else None
             argv = ['scp', '-q', '-o', 'BatchMode=yes']
             if source.is_dir():
                 argv.append('-r')
             _run([*argv, str(source), '{}:{}'.format(host, guard.ready['proxy'])], 'envoi confine')
-            observed = guard.commit()
+            observed = guard.commit(expected)
         size = sum(f.stat().st_size for f in source.rglob('*') if f.is_file()) if source.is_dir() else source.stat().st_size
         return {'sent': str(source), 'to': observed['actual_path'], 'bytes': size,
                 'transport': 'scp', 'remote_sha256': observed['sha256']}
@@ -163,7 +167,56 @@ def upload(host: str, local_path: str, remote_path: str) -> dict:
     }
 
 
+def _destination(remote_path, local_path):
+    destination = Path(local_path).expanduser().resolve()
+    return destination / posixpath.basename(remote_path) if destination.is_dir() else destination
+
+
+def _version(path):
+    try:
+        info = os.stat(path, follow_symlinks=False)
+        return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns
+    except FileNotFoundError:
+        return None
+
+
+def _publish_local(source, target):
+    if source.is_symlink() or target.is_symlink():
+        raise SSHError('La publication locale refuse les liens symboliques.')
+    if source.is_dir() and target.is_dir():
+        for child in source.iterdir():
+            _publish_local(child, target / child.name)
+    else:
+        os.replace(source, target)
+
+
 def download(host: str, remote_path: str, local_path: str, recursive: bool = False) -> dict:
+    """Copy privately, then publish under an exclusive local reservation."""
+    if not local_path:
+        raise SSHError("local_path doit designer explicitement une destination locale.")
+    destination = _destination(remote_path, local_path)
+    with ResourceLease([(destination, True)]):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        previous = _version(destination)
+        with tempfile.TemporaryDirectory(prefix='.romeo-download-', dir=destination.parent) as temporary:
+            staged = Path(temporary) / 'payload'
+            result = _download(host, remote_path, str(staged), recursive)
+            checker = _CANCEL_CHECK.get()
+            if checker is not None:
+                checker()
+            if previous != _version(destination):
+                raise SSHError('La destination locale a change pendant le transfert ; publication refusee.')
+            if not staged.exists():
+                raise SSHError('Le processus de transfert n\'a pas cree la copie locale attendue.')
+            checksum = result.get('remote_sha256')
+            if checksum and staged.is_file() and empreinte_locale(staged) != checksum:
+                raise SSHError('Empreinte de la copie locale differente ; publication refusee.')
+            _publish_local(staged, destination)
+            return {**result, 'to': str(destination),
+                    'bytes': destination.stat().st_size if destination.is_file() else None}
+
+
+def _download(host: str, remote_path: str, local_path: str, recursive: bool = False) -> dict:
     """Rapatrie un fichier ou un repertoire depuis ROMEO."""
     if not local_path:
         raise SSHError("local_path doit designer explicitement une destination locale.")

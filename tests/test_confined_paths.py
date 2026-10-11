@@ -381,7 +381,7 @@ class ConfinedTransfers(unittest.TestCase):
         local = self.root/'downloaded'
         def download(argv, what):
             swap()
-            local.write_bytes(Path(argv[-2].split(':', 1)[1]).read_bytes())
+            Path(argv[-1]).write_bytes(Path(argv[-2].split(':', 1)[1]).read_bytes())
         with files.confined_paths(self.roots), patch.object(files, '_run', side_effect=download):
             result = files.download('offline', str(parent/'file'), str(local))
         self.assertTrue(result['remote_sha256'])

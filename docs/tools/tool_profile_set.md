@@ -48,7 +48,7 @@ Le choix vaut pour le processus actuel. Pour le conserver au prochain lancement,
 
 [`tool_profile_get`](tool_profile_get.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L22) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L23) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

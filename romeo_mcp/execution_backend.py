@@ -40,7 +40,7 @@ def _doublon_recent(script: str) -> dict | None:
     le comparer coute une lecture locale.
     """
     limite = time.time() - FENETRE_DOUBLON_SECONDES
-    for entree in registry().recent(limit=20):
+    for entree in registry().matching_script(script, limite):
         if entree.get("submitted_at", 0) < limite:
             break  # le registre est trie par date decroissante
         if entree.get("script") != script:
@@ -155,9 +155,13 @@ def _soumettre_sbatch(
                        "sha256": hashlib.sha256(plan.script.encode("utf-8")).hexdigest()},
         })
         commande = ["sbatch", "--parsable", *options, shlex.quote(chemin_script)]
-        resultat = _sh(s, " ".join(commande), timeout=60, cwd=plan.workdir)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc), script_path=chemin_script)
+
+    try:
+        resultat = _sh(s, " ".join(commande), timeout=60, cwd=plan.workdir)
+    except (SSHError, SSHTimeout) as exc:
+        return _error(str(exc), script_path=chemin_script, submission_outcome='unknown', retry_safe=False)
 
     if not resultat.ok:
         # Le script est joint : c'est ce qui permet de comprendre un refus de
@@ -176,6 +180,7 @@ def _soumettre_sbatch(
                 resultat.stdout.strip()[:200]
             ),
             script_path=chemin_script,
+            submission_outcome='unknown', retry_safe=False,
         )
 
     sortie_glob = "{}/{}-{}*.out".format(plan.workdir, nom, job_id)

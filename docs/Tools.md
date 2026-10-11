@@ -340,8 +340,10 @@ régulier existant et refuse un lien symbolique. Son `expected_sha256` facultati
 empêche d'écraser un contenu qui ne correspond plus à l'empreinte attendue.
 La réponse donne la nouvelle empreinte. Les deux outils publient atomiquement
 le contenu, exigent un parent existant et acceptent jusqu'à 64 Kio de texte.
-Le verrou `.romeo-mcp-files.lock` coordonne ces outils entre processus ; une
-écriture concurrente par un autre programme doit respecter le même verrou.
+Les réservations communes coordonnent aussi les transferts entre processus,
+y compris les répertoires et les alias de chemins. Une opération incompatible
+est refusée avant écriture ; les fichiers indépendants restent parallèles.
+Voir les [règles de concurrence et leurs limites](concurrency.md).
 
 [`sbatch_validate`](tools/sbatch_validate.md) ne reçoit que du texte et n'ouvre aucune connexion.
 [`sbatch_check_paths`](tools/sbatch_check_paths.md) vérifie par SSH jusqu'à 20 chemins littéraux dans les

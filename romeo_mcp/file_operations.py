@@ -6,22 +6,32 @@ import shlex
 
 from .guard import allowed_roots, check_path
 from .remote_paths import CONFINED_PATHS, roots_for
+from .resource_locks import remote_source
 
 
 # Execute par Python sur le login. Le verrou est partage entre les processus
 # MCP ; une publication atomique ne laisse jamais voir un fichier incomplet.
-_WRITE = CONFINED_PATHS + r'''
+_WRITE = CONFINED_PATHS + remote_source() + r'''
 import base64, fcntl, hashlib, json, os, secrets, stat, sys
 request = json.loads(sys.argv[1])
 path = request['path']
 parent = None
 temp = None
+lease = None
 try:
     parent, name = confined_parent(path, request['roots'])
+    physical = os.path.join(os.readlink('/proc/self/fd/{}'.format(parent)), name)
+    lease = ResourceLease([(physical, True)], request.get('lock_root') or
+                          os.path.join(request['roots'][0], '.romeo-mcp', 'concurrency'))
+    lease.__enter__()
     lock_fd = os.open('.romeo-mcp-files.lock',
-                      os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+                      os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=parent)
     with os.fdopen(lock_fd, 'w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise ValueError('Le verrou de fichier doit etre regulier.')
+        # Older clients use an exclusive directory lock. Updated clients use
+        # resource reservations, while remaining compatible with that lock.
+        fcntl.flock(lock, fcntl.LOCK_SH | fcntl.LOCK_NB)
         try:
             info = os.stat(name, dir_fd=parent, follow_symlinks=False)
         except FileNotFoundError:
@@ -66,6 +76,8 @@ finally:
         os.unlink(temp, dir_fd=parent)
     if parent is not None:
         os.close(parent)
+    if lease is not None and lease.descriptor is not None:
+        lease.__exit__(None, None, None)
 '''
 
 
@@ -78,6 +90,7 @@ def _write(connection, path, content, action, expected=None):
     target = check_path(path, connection.home, connection.scratch, connection.path_aliases)
     request = json.dumps({'path': target, 'content': base64.b64encode(raw).decode(),
                           'action': action, 'expected': expected.lower() if expected else None,
+                          'lock_root': connection.home + '/.romeo-mcp/concurrency',
                           'roots': roots_for(connection)})
     response = connection.run('python3 -c {} {}'.format(shlex.quote(_WRITE), shlex.quote(request)),
                               timeout=60, max_chars=4000)

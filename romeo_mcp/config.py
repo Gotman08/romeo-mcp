@@ -8,6 +8,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from .resource_locks import ResourceLease
 
 
 FIELDS = {"ROMEO_HOST", "ROMEO_ACCOUNT", "ROMEO_QOS", "ROMEO_TOOL_PROFILE"}
@@ -46,8 +47,13 @@ def save(values: dict[str, str]) -> Path:
             raise ValueError("Hote, compte et QOS doivent etre des identifiants simples, sans espace ni commande.")
         if key == "ROMEO_ACCOUNT" and value.upper() in {"VOTRE_PROJET", "YOUR_PROJECT", "R000000"}:
             raise ValueError("Remplacer VOTRE_PROJET par le code reel du projet autorise dans le portail ROMEO.")
-    data = {**load(), **values}
     path = config_path()
+    with ResourceLease([(path, True)]):
+        return _save_locked(path, values)
+
+
+def _save_locked(path, values):
+    data = {**load(), **values}
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=path.parent, mode="w", encoding="utf-8", newline="\n", delete=False) as stream:
         temporary = Path(stream.name)

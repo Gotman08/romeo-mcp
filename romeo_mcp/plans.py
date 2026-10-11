@@ -1,7 +1,9 @@
 """Regles de preparation et d'execution des plans exacts, sans interface MCP."""
 from dataclasses import asdict
 import hashlib
+import json
 import time
+from .resource_locks import ResourceLease, ResourceBusy
 from .cluster import DEFAULT_HOST, require_account
 from .guard import check_path
 from .pipeline import clause_dependance
@@ -56,6 +58,22 @@ def prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dic
 
 
 def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
+    if confirm is not True:
+        return _error("La soumission exige confirm=true apres lecture du plan.", submitted=False)
+    try:
+        saved = registry().prepared_submission(plan_id)
+        if saved is None:
+            return _submit_prepared(kind, plan_id, confirm)
+        payload = saved['payload']
+        intent = {'target': payload['target'], 'scripts': [entry['plan']['script'] for entry in payload['entries']]}
+        fingerprint = hashlib.sha256(json.dumps(intent, sort_keys=True).encode()).hexdigest()
+        with ResourceLease([('action:submission:' + fingerprint, True)]):
+            return _submit_prepared(kind, plan_id, confirm, fingerprint)
+    except (ResourceBusy, ValueError) as exc:
+        return _error(str(exc), submitted=False)
+
+
+def _submit_prepared(kind: str, plan_id: str, confirm: bool, fingerprint=None) -> dict:
     """Execute une seule fois le contenu conserve, sans regenerer de script."""
     if confirm is not True:
         return _error("La soumission exige confirm=true apres lecture du plan.", submitted=False)
@@ -102,8 +120,9 @@ def submit_prepared(kind: str, plan_id: str, confirm: bool) -> dict:
         if previous:
             return _error("Un job identique est deja actif. Consulte job_status.",
                           duplicate_of=previous["job_id"], submitted=False)
-    if not store.claim_submission(plan_id):
-        return _error("Plan deja reserve par une autre soumission ou expire. Consulte list_jobs.", plan_id=plan_id)
+    if not store.claim_submission(plan_id, fingerprint):
+        return _error("Plan ou intention identique deja reserve, actif, incertain ou expire. "
+                      "Consulte list_jobs et job_status avant une nouvelle tentative.", plan_id=plan_id, submitted=False)
 
     submitted, identifiers = [], {}
     result = {}

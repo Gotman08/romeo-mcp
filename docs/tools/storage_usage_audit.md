@@ -51,7 +51,7 @@ L’inventaire conserve un descripteur du répertoire physique autorisé pendant
 
 [`romeo_quota`](romeo_quota.md) · [`audit_orphan_files`](audit_orphan_files.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L275) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L290) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
