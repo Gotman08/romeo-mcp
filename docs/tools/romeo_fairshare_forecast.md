@@ -54,7 +54,7 @@ Le modèle encodé facture des cœur-secondes ; simulated_gpus est informatif et
 
 [`romeo_status`](romeo_status.md) · [`suggest_submission_slot`](suggest_submission_slot.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L793) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L746) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

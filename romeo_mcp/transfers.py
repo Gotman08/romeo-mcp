@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -47,6 +48,44 @@ def seal(plan):
     return hashlib.sha256(json.dumps({k: plan[k] for k in keys}, sort_keys=True).encode()).hexdigest()
 
 
+def finite_timestamp(value):
+    # Ne pas convertir un entier JSON arbitrairement grand en double.
+    return (type(value) in (int, float) and 0 <= value <= sys.float_info.max
+            and (type(value) is int or math.isfinite(value)))
+
+
+def validate_plan(plan, transfer_id):
+    valid = (
+        isinstance(plan, dict)
+        and plan.get("id") == transfer_id
+        and plan.get("direction") in ("upload", "download")
+        and all(isinstance(plan.get(key), str) and plan[key] for key in ("local_path", "remote_path"))
+        and all(type(plan.get(key)) is bool for key in ("recursive", "verify"))
+        and finite_timestamp(plan.get("created_at"))
+        and isinstance(plan.get("target"), dict)
+        and all(isinstance(plan["target"].get(key), str) and plan["target"][key]
+                for key in ("host", "user", "account"))
+        and isinstance(plan.get("sha256"), str)
+    )
+    if not valid or plan["sha256"] != seal(plan):
+        raise ValueError("Plan de transfert altere")
+
+
+def validate_status(result, transfer_id):
+    if not isinstance(result, dict):
+        raise ValueError("Observation de transfert invalide")
+    if result.get("transfer_id") != transfer_id:
+        raise ValueError("Observation d'un autre transfert")
+    states = ("prepared", "launching", "running", "unverified", "completed",
+              "completed_unverified", "failed", "cancelled", "launchFailed")
+    if type(result.get("ok")) is not bool or result.get("state") not in states:
+        raise ValueError("Etat de transfert invalide")
+    if "result_validated" in result and type(result["result_validated"]) is not bool:
+        raise ValueError("Validation de transfert invalide")
+    if result.get("heartbeat_at") is not None and not finite_timestamp(result["heartbeat_at"]):
+        raise ValueError("Horodatage de transfert invalide")
+
+
 def load(transfer_id):
     if not isinstance(transfer_id, str) or not re.fullmatch(r"[a-f0-9]{32}", transfer_id):
         raise ValueError("transfer_id invalide")
@@ -55,14 +94,15 @@ def load(transfer_id):
         plan = read(directory / "plan.json")
     except (OSError, ValueError) as exc:
         raise ValueError("Plan de transfert introuvable ou illisible") from exc
-    if plan.get("id") != transfer_id or plan.get("sha256") != seal(plan):
-        raise ValueError("Plan de transfert altere")
+    validate_plan(plan, transfer_id)
     return directory, plan
 
 
 def prepare(direction, local_path, remote_path, recursive=False, verify=True):
     if direction not in {"upload", "download"}:
         raise ValueError("direction doit etre upload ou download")
+    if not local_path:
+        raise ValueError("local_path doit designer explicitement une source ou une destination locale.")
     local = Path(local_path).expanduser().resolve()
     if direction == "upload" and not local.exists():
         raise ValueError("Source locale absente")
@@ -119,8 +159,7 @@ def status(transfer_id, max_chars=4000):
     result = read(path) if path.is_file() else {"ok": True, "transfer_id": transfer_id,
                                              "state": "unverified" if (directory / "started.claim").exists() else "prepared",
                                              "result_validated": False}
-    if result.get("transfer_id") != transfer_id:
-        raise ValueError("Observation d'un autre transfert")
+    validate_status(result, transfer_id)
     heartbeat = result.get("heartbeat_at")
     terminal = result["state"] in {"completed", "completed_unverified", "failed", "cancelled", "launchFailed"}
     result.update(plan=plan, current_process_observed=False,

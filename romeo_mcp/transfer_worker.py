@@ -9,7 +9,7 @@ from pathlib import Path
 from . import files
 from .cluster import DEFAULT_ACCOUNT
 from .ssh import SSHError, session, _environnement_ssh
-from .transfers import atomic, read, seal
+from .transfers import atomic, read, validate_plan
 from .transfer_progress import ProgressLog, command as progress_command
 
 
@@ -20,6 +20,7 @@ class TransferCancelled(Exception):
 def run(plan_path):
     plan = read(plan_path)
     directory = plan_path.parent
+    validate_plan(plan, directory.name)
     destination = directory / "status.json"
     result = {"ok": True, "transfer_id": plan["id"], "state": "running", "phase": "connecting",
               "started_at": time.time(), "worker_pid": os.getpid(), "result_validated": False}
@@ -91,8 +92,6 @@ def run(plan_path):
         return ""
 
     try:
-        if plan.get("sha256") != seal(plan):
-            raise ValueError("Plan altere")
         publish()
         if cancelled():
             raise TransferCancelled()

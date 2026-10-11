@@ -119,6 +119,8 @@ def empreinte_depuis_sortie(sortie: str) -> str:
 
 def upload(host: str, local_path: str, remote_path: str) -> dict:
     """Envoie un fichier ou un repertoire local vers ROMEO."""
+    if not local_path:
+        raise SSHError("local_path doit designer explicitement une source locale.")
     source = Path(local_path).expanduser()
     if not source.exists():
         raise SSHError("fichier local introuvable : {}".format(source))
@@ -163,6 +165,8 @@ def upload(host: str, local_path: str, remote_path: str) -> dict:
 
 def download(host: str, remote_path: str, local_path: str, recursive: bool = False) -> dict:
     """Rapatrie un fichier ou un repertoire depuis ROMEO."""
+    if not local_path:
+        raise SSHError("local_path doit designer explicitement une destination locale.")
     destination = Path(local_path).expanduser()
     destination.parent.mkdir(parents=True, exist_ok=True)
 

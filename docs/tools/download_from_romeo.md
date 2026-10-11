@@ -53,9 +53,11 @@ Le transfert MCP utilise SCP depuis un descripteur distant conservé pendant la 
 
 ## Voir aussi
 
+`local_path` doit être choisi explicitement : la chaîne vide est refusée avant tout accès SSH ou création de répertoire. Un chemin explicite comme `.` reste accepté.
+
 [`list_dir`](list_dir.md) · [`read_remote_file`](read_remote_file.md) · [`upload_to_romeo`](upload_to_romeo.md)
 
-[Code de l’outil](../../romeo_mcp/outils_donnees.py#L213) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_donnees.py#L215) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

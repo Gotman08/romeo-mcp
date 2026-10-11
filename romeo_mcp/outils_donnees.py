@@ -156,6 +156,8 @@ def file_replace(path: str, content: str, expected_sha256: str | None = None) ->
 )
 def upload_to_romeo(local_path: str, remote_path: str, verify: bool = True) -> dict[str, Any]:
     """Transfert montant, avec controle d'integrite de bout en bout."""
+    if not local_path:
+        return _error("local_path doit designer explicitement une source locale.")
     s = session()
     try:
         target = check_path(remote_path, s.home, s.scratch, s.path_aliases)
@@ -214,6 +216,8 @@ def download_from_romeo(
     remote_path: str, local_path: str, recursive: bool = False, verify: bool = True
 ) -> dict[str, Any]:
     """Transfert descendant, avec controle d'integrite de bout en bout."""
+    if not local_path:
+        return _error("local_path doit designer explicitement une destination locale.")
     s = session()
     try:
         source = check_path(remote_path, s.home, s.scratch, s.path_aliases)
@@ -326,7 +330,7 @@ def storage_usage_audit(path: str = "", top: int = 12) -> dict[str, Any]:
         suggestions.append(
             "Journaux de plus de 14 jours : "
             "find {} -type f \\( -name '*.out' -o -name '*.err' \\) -mtime +14 "
-            "-delete".format(cible)
+            "-delete".format(shlex.quote(cible))
         )
     if sections.get("venvs"):
         suggestions.append(
