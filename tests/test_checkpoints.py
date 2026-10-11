@@ -376,7 +376,7 @@ class OperationTests(unittest.TestCase):
         self.assertEqual((spec["nodes"], spec["ntasks_per_node"], spec["distributed"]), (2, 2, "mpi"))
         self.assertTrue(spec["checkpoint_contract"]["require_resume"])
         self.assertEqual(spec["checkpoint_contract"]["expected_binding_sha256"], "b" * 64)
-        self.assertEqual(len(saved["runtime_files"]), 5)
+        self.assertEqual(len(saved["runtime_files"]), 6)
         self.assertNotEqual(spec["runtime_id"], self.plan.spec.runtime_id)
 
     def test_failed_ssh_keeps_dated_observation_without_claiming_current_resume(self):
@@ -424,7 +424,7 @@ class OperationTests(unittest.TestCase):
         self.assertTrue(prepared["ok"], prepared)
         payload = self.store.prepared_submission(prepared["plan_id"])["payload"]
         self.assertEqual(len(payload["entries"]), 3)
-        self.assertEqual(len(payload["runtime_files"]), 5)
+        self.assertEqual(len(payload["runtime_files"]), 6)
         self.assertEqual({e["plan"]["spec"]["runtime_id"] for e in payload["entries"]}, {payload["entries"][0]["plan"]["spec"]["runtime_id"]})
         writes = []
         self.session.write_file = lambda path, content, mode=None: writes.append((path, content))
@@ -432,7 +432,7 @@ class OperationTests(unittest.TestCase):
                 return_value={"git": {"status": "unavailable"}}):
             submitted = plans.submit_prepared("resilient", prepared["plan_id"], True)
         self.assertTrue(submitted["ok"], submitted)
-        self.assertEqual(len([p for p, _ in writes if ".romeo-runtime/" in p]), 5)
+        self.assertEqual(len([p for p, _ in writes if ".romeo-runtime/" in p]), 6)
 
 
 # Fixture de processus : deux rangs comme srun, sans simuler une communication

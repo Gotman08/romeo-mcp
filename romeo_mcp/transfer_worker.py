@@ -11,6 +11,7 @@ from .cluster import DEFAULT_ACCOUNT
 from .ssh import SSHError, session, _environnement_ssh
 from .transfers import atomic, read, validate_plan
 from .transfer_progress import ProgressLog, command as progress_command
+from .resource_locks import ResourceLease
 
 
 class TransferCancelled(Exception):
@@ -18,6 +19,11 @@ class TransferCancelled(Exception):
 
 
 def run(plan_path):
+    with ResourceLease([('action:transfer-worker:' + os.path.normcase(str(plan_path.resolve())), True)]):
+        return _run_owned(plan_path)
+
+
+def _run_owned(plan_path):
     plan = read(plan_path)
     directory = plan_path.parent
     validate_plan(plan, directory.name)

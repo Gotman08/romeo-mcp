@@ -42,7 +42,7 @@ Les profils organisent la découverte des outils ; ils ne remplacent pas les aut
 
 [`tool_profile_set`](tool_profile_set.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L13) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L14) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

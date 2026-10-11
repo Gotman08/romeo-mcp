@@ -48,6 +48,8 @@ SUITES = [
      "services, configurations typees, fichiers atomiques et releves immuables", False),
     ("observability", "tests/test_observable_operations.py",
      "fraicheur, coupures SSH, operations persistantes, transferts et annulation", False),
+    ("concurrency", "tests/test_concurrency.py",
+     "reservations interprocessus, collisions, publication privee et recuperation apres arret", False),
     ("checkpoints", "tests/test_checkpoints.py",
      "reprise prouvee, rangs/signaux, quotas, protection et ressources paralleles", False),
     ("ajouts", "tests/test_ajouts.py",

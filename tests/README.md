@@ -23,6 +23,7 @@ lancent depuis la **racine du dépôt**, avec le Python du venv activé.
 python tests/run_all.py
 python tests/run_all.py --only docs
 python tests/run_all.py --only accompagnement
+python tests/run_all.py --only concurrency
 python tests/run_all.py --only terminal
 python tests/run_all.py --only issue-reports
 python tests/run_all.py --only energy
@@ -68,6 +69,7 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 | `confined-paths` | [test_confined_paths.py](test_confined_paths.py) | Noms exacts, racines physiques, FIFO et sockets, fichiers de secrets privés, changements de liens et transferts conservant leurs descripteurs ; cas POSIX exécutés sur Linux |
 | `job-io` | [test_job_io.py](test_job_io.py) | Huit tableaux soumis simultanément dans le même dossier, scripts isolés, empreintes et lecture des journaux |
 | `tool-actions` | [test_tool_actions.py](test_tool_actions.py) | Contrats MCP, effets annoncés, plans persistants, scripts exacts, appels concurrents et reprise après échec |
+| `concurrency` | [test_concurrency.py](test_concurrency.py) | Réservations entre processus, conflits entre outils, publication privée, récupération après mort du propriétaire, capacité bornée et annulation RPC réelle |
 | `lifecycles` | [test_lifecycles.py](test_lifecycles.py) | Parcours des services, allocations, environnements Python et fichiers |
 | `ajouts` | [test_ajouts.py](test_ajouts.py) | Pipelines et confrontation du modèle de cluster |
 | `docs` | [test_docs.py](test_docs.py) | Recherche, sections, pagination, portabilité et protocole documentaire |

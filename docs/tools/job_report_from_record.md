@@ -48,7 +48,7 @@ Cet outil ne collecte aucun nouvel état Slurm ni aucune empreinte distante. Les
 
 [`job_report_get`](job_report_get.md) · [`job_report_export`](job_report_export.md) · [`job_report_collect`](job_report_collect.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L48) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L54) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

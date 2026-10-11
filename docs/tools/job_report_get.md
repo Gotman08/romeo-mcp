@@ -48,7 +48,7 @@ Le relevé décrit les observations à sa date de collecte. Pour observer un nou
 
 [`job_report_collect`](job_report_collect.md) · [`job_report_export`](job_report_export.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L53) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L59) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

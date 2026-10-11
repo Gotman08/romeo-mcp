@@ -12,7 +12,8 @@ from pathlib import Path
 from .checkpoint_protocol import identity, integer
 from .privacy import sensitive_path
 
-RUNTIME_MODULES = ("checkpoint_protocol.py", "checkpoint_storage.py", "parallel_runtime.py", "checkpoint_runner.py")
+RUNTIME_MODULES = ("checkpoint_protocol.py", "checkpoint_storage.py", "parallel_runtime.py", "checkpoint_runner.py",
+                   "resource_locks.py")
 CONTRACT_KEYS = {"run_id", "code_files", "data_files", "world_size", "require_resume", "backup_dir",
                  "quota_fileset", "quota_filesystem", "quota_group", "keep_last", "max_checkpoint_bytes",
                  "max_input_bytes", "verification_timeout_seconds", "resume_timeout_seconds", "runtime_python", "action",

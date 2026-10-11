@@ -14,15 +14,17 @@ import subprocess
 import threading
 
 from .remote_paths import CONFINED_PATHS
+from .resource_locks import remote_source
 from .ssh import SSHError, _environnement_ssh
 
 
-SUPERVISOR = CONFINED_PATHS + r'''
+SUPERVISOR = CONFINED_PATHS + remote_source() + r'''
 import hashlib, json, select, secrets, signal, stat, sys
 request = json.loads(sys.argv[1])
 roots = request['roots']
 held = []
 stage_parent = stage = stage_name = None
+lease = None
 
 def keep(fd):
     held.append(fd)
@@ -167,11 +169,18 @@ try:
             keep(parent)
             actual = path
         previous = info_at(parent, name)
+        physical = os.path.join(os.readlink('/proc/self/fd/{}'.format(parent)), name)
+        lease = ResourceLease([(physical, True)], request.get('lock_root') or
+                              os.path.join(roots[0], '.romeo-mcp', 'concurrency'))
+        lease.__enter__()
         if previous is not None:
             ordinary(previous)
         proxy = staging(parent) + '/payload'
         checksum = None
     else:
+        lease = ResourceLease([(path, False)], request.get('lock_root') or
+                              os.path.join(roots[0], '.romeo-mcp', 'concurrency'))
+        lease.__enter__()
         source = keep(confined_open(path, roots, os.O_RDONLY | os.O_NONBLOCK))
         info = os.fstat(source)
         ordinary(info)
@@ -207,6 +216,8 @@ try:
                 validate_tree(payload)
             elif request['verify']:
                 checksum = digest(payload)
+                if action.get('expected_sha256') is not None and checksum != action['expected_sha256']:
+                    raise ValueError('Source locale modifiee ou copie corrompue ; publication refusee.')
             previous = info_at(parent, name)
             if previous is not None:
                 ordinary(previous)
@@ -231,6 +242,8 @@ finally:
         os.rmdir(stage_name, dir_fd=stage_parent)
     for fd in reversed(held):
         os.close(fd)
+    if lease is not None and lease.descriptor is not None:
+        lease.__exit__(None, None, None)
 '''
 
 
@@ -288,8 +301,8 @@ class TransferGuard:
             self.__exit__(None, None, None)
             raise
 
-    def commit(self):
-        self.process.stdin.write('{"action":"commit"}\n')
+    def commit(self, expected_sha256=None):
+        self.process.stdin.write(json.dumps({'action': 'commit', 'expected_sha256': expected_sha256}) + '\n')
         self.process.stdin.flush()
         self.result = self._receive()
         return self.result

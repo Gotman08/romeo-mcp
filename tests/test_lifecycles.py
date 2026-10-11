@@ -234,10 +234,11 @@ class Files(unittest.TestCase):
                     _, _, code, request = shlex.split(command)
                     request = json.loads(request)
                     request['path'] = target
+                    request['lock_root'] = str(Path(temp) / 'concurrency')
                     output = []
                     imports = {'sys': SimpleNamespace(argv=['program', json.dumps(request)])}
                     if os.name == 'nt':
-                        imports['fcntl'] = SimpleNamespace(LOCK_EX=1, flock=lambda *_: None)
+                        imports['fcntl'] = SimpleNamespace(LOCK_EX=1, LOCK_SH=2, LOCK_NB=4, flock=lambda *_: None)
                         imports['os'] = SimpleNamespace(**{**vars(os), 'O_NOFOLLOW': 0, 'fchmod': lambda *_: None})
                     def importer(name, *args, **kwargs):
                         return imports[name] if name in imports else builtins.__import__(name, *args, **kwargs)

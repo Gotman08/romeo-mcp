@@ -6,6 +6,9 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.mcpserver.utilities.func_metadata import FuncMetadata
 from mcp.types import CallToolResult, TextContent
 from pydantic import ValidationError
+import json
+import threading
+import asyncio
 
 from .config import setting
 from .errors import bounded_message
@@ -54,6 +57,11 @@ class ProfiledServer(MCPServer):
 
     def __init__(self, **kwargs):
         self.tool_profile = validate_profile(setting("ROMEO_TOOL_PROFILE", "full"))
+        self._calls_lock = threading.Lock()
+        self._profile_change = threading.Lock()
+        self._active_calls = 0
+        self._running_calls = set()
+        self.max_active_calls = 64
         super().__init__(**kwargs)
 
     def add_tool(self, fn, *args, **kwargs):
@@ -66,12 +74,33 @@ class ProfiledServer(MCPServer):
             output_model=metadata.output_model, wrap_output=metadata.wrap_output)
 
     async def call_tool(self, name, arguments, context=None):
+        with self._calls_lock:
+            if self._active_calls >= self.max_active_calls:
+                message = {'ok': False, 'busy': True, 'execution_started': False,
+                           'error': 'Trop d\'appels simultanes ; attends la fin des operations en cours.'}
+                return CallToolResult(content=[TextContent(type='text', text=json.dumps(message))], is_error=True)
+            self._active_calls += 1
+        task = asyncio.create_task(self._execute_tool(name, arguments, context))
+        self._running_calls.add(task)
+        def finished(completed):
+            self._running_calls.discard(completed)
+            if not completed.cancelled():
+                completed.exception()
+        task.add_done_callback(finished)
+        # A cancelled RPC does not make a still-running synchronous operation
+        # disappear from admission accounting or permit an unsafe replay.
+        return await asyncio.shield(task)
+
+    async def _execute_tool(self, name, arguments, context):
         # Borne aussi le nom d'un outil inconnu et les autres ToolError du SDK.
         try:
             return await super().call_tool(name, arguments, context)
         except ToolError as exc:
             return CallToolResult(content=[TextContent(type="text", text=bounded_message(str(exc)))],
                                   is_error=True)
+        finally:
+            with self._calls_lock:
+                self._active_calls -= 1
 
     async def list_tools(self):
         tools = await super().list_tools()

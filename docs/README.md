@@ -118,6 +118,7 @@ Les extraits de recherche conduisent aux sections complètes via [`read_doc`](to
 | [Code Python](../romeo_mcp/README.md) | Responsabilités des modules et trajet d’un appel |
 | [Utilitaires](../tools/README.md) | Installation des clients, contrôle de confidentialité et entretien du corpus |
 | [Tests](../tests/README.md) | Suites hors ligne et essais sur ROMEO |
+| [Concurrence](concurrency.md) | Coordination entre clients, réservations, interruptions et limites |
 | [GitHub](../.github/CONFIGURATION.md) | Vérifications automatiques du dépôt |
 | [Hooks Git](../.githooks/README.md) | Contrôles locaux avant commit et push |
 

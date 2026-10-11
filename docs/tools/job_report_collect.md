@@ -50,7 +50,7 @@ Les empreintes collectées après le calcul sont des observations après coup. L
 
 [`job_report_get`](job_report_get.md) · [`job_report_export`](job_report_export.md) · [`job_report_from_record`](job_report_from_record.md)
 
-[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L43) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_accompagnement.py#L49) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

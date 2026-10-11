@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS report_snapshots (
     payload TEXT NOT NULL,
     sha256 TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS submission_intents (
+    fingerprint TEXT PRIMARY KEY,
+    plan_id TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS job_observations (
     job_id TEXT NOT NULL,
     target TEXT NOT NULL,
@@ -251,14 +255,40 @@ class Registry:
         result["result"] = json.loads(result["result"]) if result["result"] else None
         return result
 
-    def claim_submission(self, plan_id: str) -> bool:
+    def claim_submission(self, plan_id: str, fingerprint: str | None = None) -> bool:
         """Une seule tentative, y compris entre deux processus et apres un crash."""
         with self._lock, self._conn:
+            self._conn.execute('BEGIN IMMEDIATE')
+            if fingerprint:
+                previous = self._conn.execute(
+                    'SELECT p.state,p.result FROM submission_intents i JOIN prepared_submissions p '
+                    'ON p.plan_id=i.plan_id WHERE i.fingerprint=? AND p.plan_id<>?',
+                    (fingerprint, plan_id)).fetchone()
+                if previous:
+                    if previous['state'] in ('submitting', 'uncertain'):
+                        return False
+                    result = json.loads(previous['result']) if previous['result'] else {}
+                    identifiers = result.get('job_ids') or ([result['job_id']] if result.get('job_id') else [])
+                    for identifier in identifiers:
+                        job = self._conn.execute('SELECT last_state FROM jobs WHERE job_id=?',
+                                                 (str(identifier),)).fetchone()
+                        if job is None or job[0] not in ('COMPLETED', 'CANCELLED', 'FAILED', 'TIMEOUT',
+                                                        'OUT_OF_MEMORY', 'NODE_FAIL', 'PREEMPTED', 'BOOT_FAIL', 'DEADLINE'):
+                            return False
             cursor = self._conn.execute(
                 "UPDATE prepared_submissions SET state = 'submitting' "
                 "WHERE plan_id = ? AND state = 'ready' AND created_at > ?",
                 (plan_id, time.time() - PLAN_TTL_SECONDS))
+            if cursor.rowcount == 1 and fingerprint:
+                self._conn.execute('INSERT OR REPLACE INTO submission_intents VALUES (?,?)',
+                                   (fingerprint, plan_id))
             return cursor.rowcount == 1
+
+    def matching_script(self, script: str, since: float) -> list[dict]:
+        with self._lock:
+            rows = self._conn.execute('SELECT * FROM jobs WHERE script=? AND submitted_at>? '
+                                      'ORDER BY submitted_at DESC', (script, since)).fetchall()
+        return [dict(row) for row in rows]
 
     def update_submission(self, plan_id: str, state: str, result: dict) -> None:
         with self._lock, self._conn:
