@@ -6,6 +6,14 @@ elle n'est pas mise en attente puis rejouée automatiquement. Relire le résulta
 du propriétaire et, pour une modification de texte, l'empreinte du fichier avant
 une nouvelle tentative.
 
+Les lectures de contexte ne prennent pas la réservation exclusive d'un écrivain.
+`read_remote_file` peut observer l'ancien ou le nouveau contenu publié atomiquement.
+`list_dir` est un instantané évolutif : une entrée disparue entre l'énumération et
+sa lecture est ignorée et comptée dans `disappeared_entries`. Les autres erreurs
+(répertoire absent, permissions, confinement) restent des erreurs. La borne
+`limit` et le drapeau `truncated` portent sur les noms sélectionnés initialement ;
+une entrée disparue n'est pas remplacée par un autre nom.
+
 ## Réservations de fichiers
 
 `file_create`, `file_replace`, les transferts synchrones et leurs workers utilisent
@@ -50,7 +58,7 @@ Ne pas supprimer ce cache pendant une opération active.
 | `tool_profile_set` | Un seul changement en cours par connexion, jusqu'à la notification et la capture de sa réponse. Les profils restent propres à chaque processus stdio. |
 | Mises à jour et retours | Verrous du noyau existants sur le contrôle et la transaction de l'installation ; workers distincts des serveurs actifs. |
 | Rapports et publication d'issues | Identifiants immuables, création exclusive, transactions SQLite et verrou de publication existants. Un envoi incertain ne provoque pas un second POST automatique. |
-| Lectures, diagnostics, documentation et préparation | Pas de verrou global sur les fichiers utilisateurs. Le protocole à sentinelles de chaque session SSH reste sérialisé ; les sessions courte et longue sont distinctes. Les caches et métriques conservent leurs verrous internes. |
+| Lectures, diagnostics, documentation et préparation | Pas de verrou global sur les fichiers utilisateurs. Le protocole à sentinelles de chaque session SSH reste sérialisé ; les écritures texte utilisent la session longue et les lectures la session courte. Les copies SCP ont leur propre connexion. Les caches et métriques conservent leurs verrous internes. |
 | Exécuteurs de shell experts et programmes de calcul | Leur contenu arbitraire ne permet pas d'inférer toutes les ressources modifiées. Ils doivent respecter les mêmes réservations s'ils interviennent sur des fichiers utilisés par un transfert ou une écriture MCP. |
 
 ## Soumissions et interruptions
@@ -73,14 +81,24 @@ la récupération du verrou ne constitue pas une preuve de nettoyage de ce stagi
 
 ## Bornes et limites
 
-- 64 appels MCP admis simultanément par processus, incluant ceux qui attendent
-  un thread du SDK ; les suivants reçoivent `busy=true` et
+- 64 appels MCP admis simultanément par processus : au plus 48 mutations et
+  16 lectures, incluant ceux qui attendent un worker. Les suivants reçoivent `busy=true` et
   `execution_started=false` sans exécuter le corps de l'outil.
+- Les annotations `readOnlyHint=true` enregistrées par le serveur déterminent
+  les lectures. Un outil sans cette annotation, ou inconnu, compte comme mutation.
+  La capacité réservée aux lectures reste disponible à saturation des mutations.
+  Une saturation des 16 lectures peut encore faire refuser une autre lecture.
 - 128 réservations simultanées par cache et 64 ressources au maximum par
   réservation. L'index SQLite attend au plus trois secondes son verrou.
-- Le SDK MCP 2.3 utilisé pour cette validation délègue déjà les outils synchrones à des threads.
-  Les protections ajoutées ne transforment pas le serveur en une file globale
-  où tous les outils attendraient les uns derrière les autres.
+- Les outils synchrones utilisent deux limiteurs AnyIO distincts : 32 workers
+  pour les mutations et 16 pour les lectures. Ils ne consomment pas le limiteur
+  par défaut du SDK, également utilisé par les entrées et sorties stdio.
+  `tools/list` reste donc disponible pendant les opérations bloquées. Les outils
+  asynchrones restent natifs, avec les mêmes bornes d'admission et de validation.
+  Les workers conservent le contexte et la conversion de sortie du SDK.
+- Des lectures distantes d'une même session SSH restent sérialisées par son
+  protocole ; plusieurs clients ont des sessions indépendantes. La séparation
+  des workers ne promet pas un instantané transactionnel des fichiers.
 - Les protections de fichiers sont coopératives : tous les clients doivent
   exécuter cette version et partager le cache concerné. Un éditeur, un shell,
   un ancien MCP ou un job qui écrit directement n'est pas automatiquement bloqué.
@@ -96,6 +114,9 @@ la récupération du verrou ne constitue pas une preuve de nettoyage de ce stagi
 et processus, les alias, les répertoires, la mort d'un propriétaire, les échecs
 de copie, les limites et l'annulation réelle d'un RPC stdio. Sur POSIX, la suite
 exécute aussi les helpers distants pour vérifier les conflits entre outils.
+`context-concurrency` vérifie la capacité réservée, le maintien du contexte et
+des schémas, les refus avant exécution, l'annulation et les lectures sous charge
+à travers le véritable transport stdio, avec les effets distants simulés.
 `tool-actions` vérifie les soumissions concurrentes avec Slurm simulé.
 La suite complète par défaut reste hors ligne ; ne pas utiliser `--live` pour
 une campagne où les jobs sont interdits.

@@ -507,15 +507,15 @@ class Admission(unittest.IsolatedAsyncioTestCase):
         requests = [asyncio.create_task(server.call_tool('controlled', {'number': n})) for n in range(120)]
         try:
             self.assertTrue(await asyncio.to_thread(entered.wait, 10))
-            self.assertEqual(server._active_calls, 64)
+            self.assertEqual(server._active_calls, 48)
             refusals = [r.result() for r in requests if r.done()]
-            self.assertEqual(len(refusals), 56)
+            self.assertEqual(len(refusals), 72)
             self.assertTrue(all(r.is_error and not json.loads(r.content[0].text)['execution_started'] for r in refusals))
         finally:
             release.set()
             responses = await asyncio.gather(*requests)
-        self.assertEqual(len(calls), 64)
-        self.assertEqual(sum(bool(r.is_error) for r in responses), 56)
+        self.assertEqual(len(calls), 48)
+        self.assertEqual(sum(bool(r.is_error) for r in responses), 72)
         self.assertEqual(server._active_calls, 0)
 
     async def test_cancelled_rpc_keeps_capacity_until_the_real_worker_finishes(self):
