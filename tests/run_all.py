@@ -21,6 +21,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -104,11 +105,14 @@ def executer(chemin: str, live: bool = False) -> tuple[int, float]:
                    ROMEO_TOOL_PROFILE="full")
     # `PYTHONIOENCODING` : les suites impriment des accents, et la console
     # Windows par defaut ne les encode pas.
-    proc = subprocess.run(
-        [sys.executable, chemin],
-        cwd=str(RACINE),
-        env=env,
-    )
+    with tempfile.TemporaryDirectory(prefix='romeo-test-state-') as state:
+        if not live:
+            env['ROMEO_CONCURRENCY_ROOT'] = str(Path(state) / 'concurrency')
+        proc = subprocess.run(
+            [sys.executable, chemin],
+            cwd=str(RACINE),
+            env=env,
+        )
     return proc.returncode, time.monotonic() - debut
 
 

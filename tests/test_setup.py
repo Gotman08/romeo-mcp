@@ -27,6 +27,7 @@ class SetupTests(unittest.TestCase):
         self.profile = Path(self.tmp.name) / "private" / "config.json"
         self.env = {k: v for k, v in os.environ.items() if not k.startswith("ROMEO_")}
         self.env['ROMEO_CONCURRENCY_ROOT'] = str(Path(self.tmp.name) / 'concurrency')
+        self.enterContext(patch.dict(os.environ, ROMEO_CONCURRENCY_ROOT=self.env['ROMEO_CONCURRENCY_ROOT']))
         self.env.update(ROMEO_CONFIG=str(self.profile), PYTHONPATH=str(ROOT), PYTHONIOENCODING="utf-8")
 
     def cli(self, *args):
