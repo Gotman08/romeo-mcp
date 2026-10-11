@@ -242,13 +242,15 @@ class ObservableTests(unittest.TestCase):
         self.assertFalse((self.root/'transfers').exists())
         literal = self.root/'file with spaces'
         literal.write_text('fictional')
-        self.assertEqual(transfers.prepare('upload', str(literal), '/scratch/test-user/copy')['plan']['local_path'],
-                         str(literal))
+        selected = Path(transfers.prepare('upload', str(literal), '/scratch/test-user/copy')['plan']['local_path'])
+        self.assertTrue(selected.samefile(literal))
+        self.assertEqual(selected.name, literal.name)
         if os.name == 'posix':
             trailing = self.root/'file '
             trailing.write_text('fictional')
-            self.assertEqual(transfers.prepare('upload', str(trailing), '/scratch/test-user/copy')['plan']['local_path'],
-                             str(trailing))
+            selected = Path(transfers.prepare('upload', str(trailing), '/scratch/test-user/copy')['plan']['local_path'])
+            self.assertTrue(selected.samefile(trailing))
+            self.assertEqual(selected.name, trailing.name)
 
     def test_cleanup_suggestion_preserves_the_entire_literal_path(self):
         for name in ('cleanup dir;literal', "quote'path", 'literal$(printf TEST)', 'line\npath'):
