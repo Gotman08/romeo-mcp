@@ -31,7 +31,7 @@ IMAGE = re.compile(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))")
 
 #: Lien d'ancrage que Docusaurus accole à chaque titre : `[U+200B](#id "Lien direct ...")`.
 LIEN_ANCRE = re.compile(r'\[\u200b?\]\(#([^)\s"]+)(?:\s+"[^"]*")?\)')
-TITRE = re.compile(r"^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$")
+TITRE = re.compile(r"^ {0,3}(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$")
 CLOTURE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 BALISE_ID = re.compile(r'<[A-Za-z][^>]*?\s(?:id|name)="([^"]+)"')
 
@@ -95,15 +95,16 @@ def ancre(titre: str) -> str:
     return re.sub(r"[^\w\- ]", "", texte).replace(" ", "-")
 
 
-def ancres_de(texte: str) -> set[str]:
-    """Ancres d'une page : titres (calcul GitHub et ids Docusaurus) et balises `id`.
+def titres(texte: str):
+    """Titres ATX d'une page, hors blocs de code.
 
-    Un titre répété reçoit le suffixe `-1`, `-2`... comme sur le site.
+    Rend pour chacun `(ligne, niveau, texte, ids Docusaurus, id calculé)`, le
+    numéro de ligne partant de 0. Un titre répété reçoit le suffixe `-1`, `-2`...
+    comme sur le site et sur GitHub.
     """
-    trouvees: set[str] = set()
     vus: dict[str, int] = {}
     cloture = ""
-    for ligne in re.split(r"\r?\n", texte):
+    for numero, ligne in enumerate(re.split(r"\r?\n", texte)):
         marque = CLOTURE.match(ligne)
         if marque:
             symbole = marque.group(1)[0]
@@ -117,11 +118,20 @@ def ancres_de(texte: str) -> set[str]:
         titre = TITRE.match(ligne)
         if not titre:
             continue
-        trouvees.update(LIEN_ANCRE.findall(titre.group(1)))
-        base = ancre(titre.group(1))
+        contenu = titre.group(2)
+        base = ancre(contenu)
         rang = vus.get(base, 0)
         vus[base] = rang + 1
-        trouvees.add(base if rang == 0 else "{}-{}".format(base, rang))
+        calcule = base if rang == 0 else "{}-{}".format(base, rang)
+        yield numero, len(titre.group(1)), contenu, LIEN_ANCRE.findall(contenu), calcule
+
+
+def ancres_de(texte: str) -> set[str]:
+    """Ancres d'une page : titres (calcul GitHub et ids Docusaurus) et balises `id`."""
+    trouvees: set[str] = set()
+    for _, _, _, ids, calcule in titres(texte):
+        trouvees.update(ids)
+        trouvees.add(calcule)
     trouvees.update(BALISE_ID.findall(texte))
     return trouvees
 

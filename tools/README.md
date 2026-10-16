@@ -26,6 +26,7 @@ soumettre un calcul, utiliser les [outils MCP](../docs/Tools.md).
 | [verify_corpus.py](verify_corpus.py) | Contrôler la copie documentaire | Lit les liens, images, ancres, casse des noms de fichiers, accès depuis le sommaire et empreintes du manifeste |
 | [prepare_release.py](prepare_release.py) | Préparer une release stable | Vérifie le tag et les distributions puis écrit les empreintes et notes dans `dist/` |
 | [romeo_doc_scraper.py](romeo_doc_scraper.py) | Renouveler la copie du site ROMEO | Accède au site officiel et écrit dans le dossier de sortie choisi |
+| [merge_corpus.py](merge_corpus.py) | Intégrer une collecte au corpus versionné | Compare sans rien écrire ; avec `--write`, met à jour le corpus puis le vérifie |
 
 ## Enregistrer le MCP dans un client
 
@@ -88,7 +89,12 @@ puis choisir un dossier temporaire extérieur au dépôt :
 ```sh
 python tools/romeo_doc_scraper.py --output CHEMIN_TEMPORAIRE
 python tools/verify_corpus.py CHEMIN_TEMPORAIRE
+python tools/merge_corpus.py CHEMIN_TEMPORAIRE
+python tools/merge_corpus.py CHEMIN_TEMPORAIRE --write
 ```
+
+Le collecteur écrit les pages officielles brutes ; `merge_corpus.py` les intègre
+au corpus versionné. Sans `--write`, il compare et n’écrit rien.
 
 Le collecteur normalise lui-même les liens que le site publie mal formés. Quand
 la source Markdown amont laisse des crochets autour d’une cible
@@ -108,21 +114,34 @@ contenu de crochets inexploitable garde l’adresse du site et est compté dans
 `errors`, ce qui fait échouer la commande en fin de collecte au lieu de masquer
 le défaut.
 
-Avant d’intégrer cette collecte :
+`merge_corpus.py` ajoute aux pages brutes la navigation propre au projet :
 
-1. Lire les erreurs et comparer les pages, les images et le sommaire à la copie versionnée.
-2. Reprendre les README de navigation propres au projet et adapter leurs liens
-   si les sections officielles ont changé. Le collecteur génère son propre
-   README d’accueil ; il ne produit ni ces guides de section, ni les ajouts de
-   navigation du projet (suffixe du fil d’Ariane, pied « Dans cette section »,
-   en-tête et pied du sommaire), ni la réécriture des ancres propres au site
-   (`local_anchor_repairs`).
-3. Actualiser les empreintes de `manifest.json` pour le corpus intégré, ainsi
-   que l’inventaire `local_navigation` de ses README, et reprendre la rubrique
-   `link_normalization` écrite par le collecteur.
-4. Vérifier les liens, le manifeste et la recherche locale avec les
+| Ajout | Détail |
+|---|---|
+| Fil d’Ariane | suffixe vers le guide du corpus, les guides MCP et le catalogue des outils |
+| Pied de page | « Dans cette section », avec retour en haut de page, au sommaire et au guide du corpus |
+| Ancres des titres | un id imposé par le site (`#article1`) devient l’ancre calculée depuis le titre, dans le titre comme dans les liens qui le visent, car GitHub et les lecteurs Markdown ignorent l’id du site |
+| Sommaire | l’en-tête et le pied écrits à la main entourent l’arborescence officielle |
+| Manifeste | provenance de la collecte, empreintes de tous les fichiers, inventaire des README et `local_anchor_repairs` |
+
+Les README de section écrits à la main ne sont jamais modifiés. L’outil refuse
+une collecte qui signale des erreurs, qui ne passe pas `verify_corpus.py` ou qui
+contient déjà cette navigation, et il ne supprime les pages et images disparues
+du site qu’avec `--prune`. Les dates de collecte (`scraped_at`, `retrieved_at`)
+n’entrent pas dans la comparaison : le code de sortie est 0 quand le corpus
+correspond déjà à la collecte. Le suffixe du fil d’Ariane renvoie vers
+`docs/README.md` et `docs/Tools.md` du dépôt ; si ces adresses changent,
+modifier les constantes `GUIDES_MCP` et `TOOLS` de l’outil, puis relancer la
+fusion pour réécrire toutes les pages.
+
+Après `--write` :
+
+1. Relire le README du corpus : date de collecte et décomptes du tableau de
+   provenance (l’outil signale un décompte périmé), puis les README de section
+   dont les sections officielles ont changé.
+2. Vérifier la recherche locale avec les
    [suites documentaires](../tests/README.md#suites-hors-ligne).
-5. Publier ensemble les pages, les images, la navigation et le manifeste.
+3. Publier ensemble les pages, les images, le sommaire et le manifeste.
 
 La date de collecte décrit les pages officielles. La navigation ajoutée par
 le projet reste identifiée séparément dans le [README du corpus](../romeo_mcp/documentation/README.md).

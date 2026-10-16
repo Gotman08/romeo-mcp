@@ -92,17 +92,20 @@ permises selon MIT. Respectez aussi l’attribution des contenus tiers.
 ## Renouveler le corpus ROMEO
 
 Préparez la collecte dans un dossier temporaire avec
-`python tools/romeo_doc_scraper.py --output CHEMIN_TEMPORAIRE`, puis vérifiez le
-contenu, les liens et la provenance avant de remplacer le corpus embarqué.
-Relancez `tools/verify_corpus.py` et les tests documentaires, puis commitez
-ensemble les pages, les images et le manifeste. Gardez les sources officielles
-et leurs mentions ; ne leur attribuez pas la licence du code.
+`python tools/romeo_doc_scraper.py --output CHEMIN_TEMPORAIRE`, puis comparez-la
+au corpus embarqué avec `python tools/merge_corpus.py CHEMIN_TEMPORAIRE`.
+L’option `--write` l’intègre (navigation du projet, sommaire, manifeste) et lance
+`tools/verify_corpus.py`. Relisez ensuite les README écrits à la main, relancez
+les tests documentaires, puis commitez ensemble les pages, les images et le
+manifeste. Gardez les sources officielles et leurs mentions ; ne leur attribuez
+pas la licence du code.
 
-Conserver les guides de navigation du projet et revoir les liens de retour
-après une collecte. Toute modification d’un fichier du corpus demande de
-mettre à jour son empreinte SHA-256 dans `manifest.json` ; les ajouts de
-navigation sont décrits dans `local_navigation`, avec la provenance de la
-collecte officielle conservée.
+Les guides de navigation du projet restent écrits à la main : l’outil ne les
+modifie pas, mais signale un décompte périmé dans le README du corpus. Toute
+modification d’un fichier du corpus demande de mettre à jour son empreinte
+SHA-256 dans `manifest.json`, ce que l’outil fait pour ses écritures ; les
+ajouts de navigation sont décrits dans `local_navigation`, avec la provenance
+de la collecte officielle conservée.
 
 ---
 

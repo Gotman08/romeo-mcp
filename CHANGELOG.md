@@ -66,6 +66,15 @@
   champ `errors` du manifeste ne compte que de vrais échecs, et chaque
   normalisation est consignée dans `link_normalization`. `verify_corpus`
   contrôle aussi les ancres `#fragment` et la casse exacte des noms de fichiers.
+- Corpus : `tools/merge_corpus.py` intègre une collecte brute au corpus versionné
+  à la place du script annexe. Il ajoute le fil d'Ariane et le pied de page du
+  projet, réécrit les ids de titre imposés par le site (`#article1`) en ancres
+  calculées, conserve l'en-tête et le pied écrits à la main du sommaire et
+  régénère le manifeste. Il compare sans écrire par défaut, ignore les dates de
+  collecte, refuse une collecte en erreur ou qui ne passe pas `verify_corpus` et
+  ne supprime les fichiers disparus du site qu'avec `--prune`. Une recollecte
+  réelle suivie de la fusion redonne le corpus versionné à l'identique, hors
+  dates de collecte.
 - Énergie et carbone : lecture des compteurs Slurm, attribution uniquement sur
   allocation exclusive vérifiée, données absentes laissées inconnues. Modèle
   facultatif séparé ; suppression du facteur fixe et de l'extrapolation d'une

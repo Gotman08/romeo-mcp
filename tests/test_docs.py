@@ -19,7 +19,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from romeo_mcp import docsearch, noyau, outils_contexte
-from tools import verify_corpus
+from tools import merge_corpus, verify_corpus
 from tools.install_mcp import dossier_docs
 
 try:
@@ -511,6 +511,298 @@ class CorpusVerificationTests(unittest.TestCase):
         self.assertEqual(ancre("Voir [le guide](x.md) et **gras**"), "voir-le-guide-et-gras")
         self.assertEqual(
             verify_corpus.ancres_de("# Un\n\n## Un\n\n## Un\n"), {"un", "un-1", "un-2"})
+
+
+ZWSP = chr(0x200B)
+STAMP = "2026-10-16 10:00:00"
+URL_GUIDES = "https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md"
+URL_TOOLS = "https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md"
+RAW_SUMMARY = (
+    "# Documentation ROMEO : sommaire\n\n"
+    "Arborescence reconstruite depuis la barre latérale officielle du site.\n\n"
+    "- [Accueil](index.md)\n  - [Charte](charte.md)\n  - [Guide SSH](guide/ssh.md)\n"
+)
+OLD_SUMMARY = (
+    "# Documentation ROMEO : sommaire\n\n[Corpus ROMEO](README.md)\n\n"
+    "## Toutes les pages officielles\n\n- [Ancienne](ancienne.md)\n\n"
+    "---\n\n[↑ Haut de page](#documentation-romeo--sommaire) · [Corpus ROMEO](README.md)\n"
+)
+
+
+def title_link(identifier: str, title: str) -> str:
+    """Lien d'ancrage que Docusaurus accole à un titre."""
+    return '[{}](#{} "Lien direct vers {}")'.format(ZWSP, identifier, title)
+
+
+def front_matter(title: str, path: str, stamp: str) -> str:
+    return '---\ntitle: "{}"\nsource: "https://romeo.univ-reims.fr/documentation/{}"\nscraped_at: "{}"\n---\n\n'.format(
+        title, path, stamp)
+
+
+def raw_pages(stamp: str) -> dict[str, str]:
+    """Pages telles que le collecteur les écrit : ids de titre du site, sans navigation du projet."""
+    return {
+        "index.md": front_matter("Accueil", "", stamp)
+        + "[Sommaire](SOMMAIRE.md) › Accueil\n\n# Accueil\n\n## Dans cette section\n\n"
+        "- [Charte](charte.md)\n- [Guide SSH](guide/ssh.md)\n\n---\n\n→ [Charte](charte.md)\n",
+        "charte.md": front_matter("Charte", "charte", stamp)
+        + "[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Charte\n\n# Charte\n\n"
+        "Voir l'[article 1](#article1) et le [guide](guide/ssh.md#cle).\n\n"
+        "## Article premier" + title_link("article1", "Article premier") + "\n\nTexte de l'article.\n",
+        "guide/ssh.md": front_matter("Guide SSH", "guide/ssh", stamp)
+        + "[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › Guide SSH\n\n# Guide SSH\n\n"
+        "## Déposer sa clé" + title_link("cle", "Déposer sa clé") + "\n\n"
+        "Retour à la [charte](../charte.md#article1).\n",
+    }
+
+
+def local_navigation(rel: str) -> str:
+    return " · [Corpus ROMEO]({0}README.md) · [Guides MCP]({1}) · [Tools]({2})".format(rel, URL_GUIDES, URL_TOOLS)
+
+
+class CorpusMergeTests(unittest.TestCase):
+    """`merge_corpus` : la navigation du projet s'ajoute à une collecte brute."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="romeo merge ")
+        base = Path(self.tmp.name)
+        self.raw, self.corpus = base / "collecte", base / "corpus"
+        self.write_collection(self.raw)
+        self.write_corpus(self.corpus)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    @staticmethod
+    def put(root: Path, name: str, content) -> None:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode("utf-8") if isinstance(content, str) else content)
+
+    @staticmethod
+    def seal(root: Path, errors: int = 0, retrieved: str = "2026-10-16T10:00:00+00:00", pages: int = 3) -> None:
+        """Réécrit le manifeste d'une collecte d'après les fichiers présents."""
+        files = {
+            p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix())
+            if p.is_file() and p.name != "manifest.json"
+        }
+        manifest = {
+            "source": "https://romeo.univ-reims.fr/documentation/", "publisher": "URCA (essai)",
+            "retrieved_at": retrieved, "pages": pages, "images": 1, "errors": errors,
+            "link_normalization": {"charte.md": {"/documentation/[a@example.org]": "mailto:a@example.org"}},
+            "files": files,
+        }
+        (root / "manifest.json").write_bytes((json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+
+    def write_collection(self, root: Path, stamp: str = STAMP, **seal) -> None:
+        for name, text in raw_pages(stamp).items():
+            self.put(root, name, text)
+        self.put(root, "SOMMAIRE.md", RAW_SUMMARY)
+        self.put(root, "README.md", "# Documentation ROMEO\n\n[Sommaire](SOMMAIRE.md)\n")
+        self.put(root, "images/logo.png", b"nouveau logo")
+        self.seal(root, **seal)
+
+    def write_corpus(self, root: Path) -> None:
+        old_page = front_matter("{}", "{}", "2026-01-01 00:00:00") + "[Sommaire](SOMMAIRE.md) › {}\n\n# {}\n\nAncien texte.\n"
+        self.put(root, "charte.md", old_page.format("Charte", "charte", "Charte", "Charte"))
+        self.put(root, "ancienne.md", old_page.format("Ancienne", "ancienne", "Ancienne", "Ancienne"))
+        self.put(root, "SOMMAIRE.md", OLD_SUMMARY)
+        self.put(root, "README.md", "# Corpus ROMEO\n\n| Information | Valeur |\n|---|---|\n"
+                 "| Pages officielles | 2 |\n| Images conservées | 1 |\n\n[Sommaire](SOMMAIRE.md)\n")
+        self.put(root, "guide/README.md", "# Guide\n\n[Sommaire](../SOMMAIRE.md)\n")
+        self.put(root, "images/README.md", "# Images\n")
+        self.put(root, "images/logo.png", b"ancien logo")
+        manifest = {
+            "source": "https://romeo.univ-reims.fr/documentation/", "publisher": "URCA (essai)",
+            "retrieved_at": "2026-01-01T00:00:00+00:00", "pages": 2, "images": 1, "errors": 0, "files": {},
+            "local_navigation": {
+                "origin": "projet d'essai", "readmes": ["README.md"],
+                "page_navigation": {
+                    "pages": 2, "changes": ["ajout local decrit"],
+                    "official_content_and_collection_metadata_preserved": True,
+                    "local_anchor_repairs": {}, "local_link_repairs": {"charte.md": {"ancien": "nouveau"}},
+                },
+            },
+        }
+        self.put(root, "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+
+    def run_tool(self, *args, raw=None, corpus=None):
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = merge_corpus.main([str(raw or self.raw), "--corpus", str(corpus or self.corpus), *args])
+        return code, buffer.getvalue()
+
+    @staticmethod
+    def snapshot(root: Path) -> dict[str, bytes]:
+        return {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+    def merge(self, *args):
+        code, output = self.run_tool("--write", "--prune", *args)
+        self.assertEqual(code, 0, output)
+        return output
+
+    def test_comparison_reports_every_kind_of_difference_and_writes_nothing(self):
+        before = self.snapshot(self.corpus)
+        code, output = self.run_tool()
+        self.assertEqual(code, 1, output)
+        for expected in ("pages nouvelles (2)", "pages modifiees (hors scraped_at) (1)", "images modifiees (1)",
+                         "disparues du site (1)", "SOMMAIRE.md : different", "manifest.json : different",
+                         "ancres reecrites : charte.md (1), guide/ssh.md (1)"):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, output)
+        self.assertEqual(self.snapshot(self.corpus), before)
+
+    def test_pages_receive_the_project_navigation_and_repaired_anchors(self):
+        self.merge()
+        pages = {name: (self.corpus / name).read_bytes().decode("utf-8") for name in raw_pages(STAMP)}
+        self.assertEqual(
+            pages["charte.md"],
+            front_matter("Charte", "charte", STAMP)
+            + "[Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Charte" + local_navigation("") + "\n\n# Charte\n\n"
+            "Voir l'[article 1](#article-premier) et le [guide](guide/ssh.md#déposer-sa-clé).\n\n"
+            "## Article premier" + title_link("article-premier", "Article premier") + "\n\nTexte de l'article.\n\n"
+            "## Dans cette section\n\n"
+            "[↑ Haut de page](#charte) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)\n",
+        )
+        self.assertEqual(
+            pages["guide/ssh.md"],
+            front_matter("Guide SSH", "guide/ssh", STAMP)
+            + "[Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › Guide SSH" + local_navigation("../")
+            + "\n\n# Guide SSH\n\n## Déposer sa clé" + title_link("déposer-sa-clé", "Déposer sa clé") + "\n\n"
+            "Retour à la [charte](../charte.md#article-premier).\n\n"
+            "## Dans cette section\n\n"
+            "[↑ Haut de page](#guide-ssh) · [Sommaire officiel](../SOMMAIRE.md) · [Guide du corpus](../README.md)\n",
+        )
+
+    def test_page_with_children_gets_the_footer_in_its_existing_section(self):
+        self.merge()
+        index = (self.corpus / "index.md").read_bytes().decode("utf-8")
+        self.assertEqual(index.count("## Dans cette section"), 1)
+        self.assertTrue(index.endswith(
+            "→ [Charte](charte.md)\n\n"
+            "[↑ Haut de page](#accueil) · [Sommaire officiel](SOMMAIRE.md) · [Guide du corpus](README.md)\n"))
+
+    def test_anchor_rewriting_only_touches_link_targets(self):
+        texte = "Prose avec #article1, [lien](#article1 \"titre\"), [autre](#autre) et [loin](sous/p.md#article1)."
+        reparations = {"p.md": {"#article1": "#nouveau"}, "sous/p.md": {"#article1": "#loin"}}
+        self.assertEqual(
+            merge_corpus.reecrire_ancres("p.md", texte, reparations),
+            "Prose avec #article1, [lien](#nouveau \"titre\"), [autre](#autre) et [loin](sous/p.md#loin).")
+
+    def test_summary_keeps_the_hand_written_head_and_footer(self):
+        self.merge()
+        self.assertEqual(
+            (self.corpus / "SOMMAIRE.md").read_bytes().decode("utf-8"),
+            "# Documentation ROMEO : sommaire\n\n[Corpus ROMEO](README.md)\n\n"
+            "## Toutes les pages officielles\n\n"
+            "- [Accueil](index.md)\n  - [Charte](charte.md)\n  - [Guide SSH](guide/ssh.md)\n\n"
+            "---\n\n[↑ Haut de page](#documentation-romeo--sommaire) · [Corpus ROMEO](README.md)\n")
+
+    def test_manifest_records_provenance_hashes_and_local_additions(self):
+        self.merge()
+        manifest = json.loads((self.corpus / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(manifest), ["source", "publisher", "retrieved_at", "pages", "images", "errors",
+                                          "link_normalization", "files", "local_navigation"])
+        self.assertEqual((manifest["retrieved_at"], manifest["pages"], manifest["images"], manifest["errors"]),
+                         ("2026-10-16T10:00:00+00:00", 3, 1, 0))
+        self.assertEqual(manifest["link_normalization"],
+                         {"charte.md": {"/documentation/[a@example.org]": "mailto:a@example.org"}})
+        on_disk = {name: hashlib.sha256(data).hexdigest() for name, data in self.snapshot(self.corpus).items()
+                   if name != "manifest.json"}
+        self.assertEqual(manifest["files"], dict(sorted(on_disk.items())))
+        local = manifest["local_navigation"]
+        self.assertEqual(local["origin"], "projet d'essai")
+        self.assertEqual(local["readmes"], ["README.md", "guide/README.md", "images/README.md"])
+        navigation = local["page_navigation"]
+        self.assertEqual(navigation["pages"], 3)
+        self.assertEqual(navigation["changes"], ["ajout local decrit"])
+        self.assertEqual(navigation["local_anchor_repairs"], {
+            "charte.md": {"#article1": "#article-premier"},
+            "guide/ssh.md": {"#cle": "#déposer-sa-clé"},
+        })
+        self.assertNotIn("local_link_repairs", navigation)
+
+    def test_written_corpus_passes_the_verifier_and_a_second_pass_changes_nothing(self):
+        output = self.merge()
+        self.assertIn("CORPUS CONFORME", output)
+        self.assertNotIn("indique 1 images", output)
+        before = self.snapshot(self.corpus)
+        code, output = self.run_tool()
+        self.assertEqual(code, 0, output)
+        self.assertIn("Le corpus correspond a la collecte", output)
+        self.merge()
+        self.assertEqual(self.snapshot(self.corpus), before)
+
+    def test_collection_dates_are_ignored_by_the_comparison_and_refreshed_when_writing(self):
+        self.merge()
+        recollect = Path(self.tmp.name) / "recollecte"
+        self.write_collection(recollect, stamp="2026-11-02 08:30:00", retrieved="2026-11-02T08:30:00+00:00")
+        code, output = self.run_tool(raw=recollect)
+        self.assertEqual(code, 0, output)
+        code, output = self.run_tool("--write", "--prune", raw=recollect)
+        self.assertEqual(code, 0, output)
+        self.assertIn('scraped_at: "2026-11-02 08:30:00"', (self.corpus / "charte.md").read_text(encoding="utf-8"))
+        manifest = json.loads((self.corpus / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["retrieved_at"], "2026-11-02T08:30:00+00:00")
+
+    def test_files_that_left_the_site_need_an_explicit_prune(self):
+        self.put(self.corpus, "images/vieux.png", b"image disparue")
+        before = self.snapshot(self.corpus)
+        code, output = self.run_tool("--write")
+        self.assertEqual(code, 2, output)
+        self.assertIn("--prune", output)
+        self.assertEqual(self.snapshot(self.corpus), before)
+        self.merge()
+        self.assertFalse((self.corpus / "ancienne.md").exists())
+        self.assertFalse((self.corpus / "images" / "vieux.png").exists())
+        self.assertTrue((self.corpus / "images" / "README.md").exists())
+        self.assertTrue((self.corpus / "guide" / "README.md").exists())
+
+    def test_readme_counts_are_flagged_for_manual_update(self):
+        output = self.merge()
+        self.assertIn("le tableau de provenance indique 2 pages officielles, la collecte en compte 3", output)
+        self.assertIn("verifier la date de collecte", output)
+
+    def test_first_import_into_a_corpus_without_summary_or_manifest(self):
+        nu = Path(self.tmp.name) / "nu"
+        self.put(nu, "README.md", "# Corpus\n\n[Sommaire](SOMMAIRE.md)\n")
+        code, output = self.run_tool("--write", corpus=nu)
+        self.assertEqual(code, 0, output)
+        self.assertEqual((nu / "SOMMAIRE.md").read_bytes().decode("utf-8"), RAW_SUMMARY)
+        manifest = json.loads((nu / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["local_navigation"]["origin"], "romeo-mcp project")
+        self.assertEqual(manifest["local_navigation"]["readmes"], ["README.md"])
+
+    def test_unusable_collections_are_refused_before_any_write(self):
+        def dead_link():
+            self.put(self.raw, "index.md", (self.raw / "index.md").read_bytes().decode("utf-8") + "\n[mort](absent.md)\n")
+            self.seal(self.raw)
+
+        def already_merged():
+            texte = (self.raw / "charte.md").read_bytes().decode("utf-8")
+            self.put(self.raw, "charte.md", texte.replace("› Charte\n", "› Charte [Corpus ROMEO](README.md)\n"))
+            self.seal(self.raw)
+
+        cases = (
+            ("erreurs de collecte", lambda: self.seal(self.raw, errors=2), "2 erreur(s)"),
+            ("decompte incoherent", lambda: self.seal(self.raw, pages=5), "compte 3 page(s)"),
+            ("lien mort", dead_link, "verify_corpus"),
+            ("deja fusionnee", already_merged, "contient deja la navigation"),
+        )
+        for label, damage, expected in cases:
+            with self.subTest(label):
+                shutil.rmtree(self.raw)
+                self.write_collection(self.raw)
+                damage()
+                before = self.snapshot(self.corpus)
+                code, output = self.run_tool("--write", "--prune")
+                self.assertEqual(code, 2, output)
+                self.assertIn(expected, output)
+                self.assertEqual(self.snapshot(self.corpus), before)
+        code, output = self.run_tool(raw=self.corpus)
+        self.assertEqual(code, 2, output)
+        self.assertIn("meme dossier", output)
 
 
 if __name__ == "__main__":
