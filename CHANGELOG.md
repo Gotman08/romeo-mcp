@@ -53,9 +53,11 @@
   Slurm avec vLLM, SGLang ou llama.cpp), du guide de prise en main de l'API
   Oratio et de la page d'authentification au portail ; demande de clé d'API et
   liste des modèles Oratio mises à jour. Le collecteur enregistre les images
-  intégrées en `data:`, ne s'interrompt plus sur une console Windows en cp1252
-  et ne convertit plus les fichiers joints (exemples `.py`, `.md`, `.jpg`) en
-  pages : leurs liens ouvrent le site officiel.
+  intégrées en `data:`, ne s'interrompt plus sur une console Windows en cp1252,
+  place l'ancre après l'extension (`page.md#section`) et ne convertit plus les
+  fichiers joints (exemples `.py`, `.md`, `.jpg`) en pages : leurs liens ouvrent
+  le site officiel. `verify_corpus` contrôle désormais chaque cible locale,
+  quelle que soit son extension.
 - Énergie et carbone : lecture des compteurs Slurm, attribution uniquement sur
   allocation exclusive vérifiée, données absentes laissées inconnues. Modèle
   facultatif séparé ; suppression du facteur fixe et de l'extrapolation d'une

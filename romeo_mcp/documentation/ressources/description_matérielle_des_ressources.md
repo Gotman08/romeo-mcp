@@ -1,7 +1,7 @@
 ---
 title: "Description  matérielle des ressources ROMEO"
 source: "https://romeo.univ-reims.fr/documentation/ressources/description_matérielle_des_ressources"
-scraped_at: "2026-10-16 15:46:46"
+scraped_at: "2026-10-16 16:08:14"
 ---
 
 [Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Ressources de calcul](../ressources.md) › Description  matérielle des ressources ROMEO · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

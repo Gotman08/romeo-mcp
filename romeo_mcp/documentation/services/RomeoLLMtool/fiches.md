@@ -1,7 +1,7 @@
 ---
 title: "Écrire une fiche"
 source: "https://romeo.univ-reims.fr/documentation/services/RomeoLLMtool/fiches"
-scraped_at: "2026-10-16 15:47:07"
+scraped_at: "2026-10-16 16:08:35"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [RomeoLLMTool](../RomeoLLMtool.md) › Écrire une fiche · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -192,7 +192,7 @@ vllm:
 
 `embed` et `score` tournent sur le vLLM standard, sans rien de plus.
 `transcription`, lui, a besoin d'une variante vLLM avec le support audio
-(voir [Moteurs, « Variantes »](../../services/RomeoLLMtool/engines#variantes.md)) ; sur le vLLM
+(voir [Moteurs, « Variantes »](../../services/RomeoLLMtool/engines.md#variantes)) ; sur le vLLM
 standard, il échoue au démarrage plutôt qu'au premier fichier envoyé :
 
 ```yaml

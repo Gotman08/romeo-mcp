@@ -1,7 +1,7 @@
 ---
 title: "Ressources de calcul"
 source: "https://romeo.univ-reims.fr/documentation/ressources"
-scraped_at: "2026-10-16 15:46:43"
+scraped_at: "2026-10-16 16:08:11"
 ---
 
 [Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Ressources de calcul · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

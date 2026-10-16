@@ -1,7 +1,7 @@
 ---
 title: "Ligne de commande"
 source: "https://romeo.univ-reims.fr/documentation/services/RomeoLLMtool/cli"
-scraped_at: "2026-10-16 15:47:06"
+scraped_at: "2026-10-16 16:08:34"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [RomeoLLMTool](../RomeoLLMtool.md) › Ligne de commande · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

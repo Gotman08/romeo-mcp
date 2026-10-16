@@ -1,7 +1,7 @@
 ---
 title: "Moteurs"
 source: "https://romeo.univ-reims.fr/documentation/services/RomeoLLMtool/engines"
-scraped_at: "2026-10-16 15:47:07"
+scraped_at: "2026-10-16 16:08:35"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [RomeoLLMTool](../RomeoLLMtool.md) › Moteurs · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -21,7 +21,7 @@ Le choix dépend du modèle visé : son format de poids (safetensors ou GGUF),
 s'il a besoin de plusieurs nœuds, et des endpoints dont vous avez besoin
 (simple chat, ou embeddings/classement/transcription/synthèse vocale). Les
 clés exactes de chaque section de moteur sont détaillées dans
-[Écrire une fiche](../../services/RomeoLLMtool/fiches#la-section-du-moteur.md).
+[Écrire une fiche](../../services/RomeoLLMtool/fiches.md#la-section-du-moteur).
 
 ## Moteurs partagés[​](#moteurs-partagés "Lien direct vers Moteurs partagés")
 
@@ -72,7 +72,7 @@ l'installer ni le réparer.
 
 La marche à suivre complète (ce que chaque moteur attend dans ce dossier, la
 recette de construction sur un nœud de calcul, et les règles à respecter) est
-détaillée dans [Écrire une fiche, « Fournir votre propre moteur »](../../services/RomeoLLMtool/fiches#fournir-votre-propre-moteur-engine_dir.md).
+détaillée dans [Écrire une fiche, « Fournir votre propre moteur »](../../services/RomeoLLMtool/fiches.md#fournir-votre-propre-moteur-engine_dir).
 
 ---
 

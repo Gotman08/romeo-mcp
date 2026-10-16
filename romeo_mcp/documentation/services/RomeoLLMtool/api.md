@@ -1,7 +1,7 @@
 ---
 title: "Utiliser l'API"
 source: "https://romeo.univ-reims.fr/documentation/services/RomeoLLMtool/api"
-scraped_at: "2026-10-16 15:47:06"
+scraped_at: "2026-10-16 16:08:34"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [RomeoLLMTool](../RomeoLLMtool.md) › Utiliser l'API · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -22,7 +22,7 @@ romeollmtool gateway show-key   # affiche la clé API
 
 L'URL a la forme `http://<nœud de connexion>:<port>/v1` (le port est choisi
 par la gateway, repris d'une session à l'autre tant qu'il reste libre : voir
-[Interface terminal, onglet Gateway](../../services/RomeoLLMtool/gui#onglet-gateway.md)). Dans
+[Interface terminal, onglet Gateway](../../services/RomeoLLMtool/gui.md#onglet-gateway)). Dans
 l'interface terminal, l'onglet Gateway affiche les deux et permet de copier
 l'URL (**y**) ou d'afficher la clé (**k**).
 

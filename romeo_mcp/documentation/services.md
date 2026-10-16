@@ -1,7 +1,7 @@
 ---
 title: "Services"
 source: "https://romeo.univ-reims.fr/documentation/services"
-scraped_at: "2026-10-16 15:47:00"
+scraped_at: "2026-10-16 16:08:27"
 ---
 
 [Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Services · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

@@ -92,9 +92,9 @@ def main(racine: Path) -> int:
         for motif, compteur in ((IMAGE, "img"), (LIEN, "lien")):
             for match in motif.finditer(texte):
                 href = sans_ancre(cible(match))
+                # Toute cible locale doit exister, quelle que soit son extension :
+                # un `.md` place apres l'ancre (`page#ancre.md`) passait inapercu.
                 if not est_interne(href):
-                    continue
-                if compteur == "lien" and not href.endswith(".md"):
                     continue
                 if (page.parent / href).resolve().exists():
                     if compteur == "img":

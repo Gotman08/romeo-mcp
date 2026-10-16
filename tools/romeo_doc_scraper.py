@@ -640,7 +640,8 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
                 return f"[{text}]({BASE_URL}{url})"
 
             if url.startswith("/documentation"):
-                new_url = url.replace("/documentation/", "").replace("/documentation", "")
+                path, sep, fragment = url.partition("#")
+                new_url = path.replace("/documentation/", "").replace("/documentation", "")
                 # Une URL de répertoire (`services/Oratio/`) correspond au
                 # fichier d'index `services/Oratio.md`, pas à `.../.md`.
                 new_url = new_url.rstrip("/")
@@ -648,7 +649,8 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
                     new_url = "index"
                 if not new_url.endswith(".md"):
                     new_url += ".md"
-                return f"[{text}]({prefix}{new_url})"
+                # L'ancre suit l'extension : `fiches.md#section`, pas `fiches#section.md`.
+                return f"[{text}]({prefix}{new_url}{sep}{fragment})"
 
             return match.group(0)
 
@@ -1036,8 +1038,9 @@ def main():
     # Une console Windows en cp1252 ne sait pas encoder les emojis du journal :
     # sans repli, le premier message interrompt toute la collecte.
     for stream in (sys.stdout, sys.stderr):
-        if hasattr(stream, "reconfigure"):
-            stream.reconfigure(errors="replace")
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
 
     parser = argparse.ArgumentParser(
         description="Télécharge la documentation ROMEO en Markdown",
