@@ -46,7 +46,7 @@ publication, le choix du compte bot local ou personnel et la suppression locale.
 La suite `energy` vérifie la conversion des compteurs, l'attribution au job,
 les valeurs inconnues et la couverture temporelle du facteur RTE, avec des
 données fictives. `tool-docs` compare les exemples JSON, paramètres, défauts
-et liens source des 99 outils au catalogue MCP complet, sans appeler les outils.
+et liens source des 113 outils au catalogue MCP complet, sans appeler les outils.
 
 Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
 tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.
@@ -62,6 +62,7 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 
 | Nom pour `--only` | Fichier | Ce qui est vérifié |
 |---|---|---|
+| `romeollm` | [test_romeollm.py](test_romeollm.py) | CLI simulée, plans persistants, coupures SSH, absence de double lancement, gateway conservant les jobs et protocole MCP stdio |
 | `units` | [test_units.py](test_units.py) | Durées, ressources, partitions, scripts et garde-fous |
 | `workloads` | [test_workloads.py](test_workloads.py) | Lanceurs, gabarits, diagnostics et modèles matériels |
 | `regressions` | [test_regressions.py](test_regressions.py) | Corrections de défauts déjà rencontrés |

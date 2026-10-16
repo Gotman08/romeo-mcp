@@ -35,12 +35,13 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **99 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **113 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 
 | Votre besoin | Guide | Fiches à ouvrir |
 |---|---|---|
+| Utiliser les modèles RomeoLLMTool | [Modèles et gateway](romeollm.md) | [Catalogue](tools/romeollm_catalog.md) · [Préparer](tools/romeollm_launch_prepare.md) · [Lancer](tools/romeollm_launch.md) · [État](tools/romeollm_status.md) |
 | Préparer et suivre un job | [Jobs et journaux](Tools.md#jobs-et-journaux) | [Préparer](tools/job_prepare.md) · [Soumettre](tools/job_submit.md) · [État](tools/job_status.md) · [Retrouver mes jobs](tools/list_jobs.md) |
 | Lancer plusieurs expériences | [Tableaux et pipelines](Tools.md#préparer-puis-soumettre-le-plan-exact) | [Tableau de paramètres](tools/job_array_prepare.md) · [Étapes dépendantes](tools/job_pipeline_prepare.md) · [Calcul reprenable](tools/job_resilient_prepare.md) |
 | Choisir les logiciels et l’architecture | [Calcul parallèle](Tools.md#calcul-parallèle) | [Catalogue Spack](tools/romeo_software.md) · [Environnement Python](tools/python_env_prepare.md) · [Paquets Python](tools/python_packages_prepare.md) |

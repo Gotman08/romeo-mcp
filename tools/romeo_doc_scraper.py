@@ -58,6 +58,21 @@ ATTACHMENT_EXTENSIONS = IMAGE_EXTENSIONS | {
     ".tar", ".gz", ".tgz", ".sh", ".yaml", ".yml",
 }
 
+# Certaines pages amont laissent des crochets autour de la cible d'un lien
+# (`[texte]([https://...])` dans la source Markdown). Docusaurus les prend pour
+# un chemin relatif et sert `/documentation/[https://...]` : une adresse qui
+# n'existe pas. La suivre produisait une cible locale morte et un échec 404 au
+# téléchargement. Le préfixe éventuel (site, `/documentation/`, `./`) n'est
+# qu'un chemin résolu sans valeur : la vraie cible est dans les crochets.
+BRACKETED_HREF = re.compile(
+    r"^(?:https?://romeo\.univ-reims\.fr)?/?(?:[\w.~%-]+/)*"
+    r"\[(?P<inner>[^\[\]]+)\](?P<tail>/?(?:#\S*)?)$",
+    re.IGNORECASE,
+)
+EMAIL_ADDRESS = re.compile(
+    r"^[^@\s/:#?\[\]]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$"
+)
+
 # Délai entre requêtes (politesse)
 REQUEST_DELAY = 0.3
 
@@ -227,6 +242,9 @@ class RomeoDocScraper:
         self.visited_urls: Set[str] = set()
         self.pages: list = []  # conserve pour reconstruire la navigation
         self.image_map: Dict[str, str] = {}  # URL originale -> chemin local
+        # href mal formé -> cible retenue, par page : consigné dans le manifeste.
+        self.link_normalization: Dict[str, Dict[str, str]] = {}
+        self.unresolved_links: Set[Tuple[str, str]] = set()
         self.stats = ScraperStats()
         
         # Créer les dossiers
@@ -286,6 +304,36 @@ class RomeoDocScraper:
             return False
         parsed = urllib.parse.urlparse(url)
         return Path(parsed.path).suffix.lower() in ATTACHMENT_EXTENSIONS
+
+    def resolve_bracketed_href(self, href: str) -> Optional[Tuple[str, Optional[str]]]:
+        """Interprète un href dont la cible est restée entre crochets.
+
+        Rend `None` pour un href ordinaire. Sinon un couple `(nature, cible)` :
+
+        - `("documentation", "/documentation/page#ancre")` : page de ce site,
+          à traiter comme n'importe quel lien interne ;
+        - `("external", "https://...")` : site tiers, repris tel quel ;
+        - `("mailto", "mailto:adresse")` : adresse de courriel ;
+        - `("unresolved", None)` : crochets reconnus, contenu inexploitable.
+        """
+        match = BRACKETED_HREF.match(href.strip())
+        if not match:
+            return None
+
+        target, _, fragment = match.group("inner").strip().partition("#")
+        fragment = fragment or match.group("tail").partition("#")[2]
+        suffix = f"#{fragment}" if fragment else ""
+
+        mail = target[len("mailto:"):] if target.lower().startswith("mailto:") else target
+        if EMAIL_ADDRESS.match(mail):
+            return "mailto", f"mailto:{mail}"
+
+        parsed = urllib.parse.urlparse(target)
+        if parsed.scheme.lower() in ("http", "https") and parsed.netloc:
+            if self.is_doc_url(target):
+                return "documentation", parsed.path + suffix
+            return "external", target + suffix
+        return "unresolved", None
 
     def fetch_page(self, url: str) -> Optional[str]:
         """Récupère le contenu HTML d'une page."""
@@ -441,7 +489,17 @@ class RomeoDocScraper:
         # et la barre laterale, qui sont hors du contenu principal.
         links = set()
         for a in soup.find_all("a", href=True):
-            href = self.normalize_url(a["href"])
+            bracketed = self.resolve_bracketed_href(a["href"])
+            if bracketed is not None:
+                # Fausse cible (`/documentation/[...]`) : jamais téléchargée,
+                # sous peine de compter un 404 qui n'est pas une vraie panne.
+                # Seule la page du site que les crochets désignent est à visiter.
+                kind, target = bracketed
+                if kind != "documentation" or target is None:
+                    continue
+                href = self.normalize_url(target)
+            else:
+                href = self.normalize_url(a["href"])
             if href and self.is_doc_url(href) and not self.is_attachment_url(href):
                 links.add(href)
         
@@ -625,34 +683,45 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
 
         # Profondeur de la page dans l'arborescence du corpus.
         try:
-            depth = len(filepath.relative_to(self.output_dir).parts) - 1
+            relative = filepath.relative_to(self.output_dir)
         except ValueError:
-            depth = 0
+            page_key, depth = filepath.name, 0
+        else:
+            page_key, depth = relative.as_posix(), len(relative.parts) - 1
         prefix = "../" * depth
 
         # Corriger les liens vers d'autres pages de doc
         def fix_link(match):
             text = match.group(1)
             url = match.group(2)
+            original = url
+
+            # Cible restée entre crochets en amont : on lui substitue sa vraie
+            # valeur, puis le lien suit le chemin d'un lien ordinaire.
+            bracketed = self.resolve_bracketed_href(url)
+            if bracketed is not None:
+                url = bracketed[1]
+                if url is None:
+                    # Contenu des crochets illisible : le lien reste tel que le
+                    # site le sert, et l'anomalie est comptée plutôt que masquée.
+                    self.report_unresolved_link(page_key, original)
+                    absolute = urllib.parse.urljoin(f"{BASE_URL}{DOC_ROOT}/", original)
+                    return f"[{text}]({absolute})"
 
             if url.startswith("/documentation") and self.is_attachment_url(url):
                 # Fichier joint non copié : le lien reste valable vers le site.
-                return f"[{text}]({BASE_URL}{url})"
+                link = target = f"{BASE_URL}{url}"
+            elif url.startswith("/documentation"):
+                target = self.local_doc_target(url)
+                link = f"{prefix}{target}"
+            elif bracketed is not None:
+                link = target = url  # site tiers ou adresse de courriel
+            else:
+                return match.group(0)
 
-            if url.startswith("/documentation"):
-                path, sep, fragment = url.partition("#")
-                new_url = path.replace("/documentation/", "").replace("/documentation", "")
-                # Une URL de répertoire (`services/Oratio/`) correspond au
-                # fichier d'index `services/Oratio.md`, pas à `.../.md`.
-                new_url = new_url.rstrip("/")
-                if not new_url:
-                    new_url = "index"
-                if not new_url.endswith(".md"):
-                    new_url += ".md"
-                # L'ancre suit l'extension : `fiches.md#section`, pas `fiches#section.md`.
-                return f"[{text}]({prefix}{new_url}{sep}{fragment})"
-
-            return match.group(0)
+            if bracketed is not None:
+                self.link_normalization.setdefault(page_key, {})[original] = target
+            return f"[{text}]({link})"
 
         markdown = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', fix_link, markdown)
 
@@ -668,6 +737,32 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
         
         return markdown.strip()
     
+    def local_doc_target(self, url: str) -> str:
+        """Cible locale d'un lien interne `/documentation/...`, depuis la racine du corpus.
+
+        L'ancre suit l'extension : `fiches.md#section`, pas `fiches#section.md`.
+        """
+        path, sep, fragment = url.partition("#")
+        # Seul le préfixe de tête est retiré : un `/documentation/` plus loin
+        # dans le chemin ne doit pas le mutiler.
+        new_url = re.sub(r"^/documentation/?", "", path)
+        # Une URL de répertoire (`services/Oratio/`) correspond au fichier
+        # d'index `services/Oratio.md`, pas à `.../.md`.
+        new_url = new_url.rstrip("/")
+        if not new_url:
+            new_url = "index"
+        if not new_url.endswith(".md"):
+            new_url += ".md"
+        return f"{new_url}{sep}{fragment}"
+
+    def report_unresolved_link(self, page: str, href: str) -> None:
+        """Compte un href à crochets inexploitable, une seule fois par page."""
+        if (page, href) in self.unresolved_links:
+            return
+        self.unresolved_links.add((page, href))
+        self.stats.errors += 1
+        print(f"  ❌ Lien à crochets inexploitable dans {page} : {href}")
+
     # -- reconstruction de la navigation -------------------------------------
     def corpus_key(self, url: str) -> Optional[str]:
         """Identifiant d'une page dans le corpus : son chemin relatif en .md.
@@ -947,7 +1042,15 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "pages": len({p.filepath for p in self.pages if p.filepath}),
             "images": self.stats.images_downloaded,
+            # Echecs reels seulement : les fausses cibles a crochets ne sont
+            # pas telechargees et figurent plutot dans `link_normalization`.
             "errors": self.stats.errors,
+            # Pour chaque page, href amont mal forme -> cible retenue dans le
+            # corpus (page locale, site tiers ou `mailto:`).
+            "link_normalization": {
+                page: dict(sorted(links.items()))
+                for page, links in sorted(self.link_normalization.items())
+            },
             "files": files,
         }
         write_atomic(self.output_dir / "manifest.json",

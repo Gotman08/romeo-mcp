@@ -14,6 +14,9 @@ from mcp import ClientSession, StdioServerParameters, stdio_client  # noqa: E402
 #: C'est le seul garde-fou contre une perte silencieuse lors d'un deplacement
 #: de code entre modules.
 OUTILS_ATTENDUS = {
+    'romeollm_catalog', 'romeollm_status', 'romeollm_engines', 'romeollm_doctor', 'romeollm_stats',
+    'romeollm_launch_prepare', 'romeollm_launch', 'romeollm_stop', 'romeollm_logs', 'romeollm_endpoint',
+    'romeollm_gateway_status', 'romeollm_gateway_start', 'romeollm_gateway_stop', 'romeollm_chat',
     'mcp_issue_policy_get',
     'mcp_issue_policy_set',
     'mcp_issue_report',

@@ -88,7 +88,12 @@ A savoir avant toute action :
 - Les logiciels se chargent via Spack, propre a chaque architecture. Cherche-les
   avec `romeo_software`, puis passe-les en `spack_packages`. Ne conclus jamais
   qu'un outil est absent parce que `command -v` ne le trouve pas sur le login.
-- Aucun calcul sur le noeud de login. Tout passe par `job_prepare`.
+- Aucun calcul sur le noeud de login. Utilise `job_prepare` pour les calculs.
+- RomeoLLMTool : `romeollm_catalog`, puis `romeollm_launch_prepare` et
+  `romeollm_launch(confirm=true)` deleguent le lancement Slurm a la CLI officielle.
+  Suis `romeollm_status` sans attendre le chargement. La gateway se gere avec
+  `romeollm_gateway_*` ; son arret conserve les jobs. `romeollm_chat` envoie
+  un message a un modele deja servi. Aucun moteur n'est installe sur le login.
 - ROMEO est un calculateur generaliste : chimie, mecanique des fluides,
   bio-informatique, statistique, apprentissage automatique. Le parallelisme
   courant est MPI (`distributed='mpi'`, simple prefixe srun). Les options
