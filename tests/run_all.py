@@ -29,6 +29,8 @@ RACINE = Path(__file__).resolve().parents[1]
 
 #: (cle, chemin, description, besoin du cluster)
 SUITES = [
+    ("romeollm", "tests/test_romeollm.py",
+     "CLI RomeoLLMTool simulee, plans, gateway, limites et protocole MCP", False),
     ("units", "tests/test_units.py",
      "durees, partitions, architectures, sbatch, garde-fous", False),
     ("workloads", "tests/test_workloads.py",

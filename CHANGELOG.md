@@ -14,6 +14,10 @@
 
 ## Non publié — intentions et cycles de vie explicites
 
+- Quatorze outils RomeoLLMTool : catalogue, préparation et lancement Slurm sans
+  attente, suivi, journaux, accès, gateway, chat ponctuel et diagnostics. Plans
+  consommés une fois, fiche revérifiée et arrêt de gateway conservant les jobs.
+  [Guide et limites](docs/romeollm.md).
 - Cinq outils de rapports GitHub dans tous les profils : accord automatique
   persistant, description filtrée, registre local et liens après reconnexion.
   Création suivie d'une relecture, protection contre les doublons locaux,
