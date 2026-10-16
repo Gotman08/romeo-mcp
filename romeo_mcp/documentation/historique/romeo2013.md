@@ -1,7 +1,7 @@
 ---
 title: "Supercalculateur ROMEO 2013"
 source: "https://romeo.univ-reims.fr/documentation/historique/romeo2013"
-scraped_at: "2026-09-26 02:35:55"
+scraped_at: "2026-10-16 16:08:10"
 ---
 
 [Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Historique des équipements](../historique.md) › Supercalculateur ROMEO 2013 · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

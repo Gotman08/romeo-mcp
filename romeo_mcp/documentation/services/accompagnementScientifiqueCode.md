@@ -1,7 +1,7 @@
 ---
 title: "Accompagnement personnalisé pour les utilisateurs ROMEO"
 source: "https://romeo.univ-reims.fr/documentation/services/accompagnementScientifiqueCode"
-scraped_at: "2026-09-26 02:37:12"
+scraped_at: "2026-10-16 16:08:37"
 ---
 
 [Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Accompagnement personnalisé pour les utilisateurs ROMEO · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

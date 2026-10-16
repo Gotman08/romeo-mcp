@@ -1,7 +1,7 @@
 ---
 title: "Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo"
 source: "https://romeo.univ-reims.fr/documentation/bonnes_pratiques_cybersecurite"
-scraped_at: "2026-09-26 02:35:51"
+scraped_at: "2026-10-16 16:08:09"
 ---
 
 [Sommaire](SOMMAIRE.md) › [Accueil](index.md) › Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo · [Corpus ROMEO](README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -26,7 +26,14 @@ Une clé ssh est faite pour être unique par utilisateur et machine de connexion
 
 Les mots de passe doivent être suffisamment longs et complexes : Au minimum 12 caractères, si possible avec des minuscules, majuscules et caractères spéciaux. Ne mettez pas d'informations personnelles ou liées au compte dans vos mots de passe et évitez les suites triviales de caractères (AaAa, 54321, etc…).
 
-**Afin de pouvoir bien gérer vos mots de passe et d'éviter d'avoir à en retenir un trop grand nombre**, nous vous recommandons l'utilisation d'un [gestionnaire de mots de passe](https://fr.wikipedia.org/wiki/Gestionnaire_de_mots_de_passe) certifié par l'[Agence Nationale de la Sécurité des Systèmes d'Information](https://cyber.gouv.fr) (ANSSI) comme [Keepass](https://keepass.info/) (ou [KeepassXC](https://keepassxc.org/) pour les autres systèmes d'exploitation, également disponible sur mobile). Cela vous permettra de retenir un unique mot de passe pour accéder à tous vos autres mots de passe, et de limiter les dégâts si certains sont compromis.
+**Afin de pouvoir bien gérer vos mots de passe et d'éviter d'avoir à en retenir un trop grand nombre**, nous vous recommandons l'utilisation d'un [gestionnaire de mots de passe](https://fr.wikipedia.org/wiki/Gestionnaire_de_mots_de_passe) certifié par l'[Agence Nationale de la Sécurité des Systèmes d'Information](https://cyber.gouv.fr) (ANSSI) comme [Keepass](https://keepass.info/) (ou [KeepassXC](https://keepassxc.org/) pour les autres systèmes d'exploitation comme Linux ou MacOS). Cela vous permettra de retenir un unique mot de passe pour accéder à tous vos autres mots de passe, et de limiter les dégâts si certains sont compromis.
+
+Exemples d'autres gestionnaires de mots de passe pour mobiles :
+
+- [KeepassDX](https://play.google.com/store/apps/details?id=com.kunzisoft.keepass.free) pour Android
+- [Keepass4Android](https://play.google.com/store/apps/details?id=keepass2android.keepass2android) pour Android
+- [StrongBox](https://itunes.apple.com/us/app/strongbox-password-safe/id897283731) pour iOS
+- [Keepassium](https://apps.apple.com/us/app/keepassium-keepass-passwords/id1435127111) pour iOS
 
 ## 3. Ne pas laisser vos équipements sans surveillance[​](#3-ne-pas-laisser-vos-équipements-sans-surveillance "Lien direct vers 3. Ne pas laisser vos équipements sans surveillance")
 
@@ -52,7 +59,7 @@ Pour rappel, l'utilisation des services de Romeo est sujette au respect [des dif
 
 ---
 
-← [Supercalculateur ROMEO 2013](historique/romeo2013.md) | → [Conditions Générales d’Utilisation des ressources de calcul de ROMEO](2.5.charte.md)
+← [Supercalculateur ROMEO 2013](historique/romeo2013.md) | → [Authentification au portail ROMEO](authentification.md)
 
 ## Dans cette section
 

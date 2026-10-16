@@ -32,10 +32,11 @@ ouvrent GitHub.
 | Besoin | Lecture |
 |---|---|
 | Parcourir toutes les pages officielles | [Sommaire complet](SOMMAIRE.md) |
-| Préparer son accès | [Portail et compte](creation_compte.md), puis [connexion SSH](ressources/connexion_ssh.md) |
+| Préparer son accès | [Portail et compte](creation_compte.md), [authentification au portail](authentification.md), puis [connexion SSH](ressources/connexion_ssh.md) |
 | Calculer sur ROMEO 2025 | [Parcours des procédures](ressources/romeo_2025/README.md) |
 | Choisir un logiciel ou une architecture | [Catalogues logiciels](ressources/romeo_2025/Logiciels/README.md) |
 | Comprendre les services associés | [Services](services/README.md) |
+| Utiliser des modèles de langage (LLM) | [Oratio](services/Oratio/README.md) ou [RomeoLLMTool](services/RomeoLLMtool/README.md) |
 | Consulter les générations précédentes | [Historique](historique/README.md) et [archives des ressources](ressources/archives/README.md) |
 | Retrouver une illustration | [Images du corpus](images/README.md) |
 
@@ -44,10 +45,11 @@ ouvrent GitHub.
 - [Ressources de calcul](ressources/README.md) : accès, matériel, ROMEO 2025,
   Juliet, QLM et archives.
 - [Services](services/README.md) : assistance, accompagnement scientifique,
-  RomeoGit et Oratio.
+  RomeoGit, Oratio et RomeoLLMTool.
 - [Historique](historique/README.md) : équipements présentés en 2013 et 2018.
 - [Images](images/README.md) : captures d’écran conservées avec les pages.
-- [Bonnes pratiques de sécurité](bonnes_pratiques_cybersecurite.md) et
+- [Bonnes pratiques de sécurité](bonnes_pratiques_cybersecurite.md),
+  [authentification au portail](authentification.md) et
   [conditions d’utilisation](2.5.charte.md) : cadre d’utilisation des services.
 
 ## Provenance et intégrité
@@ -55,9 +57,9 @@ ouvrent GitHub.
 | Information | Valeur de la copie embarquée |
 |---|---|
 | Source | [Documentation officielle ROMEO](https://romeo.univ-reims.fr/documentation/) |
-| Collecte des pages | 26 septembre 2026 |
-| Pages officielles | 42 |
-| Images conservées | 21 |
+| Collecte des pages | 16 octobre 2026 |
+| Pages officielles | 50 |
+| Images conservées | 34 |
 | Inventaire et empreintes SHA-256 | [manifest.json](manifest.json) |
 
 Chaque page officielle possède un en-tête `source` et `scraped_at`.
@@ -76,7 +78,10 @@ nécessitent une connexion réseau. Certaines pages de la source sont des
 avec leurs sources, lignes et arguments de lecture. [`read_doc`](https://github.com/Gotman08/romeo-mcp/blob/main/docs/tools/read_doc.md) permet ensuite
 de lire une section et de poursuivre avec `next_call` si nécessaire. Les
 README de navigation sont exclus de cet index pour préserver la recherche
-dans les 42 pages officielles.
+dans les 50 pages officielles.
+
+Les fichiers joints à certaines pages, comme les exemples téléchargeables de
+l’API Oratio, ne sont pas copiés : leurs liens ouvrent le site officiel.
 
 Pour les droits, quotas et disponibilités actuels, compléter ces lectures
 datées avec les outils de diagnostic du MCP. Les procédures de la source

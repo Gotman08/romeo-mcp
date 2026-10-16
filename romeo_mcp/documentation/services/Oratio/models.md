@@ -1,7 +1,7 @@
 ---
 title: "Modèles disponibles"
 source: "https://romeo.univ-reims.fr/documentation/services/Oratio/models"
-scraped_at: "2026-09-26 02:37:11"
+scraped_at: "2026-10-16 16:08:33"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › Modèles disponibles · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -13,7 +13,7 @@ scraped_at: "2026-09-26 02:37:11"
 > info
 
 Dernière mis à jour de la liste des modèles sur cette page :
-27/08/2026
+06/10/2026
 
 > ⚠️ **Attention**
 >
@@ -29,7 +29,6 @@ Les données ne sont pas réutilisées à d'autres fins et ne sont pas communiqu
 | --- | --- | --- |
 | **Modèle Généraliste** | ROMEO | Modèle recommandé pour un usage général. Il pointe actuellement vers `mistral-small-4-119b` avec raisonnement non actif. |
 | **Modèle Intelligent** | ROMEO | Modèle spécialisé dans le raisonnement, la programmation et les tâches « agentiques » (enchaînement de plusieurs actions) et complexes. Il est généralement moins rapide et moins performant pour la rédaction de textes. Il pointe actuellement vers `mistral-small-4-119b` avec raisonnement actif. |
-| `romeo.mistral-small-3.2-24b` | ROMEO | Modèle généraliste français, particulièrement adapté à la rédaction de textes en français. **Ancien modèle, bientôt retiré.** |
 | `romeo.mistral-small-4-119b` | ROMEO | Nouveau modèle généraliste français, notamment adapté à la rédaction de textes en français. \*\* |
 | `ilaas/mistral-small-4-119b` | ILaaS | Modèle généraliste français, notamment adapté à la rédaction de textes en français. |
 | `ilaas/gemma-4-31b` | ILaaS | Modèle généraliste américain. |
@@ -41,7 +40,7 @@ Les données ne sont pas réutilisées à d'autres fins et ne sont pas communiqu
 
 ---
 
-← [API Oratio](api_oratio.md) | → [Historique des équipements](../../historique.md)
+← [API Oratio](api_oratio.md) | → [API Oratio : guide de prise en main (preview)](3.1.api_oratio.md)
 
 ## Dans cette section
 

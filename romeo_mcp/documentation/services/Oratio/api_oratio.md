@@ -1,7 +1,7 @@
 ---
 title: "API Oratio"
 source: "https://romeo.univ-reims.fr/documentation/services/Oratio/api_oratio"
-scraped_at: "2026-09-26 02:37:10"
+scraped_at: "2026-10-16 16:08:32"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Services](../../services.md) › [Oratio](../Oratio.md) › API Oratio · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -19,9 +19,19 @@ Cette documentation présente l’API LLM accessible via ROMEO, utilisée à l�
 
 ---
 
+## Demander une clé d'API Oratio[​](#demander-une-clé-dapi-oratio "Lien direct vers Demander une clé d'API Oratio")
+
+L'obtention d'une clé d'API Oratio se fait dans le cadre d'un projet ROMEO. Ainsi, il suffit de sélectionner la ressource "ORATIO/ILAAS API" au moment du choix de la "Machine du projet", à la toute première étape de création d'un projet.
+
+La documentation ROMEO détaille la création de projet : [<https://romeo.univ-reims.fr/documentation/creation_compte#%C3%A9tape-2--cr%C3%A9er-ou-rejoindre-un-projet>]
+
+> Le traitement de la demande est manuel, ce qui peut prendre quelques jours en fonction de la disponibilité des équipes. Vous recevrez votre clé individuelle (une par membre du projet) par email.
+
+---
+
 ## Configuration de base[​](#configuration-de-base "Lien direct vers Configuration de base")
 
-**URL de l'API** : `https://romeogate.univ-reims.fr/llm`
+**URL de l'API** : `https://romeogate.univ-reims.fr/llm` (`https://romeogate.univ-reims.fr/llm/v1` fonctionne normalement également, plus standard)
 **Clé d'API (exemple)** : `sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` - clé obtenue auprès de ROMEO dans le cadre d'un projet
 **Format API** : OpenAI Compatible
 
@@ -47,6 +57,12 @@ Cette API fonctionne coté ROMEO via l'outil LiteLLM et implémente les endpoint
 Voici une liste des paramètres que nous allons utiliser petit à petit tout au long de ce document
 
 ### Paramètres principaux[​](#paramètres-principaux "Lien direct vers Paramètres principaux")
+
+> ⚠️ **Attention**
+>
+> info
+
+Les paramètres principaux et recommandations d'usage ci-dessous sont généralistes, certain modèles peuvent avoir des spécificités et recommandations differentes, souvent renseignées sur leur page de présentation officielle.
 
 | Paramètre | Type | Range | Description |
 | --- | --- | --- | --- |

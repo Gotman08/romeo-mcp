@@ -617,8 +617,8 @@ pages imbriquées comme `ressources/romeo_2025/lancer_un_calcul.md`.
 ## Documentation hors ligne
 
 Le [corpus officiel embarqué](../romeo_mcp/documentation/SOMMAIRE.md) est **versionné
-avec le projet et inclus dans les distributions Python**. Il contient 42 pages
-officielles et 21 images, ainsi qu'un sommaire, les liens de navigation et
+avec le projet et inclus dans les distributions Python**. Il contient 50 pages
+officielles et 34 images, ainsi qu'un sommaire, les liens de navigation et
 l'attribution URCA. Le [manifeste](../romeo_mcp/documentation/manifest.json) conserve
 l'URL source, la date de collecte et les empreintes SHA-256 des fichiers.
 
