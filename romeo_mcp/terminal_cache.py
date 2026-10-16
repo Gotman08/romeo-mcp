@@ -13,8 +13,21 @@ def signature(path: Path):
         return None
 
 
+def change_counter(path: Path):
+    """SQLite counts every commit in header bytes 24-27. Size and mtime cannot: pages are
+    rewritten in place and a coarse file clock (NTFS ticks every ~15 ms) stamps two quick
+    commits identically."""
+    try:
+        with path.open("rb", buffering=0) as stream:
+            stream.seek(24)
+            return stream.read(4)
+    except OSError:
+        return None
+
+
 def database_signature(path: Path):
-    return (signature(path), signature(Path(str(path) + "-wal")), signature(Path(str(path) + "-journal")))
+    return (signature(path), signature(Path(str(path) + "-wal")), signature(Path(str(path) + "-journal")),
+            change_counter(path))
 
 
 class JsonFiles:

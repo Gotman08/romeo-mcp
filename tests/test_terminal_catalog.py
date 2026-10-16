@@ -12,8 +12,17 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from romeo_mcp import terminal_catalog as catalog
+from romeo_mcp import terminal_cache, terminal_catalog as catalog
 from romeo_mcp.registry import _SCHEMA
+
+
+def coarse_clock(path):
+    """File identity on a filesystem whose clock cannot tell two quick writes apart (NTFS: ~15 ms)."""
+    try:
+        value = path.stat()
+    except FileNotFoundError:
+        return None
+    return value.st_dev, value.st_ino, value.st_size
 
 
 class CatalogTests(unittest.TestCase):
@@ -103,6 +112,26 @@ class CatalogTests(unittest.TestCase):
         before = self.reader.job_reads
         self.reader.snapshot({"force": True})
         self.assertEqual(self.reader.job_reads, before + 1)
+
+    def test_database_signature_counts_commits_that_leave_size_and_mtime_alone(self):
+        with closing(sqlite3.connect(self.path)) as db, patch.object(terminal_cache, "signature", coarse_clock):
+            db.execute("CREATE TABLE t(x TEXT)")
+            db.execute("INSERT INTO t VALUES('a')")
+            db.commit()
+            before = terminal_cache.database_signature(self.path)
+            db.execute("UPDATE t SET x='b'")
+            db.commit()
+            self.assertNotEqual(terminal_cache.database_signature(self.path), before)
+
+    def test_commit_within_one_clock_tick_is_not_served_from_cache(self):
+        self.jobs(3)
+        with patch.object(terminal_cache, "signature", coarse_clock):
+            self.reader.snapshot()
+            with closing(sqlite3.connect(self.path)) as db:
+                db.execute("UPDATE jobs SET name='Renamed in place' WHERE job_id='1'")
+                db.commit()
+            found = self.reader.snapshot({"queries": {"jobs": "Renamed in place"}})
+        self.assertEqual([row["id"] for row in found["jobs"]], ["1"])
 
     def test_hpc_counts_have_sources_and_never_export_script_or_target(self):
         self.jobs(3)

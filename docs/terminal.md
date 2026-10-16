@@ -193,7 +193,9 @@ La relecture intervient toutes les 5 secondes (`--refresh` : 1 à 300). Le lecte
 réutilise les lignes indexées et surveille les signatures des sources, y compris
 le WAL SQLite. Seuls les transferts modifiés sont reparsés. Les métadonnées des
 fichiers sont encore vérifiées à chaque lecture pour détecter une écriture en
-place. Le cache JSON garde au plus 2 048 entrées et 8 Mio de tailles sérialisées ;
+place ; pour le registre SQLite, le compteur de modifications de son en-tête
+s'y ajoute, car deux validations rapprochées peuvent recevoir la même date.
+Le cache JSON garde au plus 2 048 entrées et 8 Mio de tailles sérialisées ;
 l'index global croît avec le nombre de traces. Recherche et tri s'appliquent à
 cet index puis les pages bornées sont transmises au rendu.
 [Méthode, résultats et limites des mesures](terminal-performance.md).
