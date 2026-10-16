@@ -42,6 +42,7 @@ qui exécutent le calcul. La préparation par [`job_prepare`](../docs/tools/job_
 
 | Module | Responsabilité | Exemples d’outils |
 |---|---|---|
+| [outils_romeollm.py](outils_romeollm.py) | Piloter les modèles et la gateway RomeoLLMTool | [`romeollm_catalog`](../docs/tools/romeollm_catalog.md), [`romeollm_launch_prepare`](../docs/tools/romeollm_launch_prepare.md), [`romeollm_launch`](../docs/tools/romeollm_launch.md), [`romeollm_chat`](../docs/tools/romeollm_chat.md) |
 | [outils_contexte.py](outils_contexte.py) | Se situer sur le cluster et lire la documentation | [`romeo_status`](../docs/tools/romeo_status.md), [`romeo_quota`](../docs/tools/romeo_quota.md), [`romeo_software`](../docs/tools/romeo_software.md), [`search_docs`](../docs/tools/search_docs.md), [`read_doc`](../docs/tools/read_doc.md), [`romeo_selfcheck`](../docs/tools/romeo_selfcheck.md) |
 | [outils_calcul.py](outils_calcul.py) | Préparer, soumettre et suivre les calculs | [`job_prepare`](../docs/tools/job_prepare.md) / [`job_submit`](../docs/tools/job_submit.md), [`job_array_prepare`](../docs/tools/job_array_prepare.md) / [`job_array_submit`](../docs/tools/job_array_submit.md), [`job_pipeline_prepare`](../docs/tools/job_pipeline_prepare.md) / [`job_pipeline_submit`](../docs/tools/job_pipeline_submit.md), [`job_status`](../docs/tools/job_status.md), [`job_log_tail`](../docs/tools/job_log_tail.md), [`job_efficiency`](../docs/tools/job_efficiency.md) |
 | [outils_donnees.py](outils_donnees.py) | Gérer fichiers, transferts et stockage | [`list_dir`](../docs/tools/list_dir.md), [`upload_to_romeo`](../docs/tools/upload_to_romeo.md), [`download_from_romeo`](../docs/tools/download_from_romeo.md), [`dataset_prepare`](../docs/tools/dataset_prepare.md), [`sbatch_validate`](../docs/tools/sbatch_validate.md) |
@@ -50,7 +51,7 @@ qui exécutent le calcul. La préparation par [`job_prepare`](../docs/tools/job_
 | [outils_accompagnement.py](outils_accompagnement.py) | Choisir le catalogue et exporter les preuves d’un job | [`tool_profile_get`](../docs/tools/tool_profile_get.md) / [`tool_profile_set`](../docs/tools/tool_profile_set.md), [`job_report_export`](../docs/tools/job_report_export.md) |
 
 La page [Tools](../docs/Tools.md) donne accès à une fiche par outil, avec ses paramètres, un exemple et ses
-limites. Le profil `essential` annonce 22 outils ; `full` annonce les outils métier, `expert` ajoute les exécuteurs génériques au catalogue
+limites. Le profil `essential` annonce les outils courants ; `full` annonce les outils métier, `expert` ajoute les exécuteurs génériques au catalogue
 complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 
 ## Modules de support
@@ -64,7 +65,7 @@ complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 | Transport et fichiers | [ssh.py](ssh.py), [files.py](files.py), [remote_paths.py](remote_paths.py), [confined_transfers.py](confined_transfers.py), [sortie.py](sortie.py) |
 | Validation locale | [validation.py](validation.py), [guard.py](guard.py) |
 | Plans et cycles de vie | [plans.py](plans.py), [services.py](services.py), [service_models.py](service_models.py) |
-| Opérations métier | [python_operations.py](python_operations.py), [workload_preparation.py](workload_preparation.py) |
+| Opérations métier | [python_operations.py](python_operations.py), [workload_preparation.py](workload_preparation.py), [romeollm.py](romeollm.py) |
 | Adaptateurs Slurm et fichiers atomiques | [execution_backend.py](execution_backend.py), [file_operations.py](file_operations.py) |
 | Scripts et dépendances entre jobs | [slurm.py](slurm.py), [templates.py](templates.py), [pipeline.py](pipeline.py) |
 | Analyse des échecs et du matériel | [diagnostics.py](diagnostics.py), [hardware.py](hardware.py) |

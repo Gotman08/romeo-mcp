@@ -15,6 +15,7 @@ Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son rés
   - [Cluster et ordonnancement](#cluster-et-ordonnancement)
   - [Préparation et gestion des jobs](#préparation-et-gestion-des-jobs)
   - [Journaux, mesures et profilage](#journaux-mesures-et-profilage)
+  - [RomeoLLMTool](#romeollmtool)
   - [Services et allocations](#services-et-allocations)
   - [Environnements et paquets Python](#environnements-et-paquets-python)
   - [Fichiers, stockage et données](#fichiers-stockage-et-données)
@@ -165,6 +166,27 @@ Voir le [guide des rapports publics et de l'autorisation persistante](issue-repo
 | [`job_profile_submit`](tools/job_profile_submit.md) | Soumettre un job de profilage GPU à partir du plan relu. | `full`, `expert` |
 | [`profile_report`](tools/profile_report.md) | Résumer le rapport d’un job de profilage. | `full`, `expert` |
 | [`job_energy_footprint`](tools/job_energy_footprint.md) | Lire l’énergie disponible et calculer une estimation carbone sourcée. | `full`, `expert` |
+
+### RomeoLLMTool
+
+[Parcours complet : modèles et gateway](romeollm.md).
+
+| Outil | Rôle | Profils |
+|---|---|---|
+| [`romeollm_catalog`](tools/romeollm_catalog.md) | Parcourir les modèles et lire une fiche. | `essential`, `full`, `expert` |
+| [`romeollm_status`](tools/romeollm_status.md) | Suivre les jobs de modèles. | `essential`, `full`, `expert` |
+| [`romeollm_engines`](tools/romeollm_engines.md) | Consulter les moteurs partagés. | `full`, `expert` |
+| [`romeollm_doctor`](tools/romeollm_doctor.md) | Diagnostiquer les permissions. | `full`, `expert` |
+| [`romeollm_stats`](tools/romeollm_stats.md) | Consulter l'utilisation des modèles. | `full`, `expert` |
+| [`romeollm_launch_prepare`](tools/romeollm_launch_prepare.md) | Préparer le lancement d'un modèle. | `essential`, `full`, `expert` |
+| [`romeollm_launch`](tools/romeollm_launch.md) | Lancer le modèle du plan relu. | `essential`, `full`, `expert` |
+| [`romeollm_stop`](tools/romeollm_stop.md) | Arrêter un job de modèle précis. | `essential`, `full`, `expert` |
+| [`romeollm_logs`](tools/romeollm_logs.md) | Lire les journaux d'un modèle. | `essential`, `full`, `expert` |
+| [`romeollm_endpoint`](tools/romeollm_endpoint.md) | Obtenir l'accès à un modèle. | `essential`, `full`, `expert` |
+| [`romeollm_gateway_status`](tools/romeollm_gateway_status.md) | Consulter la gateway et son accès. | `essential`, `full`, `expert` |
+| [`romeollm_gateway_start`](tools/romeollm_gateway_start.md) | Démarrer la gateway des modèles. | `essential`, `full`, `expert` |
+| [`romeollm_gateway_stop`](tools/romeollm_gateway_stop.md) | Arrêter la gateway en conservant les modèles. | `essential`, `full`, `expert` |
+| [`romeollm_chat`](tools/romeollm_chat.md) | Interroger un modèle déjà servi. | `essential`, `full`, `expert` |
 
 ### Services et allocations
 

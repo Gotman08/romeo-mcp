@@ -28,7 +28,7 @@ def job_observation_get(job_id: str) -> dict[str, Any]:
 
 
 @outil(annotations=READ_ONLY, description="Outils pertinents pour une tache et leur visibilite dans le profil actuel. Verification locale ; ne certifie ni connexion SSH ni ressources libres.")
-def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "python", "files", "updates", "issues"] = "all") -> dict[str, Any]:
+def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "llm", "python", "files", "updates", "issues"] = "all") -> dict[str, Any]:
     groups = {
         "issues": ["mcp_issue_policy_get", "mcp_issue_policy_set", "mcp_issue_report", "mcp_issue_publish", "mcp_issue_status"],
         "updates": ["mcp_update_check", "mcp_update_policy", "mcp_update_start", "mcp_update_status", "mcp_update_rollback"],
@@ -37,6 +37,10 @@ def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "servi
                    "job_resume_status", "checkpoint_protect_prepare", "checkpoint_protect_submit", "checkpoint_export_prepare", "transfer_start", "checkpoint_export_status"],
         "parallel": ["romeo_software", "job_prepare", "job_submit", "job_environment_status", "job_efficiency"],
         "services": ["service_prepare", "service_start", "service_status", "service_connection_info", "service_stop"],
+        "llm": ["romeollm_catalog", "romeollm_launch_prepare", "romeollm_launch", "romeollm_status",
+                "romeollm_logs", "romeollm_endpoint", "romeollm_stop", "romeollm_gateway_status",
+                "romeollm_gateway_start", "romeollm_gateway_stop", "romeollm_chat",
+                "romeollm_engines", "romeollm_doctor", "romeollm_stats"],
         "python": ["python_env_prepare", "python_env_create", "python_packages_prepare", "python_packages_install", "romeo_software"],
         "files": ["list_dir", "upload_to_romeo", "download_from_romeo", "transfer_prepare", "transfer_start", "transfer_status", "transfer_cancel"],
     }

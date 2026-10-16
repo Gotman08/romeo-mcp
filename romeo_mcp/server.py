@@ -25,6 +25,7 @@ from .outils_transferts import *  # noqa: F401,F403
 from .outils_checkpoints import *  # noqa: F401,F403
 from .outils_updates import *  # noqa: F401,F403
 from .outils_issues import *  # noqa: F401,F403
+from .outils_romeollm import *  # noqa: F401,F403
 from .observability import TIMINGS
 TIMINGS.record("server_initialization", time.monotonic() - _IMPORT_STARTED)
 
