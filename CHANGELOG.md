@@ -48,6 +48,14 @@
 
 ## Non publié
 
+- Corpus ROMEO recollecté le 16 octobre 2026 : 50 pages officielles et
+  34 images au lieu de 42 et 21. Ajout de RomeoLLMTool (lancement de LLM par
+  Slurm avec vLLM, SGLang ou llama.cpp), du guide de prise en main de l'API
+  Oratio et de la page d'authentification au portail ; demande de clé d'API et
+  liste des modèles Oratio mises à jour. Le collecteur enregistre les images
+  intégrées en `data:`, ne s'interrompt plus sur une console Windows en cp1252
+  et ne convertit plus les fichiers joints (exemples `.py`, `.md`, `.jpg`) en
+  pages : leurs liens ouvrent le site officiel.
 - Énergie et carbone : lecture des compteurs Slurm, attribution uniquement sur
   allocation exclusive vérifiée, données absentes laissées inconnues. Modèle
   facultatif séparé ; suppression du facteur fixe et de l'extrapolation d'une

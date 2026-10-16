@@ -3,9 +3,9 @@
 [Corpus ROMEO](../README.md) › Services
 
 Cette section rassemble les services décrits dans la documentation officielle :
-assistance aux utilisateurs, accompagnement scientifique, hébergement de code
-et service Oratio. La [présentation des services](../services.md) en donne
-le point d’entrée d’origine.
+assistance aux utilisateurs, accompagnement scientifique, hébergement de code,
+service Oratio et outil RomeoLLMTool. La [présentation des services](../services.md)
+en donne le point d’entrée d’origine.
 
 **Sur cette page :** [Choisir une lecture](#choisir-une-lecture) · [Préparer une demande d’assistance](#préparer-une-demande-dassistance)
 
@@ -17,6 +17,7 @@ le point d’entrée d’origine.
 | Être accompagné sur un code scientifique | [Accompagnement personnalisé](accompagnementScientifiqueCode.md) |
 | Consulter le service de gestion de code | [RomeoGit](romeogit.md) |
 | Découvrir le service Oratio | [Parcours Oratio](Oratio/README.md) |
+| Lancer ses propres modèles de langage (LLM) sur le cluster | [Parcours RomeoLLMTool](RomeoLLMtool/README.md) |
 
 ## Préparer une demande d’assistance
 

@@ -1,7 +1,7 @@
 ---
 title: "Ecrire un fichier de soumission"
 source: "https://romeo.univ-reims.fr/documentation/ressources/romeo_2025/ecrire_un_fichier_de_soumission"
-scraped_at: "2026-09-26 02:36:33"
+scraped_at: "2026-10-16 15:46:51"
 ---
 
 [Sommaire](../../SOMMAIRE.md) › [Accueil](../../index.md) › [Ressources de calcul](../../ressources.md) › [Romeo 2025](../romeo_2025.md) › Ecrire un fichier de soumission · [Corpus ROMEO](../../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)

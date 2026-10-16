@@ -2,7 +2,7 @@
 
 [Corpus ROMEO](../README.md) › Images
 
-Ce dossier contient les 21 images téléchargées avec les pages officielles.
+Ce dossier contient les 34 images téléchargées avec les pages officielles.
 Les fichiers restent locaux afin que les procédures illustrées soient lisibles
 sans charger leurs images depuis un autre site.
 
@@ -16,9 +16,13 @@ sans charger leurs images depuis un autre site.
 | FileZilla sous Linux | `FileZillaLinux1` à `FileZillaLinux6` | [Première capture Linux](FileZillaLinux1_440b1aad.png) |
 | MobaXterm et clés SSH | Deux fichiers commençant par `Moba_` | [Génération de clé](Moba_sshkgeddsa-772371d8bf4e65caefc5bc5eb2340ad7_3ca97d07.png) |
 | WinSCP | `WinSCP1` à `WinSCP7` | [Première capture](WinSCP1_3c72246d.png) |
+| Prise en main de l’API Oratio | Quatre fichiers numérotés de `1-` à `4-` | [Première capture](1-2c5c35bcd4c4699f7171c2ffb1f5dbac_d5c82201.png) |
+| RomeoLLMTool | Huit fichiers numérotés et `inline_bc2552ef.png` | [Interface terminal](1-4c738669c41b77ade86e78463574ffcc_b495b68a.png) |
 
-Lire ces images dans leur procédure : [connexion SSH](../ressources/connexion_ssh.md)
-ou [transfert de données](../ressources/romeo_2025/transferer_données.md).
+Lire ces images dans leur procédure : [connexion SSH](../ressources/connexion_ssh.md),
+[transfert de données](../ressources/romeo_2025/transferer_données.md),
+[prise en main de l’API Oratio](../services/Oratio/3.1.api_oratio.md) ou
+[interface terminal de RomeoLLMTool](../services/RomeoLLMtool/gui.md).
 Le texte de la page explique les prérequis et l’ordre des manipulations.
 
 ## Conservation et attribution

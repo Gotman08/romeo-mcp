@@ -1,7 +1,7 @@
 ---
 title: "Oratio"
 source: "https://romeo.univ-reims.fr/documentation/services/Oratio"
-scraped_at: "2026-09-26 02:37:08"
+scraped_at: "2026-10-16 15:47:00"
 ---
 
 [Sommaire](../SOMMAIRE.md) › [Accueil](../index.md) › [Services](../services.md) › Oratio · [Corpus ROMEO](../README.md) · [Guides MCP](https://github.com/Gotman08/romeo-mcp/blob/main/docs/README.md) · [Tools](https://github.com/Gotman08/romeo-mcp/blob/main/docs/Tools.md)
@@ -60,6 +60,7 @@ flowchart LR
 - [Interface Web Oratio](Oratio/gui_oratio.md)
 - [API Oratio](Oratio/api_oratio.md)
 - [Modèles disponibles](Oratio/models.md)
+- [API Oratio : guide de prise en main (preview)](Oratio/3.1.api_oratio.md)
 
 ---
 

@@ -66,7 +66,7 @@ JSON, les résultats attendus et des liens vers les outils associés.
 Le [guide du corpus officiel](../romeo_mcp/documentation/README.md) présente
 la provenance et les limites de cette copie. Le
 [sommaire complet](../romeo_mcp/documentation/SOMMAIRE.md) donne accès aux
-42 pages officielles.
+50 pages officielles.
 
 | Sujet | Pages à consulter |
 |---|---|
@@ -75,7 +75,7 @@ la provenance et les limites de cette copie. Le
 | Logiciels, Python, MPI et GPU | [Catalogues par architecture](../romeo_mcp/documentation/ressources/romeo_2025/Logiciels/README.md) · [Python](../romeo_mcp/documentation/ressources/romeo_2025/utiliser_python.md) · [OpenMPI](../romeo_mcp/documentation/ressources/romeo_2025/utiliser_openmpi.md) · [GPU](../romeo_mcp/documentation/ressources/romeo_2025/utiliser_des_gpu.md) |
 | Données et stockage | [Espaces de stockage](../romeo_mcp/documentation/ressources/romeo_2025/espaces_de_stockage.md) · [Transfert de données](../romeo_mcp/documentation/ressources/romeo_2025/transferer_données.md) |
 | Interfaces interactives | [JupyterLab](../romeo_mcp/documentation/ressources/romeo_2025/7.1.utiliser_jupyterlab.md) · [Visualisation](../romeo_mcp/documentation/ressources/romeo_2025/utiliser_une_session_de_visu.md) |
-| Services et assistance | [Services ROMEO](../romeo_mcp/documentation/services/README.md) · [Assistance](../romeo_mcp/documentation/services/assistance.md) · [Accompagnement scientifique](../romeo_mcp/documentation/services/accompagnementScientifiqueCode.md) · [Oratio](../romeo_mcp/documentation/services/Oratio/README.md) |
+| Services et assistance | [Services ROMEO](../romeo_mcp/documentation/services/README.md) · [Assistance](../romeo_mcp/documentation/services/assistance.md) · [Accompagnement scientifique](../romeo_mcp/documentation/services/accompagnementScientifiqueCode.md) · [Oratio](../romeo_mcp/documentation/services/Oratio/README.md) · [RomeoLLMTool](../romeo_mcp/documentation/services/RomeoLLMtool/README.md) |
 | Autres ressources et archives | [Ressources](../romeo_mcp/documentation/ressources/README.md) · [Juliet](../romeo_mcp/documentation/ressources/juliet/README.md) · [QLM](../romeo_mcp/documentation/ressources/qlm/README.md) · [Historique](../romeo_mcp/documentation/historique/README.md) · [Archives ROMEO 2018](../romeo_mcp/documentation/ressources/archives/README.md) |
 | Règles et sécurité | [Charte ROMEO](../romeo_mcp/documentation/2.5.charte.md) · [Bonnes pratiques de cybersécurité](../romeo_mcp/documentation/bonnes_pratiques_cybersecurite.md) |
 

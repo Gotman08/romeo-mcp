@@ -14,6 +14,7 @@ son interface ou son mode d’accès.
 |---|---|
 | Utiliser l’interface dans un navigateur | [Interface Web](gui_oratio.md) |
 | Comprendre l’accès depuis un programme | [API Oratio](api_oratio.md) |
+| Démarrer avec l’API par des exemples guidés (preview) | [Guide de prise en main](3.1.api_oratio.md) |
 | Consulter les modèles documentés | [Modèles disponibles](models.md) |
 
 Lire les conditions d’accès de la page choisie avant de reprendre ses exemples.

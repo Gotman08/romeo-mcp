@@ -256,7 +256,7 @@ Les exports restent **hors des dépôts Git**. Les secrets reconnaissables sont 
 
 ## Documentation locale et contexte de l’IA
 
-Le [corpus ROMEO](romeo_mcp/documentation/SOMMAIRE.md) accompagne le dépôt **et les paquets Python** : 42 pages officielles, 21 images, un sommaire et un manifeste de provenance.
+Le [corpus ROMEO](romeo_mcp/documentation/SOMMAIRE.md) accompagne le dépôt **et les paquets Python** : 50 pages officielles, 34 images, un sommaire et un manifeste de provenance.
 
 - [`search_docs`](docs/tools/search_docs.md) classe les sections par pertinence lexicale (BM25), avec prise en compte des titres et des accents.
 - Les extraits comportent les sources, les lignes, l’empreinte du document et les arguments de lecture.

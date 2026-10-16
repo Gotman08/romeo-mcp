@@ -13,6 +13,7 @@ Arborescence reconstruite depuis la barre latérale officielle du site.
 | Premier calcul | [Parcours ROMEO 2025](ressources/romeo_2025/README.md) |
 | Matériel, accès et logiciels | [Ressources](ressources/README.md) · [Logiciels par architecture](ressources/romeo_2025/Logiciels/README.md) |
 | Assistance et services | [Services ROMEO](services/README.md) · [Oratio](services/Oratio/README.md) |
+| Modèles de langage (LLM) | [Oratio](services/Oratio/README.md) · [RomeoLLMTool](services/RomeoLLMtool/README.md) |
 | Contexte historique | [Historique](historique/README.md) · [Archives](ressources/archives/README.md) |
 | Illustrations et provenance | [Images](images/README.md) · [Provenance du corpus](README.md#provenance-et-intégrité) |
 
@@ -49,16 +50,24 @@ Arborescence reconstruite depuis la barre latérale officielle du site.
     - [Documentation bientôt disponible.](ressources/archives/romeo_2018/Bientot.md)
 - [Services](services.md)
   - [Assistance](services/assistance.md)
+  - [RomeoLLMTool](services/RomeoLLMtool.md)
+    - [Interface terminal](services/RomeoLLMtool/gui.md)
+    - [Ligne de commande](services/RomeoLLMtool/cli.md)
+    - [Écrire une fiche](services/RomeoLLMtool/fiches.md)
+    - [Moteurs](services/RomeoLLMtool/engines.md)
+    - [Utiliser l'API](services/RomeoLLMtool/api.md)
   - [RomeoGit](services/romeogit.md)
   - [Accompagnement personnalisé pour les utilisateurs ROMEO](services/accompagnementScientifiqueCode.md)
   - [Oratio](services/Oratio.md)
     - [Interface Web Oratio](services/Oratio/gui_oratio.md)
     - [API Oratio](services/Oratio/api_oratio.md)
     - [Modèles disponibles](services/Oratio/models.md)
+    - [API Oratio : guide de prise en main (preview)](services/Oratio/3.1.api_oratio.md)
 - [Historique des équipements](historique.md)
   - [Supercalculateur ROMEO2018](historique/romeo2018.md)
   - [Supercalculateur ROMEO 2013](historique/romeo2013.md)
 - [Responsabilités et bonnes pratiques en sécurité numérique destinées aux utilisateurs des services Romeo](bonnes_pratiques_cybersecurite.md)
+- [Authentification au portail ROMEO](authentification.md)
 - [Conditions Générales d’Utilisation des ressources de calcul de ROMEO](2.5.charte.md)
 
 ---

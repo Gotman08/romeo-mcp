@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import time
+import base64
 import hashlib
 import json
 import argparse
@@ -24,8 +25,8 @@ from typing import Set, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 
 import requests
-from bs4 import BeautifulSoup, Tag
-from markdownify import markdownify as md, MarkdownConverter
+from bs4 import BeautifulSoup
+from markdownify import MarkdownConverter
 
 
 # =============================================================================
@@ -47,6 +48,15 @@ HEADERS = {
 
 # Extensions d'images supportées
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"}
+
+# Fichiers joints aux pages (exemples à télécharger) : ce ne sont pas des pages
+# HTML, les convertir en Markdown produirait du binaire illisible dans le corpus.
+# Les noms de pages Docusaurus contiennent parfois un point (`2.5.charte`), d'où
+# une liste explicite plutôt qu'un test sur la présence d'une extension.
+ATTACHMENT_EXTENSIONS = IMAGE_EXTENSIONS | {
+    ".py", ".md", ".txt", ".csv", ".json", ".ipynb", ".pdf", ".zip",
+    ".tar", ".gz", ".tgz", ".sh", ".yaml", ".yml",
+}
 
 # Délai entre requêtes (politesse)
 REQUEST_DELAY = 0.3
@@ -269,13 +279,24 @@ class RomeoDocScraper:
         parsed = urllib.parse.urlparse(url)
         ext = Path(parsed.path).suffix.lower()
         return ext in IMAGE_EXTENSIONS
-    
+
+    def is_attachment_url(self, url: str) -> bool:
+        """Vérifie si l'URL désigne un fichier joint plutôt qu'une page."""
+        if not url:
+            return False
+        parsed = urllib.parse.urlparse(url)
+        return Path(parsed.path).suffix.lower() in ATTACHMENT_EXTENSIONS
+
     def fetch_page(self, url: str) -> Optional[str]:
         """Récupère le contenu HTML d'une page."""
         try:
             time.sleep(REQUEST_DELAY)
             response = self.session.get(url, timeout=30)
             response.raise_for_status()
+            content_type = response.headers.get("content-type", "").lower()
+            if content_type and "html" not in content_type:
+                print(f"  ⏭️  Ignoré (pas une page HTML : {content_type})")
+                return None
             # requests retombe sur ISO-8859-1 quand l'en-tête HTTP ne précise
             # aucun charset, ce qui transforme l'UTF-8 du site en mojibake
             # ("Ã©tant" au lieu de "étant").
@@ -287,11 +308,36 @@ class RomeoDocScraper:
             self.stats.errors += 1
             return None
     
+    def save_data_uri_image(self, url: str) -> str:
+        """Enregistre une image intégrée (`data:`) et retourne son chemin local."""
+        header, _, payload = url.partition(",")
+        mime = header[5:].split(";", 1)[0].lower()
+        extensions = {
+            "image/png": ".png", "image/jpeg": ".jpg", "image/jpg": ".jpg",
+            "image/gif": ".gif", "image/svg+xml": ".svg", "image/webp": ".webp",
+        }
+        ext = extensions.get(mime)
+        if ext is None or ";base64" not in header:
+            return url
+        content = base64.b64decode(payload)
+        filename = f"inline_{hashlib.md5(content).hexdigest()[:8]}{ext}"
+        write_atomic(self.images_dir / filename, content)
+        relative_path = f"images/{filename}"
+        self.image_map[url] = relative_path
+        self.stats.images_downloaded += 1
+        return relative_path
+
     def download_image(self, url: str) -> Optional[str]:
         """Télécharge une image et retourne le chemin local relatif."""
         if url in self.image_map:
             return self.image_map[url]
-        
+        if url.startswith("data:"):
+            try:
+                return self.save_data_uri_image(url)
+            except ValueError as e:
+                print(f"  ⚠️  Image intégrée illisible: {e}")
+                return url
+
         try:
             # Normaliser l'URL
             full_url = self.normalize_url(url)
@@ -396,7 +442,7 @@ class RomeoDocScraper:
         links = set()
         for a in soup.find_all("a", href=True):
             href = self.normalize_url(a["href"])
-            if href and self.is_doc_url(href):
+            if href and self.is_doc_url(href) and not self.is_attachment_url(href):
                 links.add(href)
         
         # Extraire et télécharger les images
@@ -588,6 +634,10 @@ scraped_at: "{time.strftime('%Y-%m-%d %H:%M:%S')}"
         def fix_link(match):
             text = match.group(1)
             url = match.group(2)
+
+            if url.startswith("/documentation") and self.is_attachment_url(url):
+                # Fichier joint non copié : le lien reste valable vers le site.
+                return f"[{text}]({BASE_URL}{url})"
 
             if url.startswith("/documentation"):
                 new_url = url.replace("/documentation/", "").replace("/documentation", "")
@@ -983,6 +1033,12 @@ Téléchargée à des fins éducatives et de consultation hors-ligne.
 # =============================================================================
 
 def main():
+    # Une console Windows en cp1252 ne sait pas encoder les emojis du journal :
+    # sans repli, le premier message interrompt toute la collecte.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Télécharge la documentation ROMEO en Markdown",
         formatter_class=argparse.RawDescriptionHelpFormatter,
