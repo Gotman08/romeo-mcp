@@ -17,6 +17,7 @@
 - Quatorze outils RomeoLLMTool : catalogue, préparation et lancement Slurm sans
   attente, suivi, journaux, accès, gateway, chat ponctuel et diagnostics. Plans
   consommés une fois, fiche revérifiée et arrêt de gateway conservant les jobs.
+  Détection de l'installation partagée lorsque la CLI n'est pas dans le PATH SSH.
   [Guide et limites](docs/romeollm.md).
 - Cinq outils de rapports GitHub dans tous les profils : accord automatique
   persistant, description filtrée, registre local et liens après reconnexion.

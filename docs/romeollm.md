@@ -49,6 +49,8 @@ avec `confirm: true`, pour huit heures par défaut. Le port est choisi par la CL
 si omis. [`romeollm_gateway_status`](tools/romeollm_gateway_status.md) lit son
 URL et propose une commande SSH et une URL locale à partir de l'adresse
 observée ; aucun tunnel n'est ouvert automatiquement.
+Une gateway arrêtée est un état normal : l'outil rend `state: "stopped"` et
+`ready: false` lorsque la CLI le signale explicitement.
 
 Les réponses ne récupèrent pas la clé de gateway et n'utilisent jamais
 `endpoint --show-key`. Pour configurer un client personnel, exécuter soi-même
@@ -93,9 +95,12 @@ les quatorze outils et indique leur visibilité dans le profil courant.
 RomeoLLMTool doit déjà être accessible au compte et au nœud de connexion
 utilisés par SSH. L'accès et l'état de préproduction sont décrits dans la
 [présentation officielle embarquée](../romeo_mcp/documentation/services/RomeoLLMtool.md).
-Si le binaire est hors du PATH, la variable d'environnement du serveur
+Le MCP cherche la commande dans le PATH, puis utilise l'installation partagée
+`/apps/romeotools/romeollmtool/romeollmtool` si elle est accessible. Pour une
+installation différente, la variable d'environnement du serveur
 `ROMEO_LLM_EXECUTABLE` accepte son chemin distant. Il s'agit d'un exécutable
-unique, sans fragment shell. Aucun paquet n'est installé automatiquement.
+unique, sans fragment shell ; une configuration explicite n'est pas remplacée
+par le chemin partagé. Aucun paquet n'est installé automatiquement.
 
 Les outils rendent `output` au format texte de la CLI, ainsi que `exit_code`,
 `complete`, `truncated` et une date d'observation. Un succès de commande ne

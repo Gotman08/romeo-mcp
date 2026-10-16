@@ -27,6 +27,7 @@ _ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 _KEY_LINE = re.compile(r"^.*\b(?:api\s+key|gateway\s+key|internal\s+key|cl[eé](?:\s+api)?)\b.*$", re.I | re.M)
 _MISSING = "ROMEOLLMTOOL_EXECUTABLE_UNAVAILABLE"
 _KIND = "romeollm_launch"
+SHARED_EXECUTABLE = "/apps/romeotools/romeollmtool/romeollmtool"
 
 
 def _name(value: str, label: str = "fiche") -> str:
@@ -57,9 +58,16 @@ def _executable() -> str:
 
 def _command(argv: list[str]) -> str:
     # Ne jamais evaluer une chaine de configuration comme un fragment shell.
+    missing = f"printf '%s\\n' '{_MISSING}'; exit 127"
+    fallback = missing
+    if argv[0] == "romeollmtool":
+        shared = shlex.quote(SHARED_EXECUTABLE)
+        fallback = (f"if [ -f {shared} ] && [ -x {shared} ]; then "
+                    f"NO_COLOR=1 TERM=dumb {shlex.join([SHARED_EXECUTABLE, *argv[1:]])}; "
+                    f"else {missing}; fi")
     return (f"if command -v {shlex.quote(argv[0])} >/dev/null 2>&1; then\n"
             f"NO_COLOR=1 TERM=dumb {shlex.join(argv)}\n"
-            f"else printf '%s\\n' '{_MISSING}'; exit 127; fi")
+            f"else {fallback}; fi")
 
 
 def _run(s, args: list[str], *, read_only: bool = True, timeout: int = 30,
@@ -78,7 +86,7 @@ def _run(s, args: list[str], *, read_only: bool = True, timeout: int = 30,
     if result.rc == 127 and _MISSING in result.stdout:
         return _error("Executable RomeoLLMTool introuvable dans cette session SSH.", **common,
                       available=False, execution_started=False, retry_safe=True,
-                      next_step="Verifier l'acces au service et son chargement sur ROMEO ; "
+                      next_step="Verifier l'acces au service sur ROMEO ; le PATH et l'installation partagee ont ete sondes. "
                                 "ROMEO_LLM_EXECUTABLE accepte le chemin distant fourni par les administrateurs.")
     if not result.ok:
         return _error("La commande RomeoLLMTool a echoue ; consulter output.", **common,
@@ -114,7 +122,7 @@ def logs(job_id: str, lines: int) -> dict:
 
 def _connection(result: dict, s, local_port: int) -> dict:
     result["api_key_exposed"] = False
-    result["api_key_command"] = shlex.join([_executable(), "gateway", "show-key"])
+    result["api_key_command"] = _command([_executable(), "gateway", "show-key"])
     result["api_key_scope"] = "gateway_only"
     if not result["ok"] or not result.get("complete"):
         return result
@@ -147,7 +155,13 @@ def endpoint(job_id: str, local_port: int) -> dict:
 def gateway_status(local_port: int) -> dict:
     _integer(local_port, 1024, 65535, "local_port")
     s = session()
-    return _connection(_run(s, ["gateway", "status"]), s, local_port)
+    result = _run(s, ["gateway", "status"])
+    # La CLI officielle utilise rc=1 pour cet etat normal et explicite.
+    if (result.get("exit_code") == 1 and result.get("complete") is True
+            and result.get("output", "").strip() == "La gateway ne tourne pas (romeollmtool gateway start)."):
+        result.pop("error", None)
+        result.update(ok=True, state="stopped", ready=False, execution_outcome="observed")
+    return _connection(result, s, local_port)
 
 
 def _target(s) -> dict:

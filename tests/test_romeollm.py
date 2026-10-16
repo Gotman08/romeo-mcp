@@ -7,6 +7,8 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -192,6 +194,24 @@ class RomeoLLMTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 llm.gateway_start(*args)
 
+    def test_explicitly_stopped_gateway_is_a_normal_observed_state(self):
+        message = "La gateway ne tourne pas (romeollmtool gateway start).\n"
+        with patch.object(llm, "_sh", return_value=Result(1, message, 0)):
+            result = llm.gateway_status(11361)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["state"], "stopped")
+        self.assertFalse(result["ready"])
+        self.assertEqual(result["exit_code"], 1)
+        self.assertNotIn("error", result)
+
+    def test_unknown_or_incomplete_gateway_failure_is_not_a_stopped_state(self):
+        message = "La gateway ne tourne pas (romeollmtool gateway start).\n"
+        for outcome in (Result(1, "Unexpected failure", 0), Result(1, message, 0, True)):
+            with patch.object(llm, "_sh", return_value=outcome):
+                result = llm.gateway_status(11361)
+            self.assertFalse(result["ok"])
+            self.assertNotIn("state", result)
+
     def test_only_numeric_job_ids_can_stop_or_read_logs(self):
         for target in ("--all", "example", "123; touch bad", "0", "1\n2"):
             with self.assertRaises(ValueError):
@@ -234,6 +254,7 @@ class RomeoLLMTests(unittest.TestCase):
         self.assertNotIn("fictional-private-value", json.dumps(result))
         self.assertFalse(result["api_key_exposed"])
         self.assertEqual(result["api_key_scope"], "gateway_only")
+        self.assertIn(llm.SHARED_EXECUTABLE, result["api_key_command"])
         self.assertFalse(result["connections"][0]["authentication_verified"])
         self.assertEqual(result["connections"][0]["local_url"], "http://localhost:12000/v1")
         self.assertIn("12000:login.test:11361", result["connections"][0]["ssh_tunnel_command"])
@@ -261,6 +282,27 @@ class RomeoLLMTests(unittest.TestCase):
         with patch.dict(os.environ, {"ROMEO_LLM_EXECUTABLE": value}):
             llm.inspect("status")
         self.assertEqual(self.calls[-1][0][0], value)
+
+    def test_shared_cli_fallback_executes_literal_arguments_without_path(self):
+        bash = (str(Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe")
+                if os.name == "nt" else shutil.which("bash"))
+        if not bash or not Path(bash).is_file():
+            self.skipTest("Bash requis pour verifier l'execution du repli partage")
+        executable = Path(self.temp.name) / "shared cli"
+        executable.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n", encoding="utf-8", newline="\n")
+        executable.chmod(0o700)
+        literal = "bonjour; $(printf injected)"
+        with patch.object(llm, "SHARED_EXECUTABLE", executable.as_posix()):
+            result = subprocess.run([bash, "-c", llm._command(["romeollmtool", "chat", literal])],
+                                    capture_output=True, text=True, timeout=5,
+                                    env={**os.environ, "PATH": self.temp.name})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["chat", literal])
+
+    def test_shared_cli_fallback_does_not_replace_explicit_configuration(self):
+        command = llm._command(["/custom/install/romeollmtool", "status"])
+        self.assertNotIn(llm.SHARED_EXECUTABLE, command)
+        self.assertIn("/custom/install/romeollmtool", command)
 
     def test_truncated_gateway_output_does_not_generate_tunnel(self):
         with patch.object(llm, "_sh", return_value=Result(0, "http://login.test:1234/v1", 0, True)):
