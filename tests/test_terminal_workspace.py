@@ -20,6 +20,13 @@ from romeo_mcp.checkpoint_protocol import digest
 TARGET={"host":"synthetic.example","user":"tester","account":"example"}
 
 
+def publish(path,value):
+    """Replace a file as the product does: every version gets its own file identity."""
+    temporary=path.with_name(path.name+".tmp")
+    temporary.write_text(json.dumps(value),encoding="utf-8")
+    os.replace(temporary,path)
+
+
 class WorkspaceTests(unittest.TestCase):
     def setUp(self):
         folder=tempfile.TemporaryDirectory(prefix="romeo-ui-contract-"); self.addCleanup(folder.cleanup)
@@ -181,12 +188,12 @@ class WorkspaceTests(unittest.TestCase):
         receipt = {"export_sha256":export["sha256"],"manifest_sha256":"b"*64,"independent_backup":True,
                    "checkpoint_integrity_verified":True,"verified_at":time.time()}
         proof_path = exports/(identifier+".verified.json")
-        proof_path.write_text(json.dumps(receipt),encoding="utf-8")
+        publish(proof_path,receipt)
         self.assertIsNone(catalog.snapshot({"collect":False})["workspace"]["recovery"]["independent_backup"])
         self.assertTrue(catalog.snapshot()["workspace"]["recovery"]["independent_backup"])
-        proof_path.write_text(json.dumps({**receipt,"manifest_sha256":"c"*64}),encoding="utf-8")
+        publish(proof_path,{**receipt,"manifest_sha256":"c"*64})
         self.assertIsNone(catalog.snapshot()["workspace"]["recovery"]["independent_backup"])
-        proof_path.write_text(json.dumps(receipt),encoding="utf-8")
+        publish(proof_path,receipt)
         self.store.save_observation("checkpoint:42",TARGET,{**runtime,"latest_checkpoint":{**latest,"manifest_sha256":"d"*64}})
         self.assertIsNone(catalog.snapshot()["workspace"]["recovery"]["independent_backup"])
 
