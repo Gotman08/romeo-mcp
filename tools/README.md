@@ -23,7 +23,7 @@ soumettre un calcul, utiliser les [outils MCP](../docs/Tools.md).
 |---|---|---|
 | [install_mcp.py](install_mcp.py) | Enregistrer le serveur dans un client IA | Peut modifier les fichiers personnels du client, avec sauvegarde préalable |
 | [check_privacy.py](check_privacy.py) | Vérifier les contenus qui seront publiés | Lit l’index Git et, sur demande, l’historique ; affiche les emplacements signalés |
-| [verify_corpus.py](verify_corpus.py) | Contrôler la copie documentaire | Lit les liens, images, accès depuis le sommaire et empreintes du manifeste |
+| [verify_corpus.py](verify_corpus.py) | Contrôler la copie documentaire | Lit les liens, images, ancres, casse des noms de fichiers, accès depuis le sommaire et empreintes du manifeste |
 | [prepare_release.py](prepare_release.py) | Préparer une release stable | Vérifie le tag et les distributions puis écrit les empreintes et notes dans `dist/` |
 | [romeo_doc_scraper.py](romeo_doc_scraper.py) | Renouveler la copie du site ROMEO | Accède au site officiel et écrit dans le dossier de sortie choisi |
 
@@ -67,6 +67,13 @@ commit ; `--history` parcourt les objets accessibles depuis les références Git
 Un signalement produit un code de sortie non nul et doit être examiné avant
 publication. Ce contrôle cible des motifs connus.
 
+`verify_corpus.py` accepte aussi un dossier en argument, par exemple une
+collecte avant intégration. Il contrôle les cibles de liens et d’images avec la
+**casse exacte** des noms de fichiers (un lien correct sous Windows ou macOS est
+mort sous Linux, donc dans la CI), les ancres `#fragment`, qui doivent désigner
+un titre de la page visée, les octets parasites, les empreintes du manifeste et
+l’accès à chaque page depuis le sommaire.
+
 Les [hooks locaux](../.githooks/README.md) et la
 [CI GitHub](../.github/workflows/README.md) utilisent ces mêmes vérifications.
 
@@ -83,14 +90,36 @@ python tools/romeo_doc_scraper.py --output CHEMIN_TEMPORAIRE
 python tools/verify_corpus.py CHEMIN_TEMPORAIRE
 ```
 
+Le collecteur normalise lui-même les liens que le site publie mal formés. Quand
+la source Markdown amont laisse des crochets autour d’une cible
+(`[texte]([https://…])`), Docusaurus sert `/documentation/[https://…]`, une
+adresse qui n’existe pas. Le collecteur retire les crochets, puis :
+
+| Contenu des crochets | Lien produit |
+|---|---|
+| Page de la documentation | lien local `page.md`, ancre après l’extension (`page.md#section`) |
+| Autre URL `http(s)` | lien externe, repris tel quel |
+| Adresse de courriel | `mailto:adresse` |
+
+Ces fausses cibles ne sont pas téléchargées : `errors` dans `manifest.json` ne
+compte que de vrais échecs. Chaque normalisation est consignée par page dans la
+rubrique `link_normalization` du manifeste (href amont → cible retenue). Un
+contenu de crochets inexploitable garde l’adresse du site et est compté dans
+`errors`, ce qui fait échouer la commande en fin de collecte au lieu de masquer
+le défaut.
+
 Avant d’intégrer cette collecte :
 
 1. Lire les erreurs et comparer les pages, les images et le sommaire à la copie versionnée.
 2. Reprendre les README de navigation propres au projet et adapter leurs liens
    si les sections officielles ont changé. Le collecteur génère son propre
-   README d’accueil ; il ne produit pas tous ces guides de section.
+   README d’accueil ; il ne produit ni ces guides de section, ni les ajouts de
+   navigation du projet (suffixe du fil d’Ariane, pied « Dans cette section »,
+   en-tête et pied du sommaire), ni la réécriture des ancres propres au site
+   (`local_anchor_repairs`).
 3. Actualiser les empreintes de `manifest.json` pour le corpus intégré, ainsi
-   que l’inventaire `local_navigation` de ses README.
+   que l’inventaire `local_navigation` de ses README, et reprendre la rubrique
+   `link_normalization` écrite par le collecteur.
 4. Vérifier les liens, le manifeste et la recherche locale avec les
    [suites documentaires](../tests/README.md#suites-hors-ligne).
 5. Publier ensemble les pages, les images, la navigation et le manifeste.

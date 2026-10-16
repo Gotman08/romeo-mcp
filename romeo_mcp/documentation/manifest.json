@@ -5,6 +5,14 @@
   "pages": 50,
   "images": 34,
   "errors": 0,
+  "link_normalization": {
+    "authentification.md": {
+      "/documentation/[https://romeo-ticket.univ-reims.fr/]": "https://romeo-ticket.univ-reims.fr/",
+      "/documentation/[https://romeo.univ-reims.fr/documentation/2.5.charte]": "2.5.charte.md",
+      "/documentation/[romeo@univ-reims.fr]": "mailto:romeo@univ-reims.fr",
+      "/documentation/[romeosecurity@univ-reims.fr]": "mailto:romeosecurity@univ-reims.fr"
+    }
+  },
   "files": {
     "2.5.charte.md": "2d81a3ad3b00e75be6f25864ff3a83ca2c7e6e28ba868cd39123c37a0e5415c8",
     "README.md": "b9310926ebce111caadfeffb0c6ab3a637992976e09e64f1385eed95ca98df32",
@@ -141,14 +149,6 @@
         },
         "ressources/connexion_ssh.md": {
           "#Deposer-sa-cle-ssh-sur-les-ressources": "#déposer-sa-clé-ssh-sur-les-ressources"
-        }
-      },
-      "local_link_repairs": {
-        "authentification.md": {
-          "[https://romeo.univ-reims.fr2.5.charte].md": "2.5.charte.md",
-          "[https://romeo-ticket.univ-reims.fr/].md": "https://romeo-ticket.univ-reims.fr/",
-          "[romeo@univ-reims.fr].md": "mailto:romeo@univ-reims.fr",
-          "[romeosecurity@univ-reims.fr].md": "mailto:romeosecurity@univ-reims.fr"
         }
       }
     }

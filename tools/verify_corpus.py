@@ -2,9 +2,10 @@
 """Contrôle d'intégrité du corpus de documentation aspiré.
 
 Vérifie ce qui rend un corpus réellement exploitable par un modèle :
-liens et images résolvables, absence d'octets parasites, et surtout
-**accessibilité** : chaque page doit être atteignable depuis le sommaire,
-sans quoi elle est invisible en pratique.
+liens et images résolvables (avec la casse exacte des noms de fichiers),
+ancres `#fragment` qui désignent un titre existant, absence d'octets
+parasites, et surtout **accessibilité** : chaque page doit être atteignable
+depuis le sommaire, sans quoi elle est invisible en pratique.
 
 Usage :
     python tools/verify_corpus.py [chemin_du_corpus]
@@ -12,10 +13,14 @@ Usage :
 
 from __future__ import annotations
 
+import html
+import os
 import re
 import sys
 import json
 import hashlib
+import unicodedata
+import urllib.parse
 from collections import deque
 from pathlib import Path
 
@@ -23,6 +28,12 @@ from pathlib import Path
 # (`[texte](<chemin avec espaces>)`).
 LIEN = re.compile(r"(?<!!)\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))\s*\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))")
+
+#: Lien d'ancrage que Docusaurus accole à chaque titre : `[U+200B](#id "Lien direct ...")`.
+LIEN_ANCRE = re.compile(r'\[\u200b?\]\(#([^)\s"]+)(?:\s+"[^"]*")?\)')
+TITRE = re.compile(r"^ {0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$")
+CLOTURE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+BALISE_ID = re.compile(r'<[A-Za-z][^>]*?\s(?:id|name)="([^"]+)"')
 
 #: En deçà, une page n'apporte rien à une recherche documentaire.
 SEUIL_PAGE_VIDE = 200
@@ -38,6 +49,90 @@ def sans_ancre(href: str) -> str:
 
 def est_interne(href: str) -> bool:
     return bool(href) and not href.startswith(("http://", "https://", "mailto:", "#"))
+
+
+def casse_exacte(racine: Path, chemin: Path, listings: dict[str, frozenset[str]]) -> bool:
+    """Vrai si chaque composant de `chemin` existe avec la casse du disque.
+
+    Windows et macOS acceptent `Services.md` pour `services.md`, Linux non : un
+    lien correct sur le poste du contributeur est alors mort sur le serveur et
+    dans la CI. Hors du corpus, seule l'existence compte, déjà vérifiée.
+    """
+    base = os.path.normpath(racine)
+    try:
+        relatif = os.path.relpath(os.path.normpath(chemin), base)
+    except ValueError:  # autre lecteur Windows
+        return True
+    morceaux = relatif.split(os.sep)
+    if morceaux[0] == os.pardir or relatif == os.curdir:
+        return True
+    courant = base
+    for nom in morceaux:
+        if courant not in listings:
+            try:
+                listings[courant] = frozenset(
+                    unicodedata.normalize("NFC", entree) for entree in os.listdir(courant)
+                )
+            except OSError:
+                return False
+        if unicodedata.normalize("NFC", nom) not in listings[courant]:
+            return False
+        courant = os.path.join(courant, nom)
+    return True
+
+
+def ancre(titre: str) -> str:
+    """Identifiant d'un titre, selon le calcul de GitHub et de Docusaurus."""
+    texte = LIEN_ANCRE.sub("", titre)
+    texte = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", texte)
+    texte = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", texte)
+    texte = re.sub(r"<[^>]+>", "", texte)
+    texte = html.unescape(texte).replace("\u200b", "")
+    texte = re.sub(r"[`*]", "", texte)
+    texte = unicodedata.normalize("NFC", texte).strip().lower()
+    # Le trait bas reste (`x86\_64` donne `x86_64`), la barre d'échappement et la
+    # ponctuation tombent, chaque espace devient un tiret.
+    return re.sub(r"[^\w\- ]", "", texte).replace(" ", "-")
+
+
+def ancres_de(texte: str) -> set[str]:
+    """Ancres d'une page : titres (calcul GitHub et ids Docusaurus) et balises `id`.
+
+    Un titre répété reçoit le suffixe `-1`, `-2`... comme sur le site.
+    """
+    trouvees: set[str] = set()
+    vus: dict[str, int] = {}
+    cloture = ""
+    for ligne in re.split(r"\r?\n", texte):
+        marque = CLOTURE.match(ligne)
+        if marque:
+            symbole = marque.group(1)[0]
+            if not cloture:
+                cloture = symbole
+            elif symbole == cloture:
+                cloture = ""
+            continue
+        if cloture:
+            continue
+        titre = TITRE.match(ligne)
+        if not titre:
+            continue
+        trouvees.update(LIEN_ANCRE.findall(titre.group(1)))
+        base = ancre(titre.group(1))
+        rang = vus.get(base, 0)
+        vus[base] = rang + 1
+        trouvees.add(base if rang == 0 else "{}-{}".format(base, rang))
+    trouvees.update(BALISE_ID.findall(texte))
+    return trouvees
+
+
+def ancre_resolue(fragment: str, disponibles: set[str]) -> bool:
+    """Vrai si `fragment` désigne une ancre de la page, brut ou décodé."""
+    # `#top` et le fragment vide désignent le haut de page (spécification HTML).
+    if fragment.lower() == "top" or fragment.startswith(":~:"):
+        return True
+    variantes = {fragment, urllib.parse.unquote(fragment)}
+    return any(unicodedata.normalize("NFC", v) in disponibles for v in variantes)
 
 
 def corps_utile(texte: str) -> str:
@@ -86,30 +181,61 @@ def main(racine: Path) -> int:
     for p in binaires:
         problemes.append("octet NUL dans {}".format(p.relative_to(racine).as_posix()))
 
-    # 2. Liens et images
-    liens_ok = liens_ko = img_ok = img_ko = 0
+    # 2. Liens, images et ancres
+    liens_ok = liens_ko = img_ok = img_ko = ancres_ok = ancres_ko = 0
+    listings: dict[str, frozenset[str]] = {}
+    ancres_par_page: dict[Path, set[str]] = {}
+    textes_resolus = {p.resolve(): t for p, t in textes.items()}
+    racine_resolue = racine.resolve()
     for page, texte in textes.items():
+        nom_page = page.relative_to(racine).as_posix()
         for motif, compteur in ((IMAGE, "img"), (LIEN, "lien")):
             for match in motif.finditer(texte):
-                href = sans_ancre(cible(match))
-                # Toute cible locale doit exister, quelle que soit son extension :
-                # un `.md` place apres l'ancre (`page#ancre.md`) passait inapercu.
-                if not est_interne(href):
-                    continue
-                if (page.parent / href).resolve().exists():
-                    if compteur == "img":
-                        img_ok += 1
+                href, _, fragment = cible(match).partition("#")
+                voisine = None  # page Markdown du corpus dont l'ancre est a verifier
+                if not href and fragment and compteur == "lien":
+                    voisine = page.resolve()  # ancre dans la page elle-meme
+                elif est_interne(href):
+                    # Toute cible locale doit exister, quelle que soit son extension :
+                    # un `.md` place apres l'ancre (`page#ancre.md`) passait inapercu.
+                    chemin = page.parent / href
+                    existe = chemin.resolve().exists()
+                    if existe and casse_exacte(racine, chemin, listings):
+                        if compteur == "img":
+                            img_ok += 1
+                        else:
+                            liens_ok += 1
+                        cible_md = chemin.resolve()
+                        if cible_md.suffix == ".md" and cible_md.is_relative_to(racine_resolue):
+                            voisine = cible_md
                     else:
-                        liens_ok += 1
-                else:
-                    if compteur == "img":
-                        img_ko += 1
-                    else:
-                        liens_ko += 1
-                    problemes.append(
-                        "{} mort dans {} -> {}".format(
-                            compteur, page.relative_to(racine).as_posix(), href
+                        if compteur == "img":
+                            img_ko += 1
+                        else:
+                            liens_ko += 1
+                        problemes.append(
+                            "{} mort dans {} -> {}{}".format(
+                                compteur, nom_page, href,
+                                " (casse differente de celle du disque)" if existe else "",
+                            )
                         )
+                else:
+                    continue
+
+                # Une ancre doit designer un titre de la page visee.
+                if voisine is None or not fragment or compteur != "lien":
+                    continue
+                if voisine not in ancres_par_page:
+                    contenu = textes_resolus.get(voisine)
+                    if contenu is None:
+                        contenu = voisine.read_text(encoding="utf-8", errors="replace")
+                    ancres_par_page[voisine] = ancres_de(contenu)
+                if ancre_resolue(fragment, ancres_par_page[voisine]):
+                    ancres_ok += 1
+                else:
+                    ancres_ko += 1
+                    problemes.append(
+                        "ancre introuvable dans {} -> {}#{}".format(nom_page, href, fragment)
                     )
 
     # 3. Accessibilité depuis le sommaire : une page qu'aucun chemin n'atteint
@@ -155,6 +281,7 @@ def main(racine: Path) -> int:
     print("  pages                    : {}".format(len(pages)))
     print("  images resolvables       : {} (cassees : {})".format(img_ok, img_ko))
     print("  liens internes resolvables: {} (cassees : {})".format(liens_ok, liens_ko))
+    print("  ancres resolvables       : {} (introuvables : {})".format(ancres_ok, ancres_ko))
     print("  fichiers avec octet NUL  : {}".format(len(binaires)))
     # `README.md` decrit le corpus, il n'en fait pas partie : il pointe vers le
     # sommaire sans que l'inverse ait de sens.
