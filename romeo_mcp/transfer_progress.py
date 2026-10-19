@@ -13,8 +13,11 @@ import subprocess
 import time
 
 MAX_TAIL = 16384
+# rsync >= 3.5 appends a B suffix to byte counts and prints raw B/s speeds
+# (e.g. "32768B   1%       0B/s"); older releases print bare counts with
+# k/M/G-suffixed speeds. Both are accepted; a missing unit means bytes/s.
 _LINE = re.compile(
-    rb"\s*([0-9]{1,16})\s+([0-9]{1,3})%\s+([0-9]{1,12}(?:\.[0-9]{1,2})?)([kMG])B/s"
+    rb"\s*([0-9]{1,16})B?\s+([0-9]{1,3})%\s+([0-9]{1,12}(?:\.[0-9]{1,2})?)([kMG])?B/s"
     rb"\s+([0-9]{1,4}:[0-9]{2}:[0-9]{2}|\?\?:\?\?:\?\?)"
     rb"(\s+\(xfr#[0-9]+, to-chk=[0-9]+/[0-9]+\))?\s*\Z"
 )
@@ -26,7 +29,7 @@ def parse(line: bytes, observed_at: float) -> dict | None:
     if match is None:
         return None
     done, percent = int(match[1]), int(match[2])
-    speed = float(match[3]) * {b"k": 1024, b"M": 1024 ** 2, b"G": 1024 ** 3}[match[4]]
+    speed = float(match[3]) * {b"k": 1024, b"M": 1024 ** 2, b"G": 1024 ** 3}.get(match[4], 1)
     if done > 2 ** 53 or percent > 100 or not math.isfinite(speed):
         return None
     eta = None

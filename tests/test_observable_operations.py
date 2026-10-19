@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import offline
 from romeo_mcp import server as assembled
 from romeo_mcp import outils_calcul as jobs, outils_contexte as context, outils_diagnostics as diagnostics
-from romeo_mcp import transfers, transfer_worker, outils_donnees as data, files, noyau, services
+from romeo_mcp import transfers, transfer_worker, transfer_progress, outils_donnees as data, files, noyau, services
 from romeo_mcp.observability import ReadCache
 from romeo_mcp.registry import Registry
 from romeo_mcp.ssh import RomeoSession, Result, SSHError
@@ -312,6 +312,20 @@ class ObservableTests(unittest.TestCase):
                 if worker.is_alive():
                     transfers.cancel(prepared["transfer_id"], True)
                     worker.join(8)
+
+    def test_progress_parse_accepts_rsync35_and_legacy_records(self):
+        # Lignes reelles, rsync 3.5.1 avec --info=progress2 --no-human-readable.
+        record = transfer_progress.parse(b"          32768B   1%       0B/s    0:00:00  ", 0.0)
+        self.assertEqual((record["bytes_transferred"], record["percent_reported"]), (32768, 1))
+        self.assertEqual((record["bytes_per_second"], record["eta_seconds"]), (0, 0))
+        record = transfer_progress.parse(b"        3145728B 100% 1055240B/s    0:00:02 (xfr#1, to-chk=0/1)", 0.0)
+        self.assertEqual((record["bytes_transferred"], record["percent_reported"]), (3145728, 100))
+        self.assertEqual(record["bytes_per_second"], 1055240)
+        self.assertIsNone(record["eta_seconds"])
+        # Ancien format, compteurs nus et vitesse avec unite : toujours accepte.
+        record = transfer_progress.parse(b"        3145728 100%    1.00MB/s    0:00:02 (xfr#1, to-chk=0/1)", 0.0)
+        self.assertEqual(record["bytes_per_second"], 1024 ** 2)
+        self.assertIsNone(transfer_progress.parse(b"not a progress line", 0.0))
 
     def test_cancellation_stops_a_real_owned_transfer_process(self):
         source = self.root / "data.txt"
