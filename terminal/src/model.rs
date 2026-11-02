@@ -267,6 +267,8 @@ pub struct Checkpoint {
 
 #[derive(Clone, Debug, Deserialize, Default)]
 pub struct Progress {
+    #[serde(default)]
+    pub source: String,
     pub bytes_transferred: u64,
     pub bytes_total: Option<u64>,
     pub percent_reported: Option<u64>,
@@ -466,6 +468,11 @@ mod tests {
 
     #[test]
     fn progress_needs_a_measured_valid_total() {
+        let legacy: Progress =
+            serde_json::from_str(r#"{"bytes_transferred":48,"bytes_total":120}"#)
+                .expect("older observations without a source remain readable");
+        assert!(legacy.source.is_empty());
+        assert_eq!(legacy.percent(), Some(40));
         let mut progress = Progress {
             bytes_total: Some(120),
             bytes_transferred: 48,

@@ -398,7 +398,7 @@ fn scrollbar(frame: &mut Frame, area: Rect, total: usize, position: usize, visib
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Job, Snapshot, Transfer};
+    use crate::model::{Job, Progress, Snapshot, Transfer};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use ratatui::{backend::TestBackend, Terminal};
     fn render(width: u16, height: u16, app: &mut App) -> String {
@@ -459,6 +459,48 @@ mod tests {
         }
         app.key(key(KeyCode::Enter));
         assert!(render(100, 30, &mut app).contains("Filtre : checkpoint"));
+    }
+
+    #[test]
+    fn scp_destination_progress_is_visible_without_claiming_integrity() {
+        let mut app = App::new(View::Transfers);
+        app.apply(Snapshot {
+            transfers: vec![Transfer {
+                id: "copy".into(),
+                name: "data.bin".into(),
+                state: "running".into(),
+                phase: "transferring".into(),
+                progress: Some(Progress {
+                    source: "scp_destination_size".into(),
+                    bytes_transferred: 48,
+                    bytes_total: Some(120),
+                    bytes_per_second: Some(24.0),
+                    eta_seconds: Some(3.0),
+                    ..Progress::default()
+                }),
+                ..Transfer::default()
+            }],
+            ..Snapshot::default()
+        });
+        app.key(key(KeyCode::Enter));
+        let text = render(100, 30, &mut app);
+        for expected in [
+            "40 %",
+            "Taille présente dans la copie (SCP)",
+            "Octets présents",
+            "Débit observé",
+            "Validation de copie absente",
+        ] {
+            assert!(text.contains(expected), "{expected} missing from {text}");
+        }
+        app.data.transfers[0]
+            .progress
+            .as_mut()
+            .unwrap()
+            .bytes_transferred = 120;
+        let text = render(100, 30, &mut app);
+        assert!(text.contains("100 %"));
+        assert!(text.contains("Validation de copie absente"));
     }
 
     #[test]

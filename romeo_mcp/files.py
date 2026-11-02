@@ -23,11 +23,55 @@ from pathlib import Path
 
 from .ssh import SSHError
 from .resource_locks import ResourceLease
+from .transfer_progress import DestinationProgress, LocalDestination, MAX_BYTES, regular_file_signature
 
 _TRANSFER_TIMEOUT = 900  # 15 min : un resultat de simulation peut etre lourd.
 _RUNNER = ContextVar("romeo_transfer_runner", default=None)
 _CONFINEMENT = ContextVar("romeo_transfer_confinement", default=None)
 _CANCEL_CHECK = ContextVar("romeo_transfer_cancel_check", default=None)
+_PROGRESS_PROBE = ContextVar("romeo_transfer_progress_probe", default=None)
+
+
+@contextmanager
+def _copy_probe(probe):
+    """Expose measurements only to the runner while the copy process runs."""
+    token = _PROGRESS_PROBE.set(probe if _RUNNER.get() is not None else None)
+    try:
+        yield
+    finally:
+        _PROGRESS_PROBE.reset(token)
+
+
+def _source_signature(path):
+    try:
+        current = regular_file_signature(path)
+        return current if current is not None and 0 < current[2] <= MAX_BYTES else None
+    except (OSError, ValueError):
+        return None
+
+
+def _upload_probe(guard, source, original):
+    if original is None or _RUNNER.get() is None:
+        return None
+    def sample(final=False):
+        if _source_signature(source) != original:
+            return {'valid': False}
+        return guard.finish_sample() if final else guard.sample()
+    return DestinationProgress(original[2], sample, lambda: sample(final=True))
+
+
+def _download_probe(guard, destination):
+    total = guard.ready.get('bytes_total')
+    if _RUNNER.get() is None or type(total) is not int or not 0 < total <= MAX_BYTES:
+        return None
+    local = LocalDestination(destination)
+    def sample(final=False):
+        remote = guard.finish_sample() if final else guard.sample()
+        if remote is None:
+            return None
+        done = local.sample() if remote.get('valid') is True else None
+        return {**remote, 'valid': remote.get('valid') is True and done is not None, 'bytes_present': done}
+    return DestinationProgress(total, sample, lambda: sample(final=True))
 
 
 @contextmanager
@@ -131,12 +175,15 @@ def upload(host: str, local_path: str, remote_path: str) -> dict:
     policy = _CONFINEMENT.get()
     if policy is not None:
         from .confined_transfers import TransferGuard
-        with TransferGuard(host, remote_path, policy[0], 'upload', source.name, source.is_dir(), policy[1]) as guard:
+        original = _source_signature(source) if _RUNNER.get() is not None else None
+        with TransferGuard(host, remote_path, policy[0], 'upload', source.name, source.is_dir(), policy[1],
+                           bytes_total=original[2] if original is not None else None) as guard:
             expected = empreinte_locale(source) if policy[1] and source.is_file() else None
             argv = ['scp', '-q', '-o', 'BatchMode=yes']
             if source.is_dir():
                 argv.append('-r')
-            _run([*argv, str(source), '{}:{}'.format(host, guard.ready['proxy'])], 'envoi confine')
+            with _copy_probe(_upload_probe(guard, source, original)):
+                _run([*argv, str(source), '{}:{}'.format(host, guard.ready['proxy'])], 'envoi confine')
             observed = guard.commit(expected)
         size = sum(f.stat().st_size for f in source.rglob('*') if f.is_file()) if source.is_dir() else source.stat().st_size
         return {'sent': str(source), 'to': observed['actual_path'], 'bytes': size,
@@ -233,7 +280,8 @@ def _download(host: str, remote_path: str, local_path: str, recursive: bool = Fa
             argv = ['scp', '-q', '-o', 'BatchMode=yes']
             if recursive:
                 argv.append('-r')
-            _run([*argv, '{}:{}'.format(host, guard.ready['proxy']), str(destination)], 'recuperation confinee')
+            with _copy_probe(_download_probe(guard, destination)):
+                _run([*argv, '{}:{}'.format(host, guard.ready['proxy']), str(destination)], 'recuperation confinee')
             observed = guard.commit()
         return {'downloaded': remote_path, 'to': str(destination),
                 'bytes': destination.stat().st_size if destination.is_file() else None,

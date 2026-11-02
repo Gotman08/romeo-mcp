@@ -215,6 +215,22 @@ class TerminalTests(unittest.TestCase):
         for change in ({"source": "clock"}, {"percent_reported": 101}, {"percent_reported": True}):
             self.assertIsNone(evidence.progress({"progress": {**reported, **change}}))
 
+    def test_scp_projection_keeps_its_size_provenance_and_observation_age(self):
+        observed_at = time.time() - 90
+        measured = {"source": "scp_destination_size", "bytes_transferred": 120, "bytes_total": 120,
+                    "percent_reported": 100, "bytes_per_second": 8, "eta_seconds": 0,
+                    "observed_at": observed_at}
+        status = {"state": "running", "result_validated": False, "heartbeat_at": time.time(), "progress": measured}
+        result = evidence.progress(status)
+        self.assertEqual(result["source"], "scp_destination_size")
+        self.assertEqual((result["bytes_transferred"], result["bytes_total"]), (120, 120))
+        self.assertEqual(result["observed_at"], observed_at)
+        self.assertGreater(time.time() - result["observed_at"], 89)
+        self.assertFalse(status["result_validated"])
+        self.assertNotIn("result_validated", result)
+        for change in ({"bytes_total": None}, {"bytes_total": 0}, {"bytes_transferred": 121}):
+            self.assertIsNone(evidence.progress({"progress": {**measured, **change}}))
+
     def test_reports_are_read_only_and_export_no_body_credentials_or_foreign_url(self):
         store = ReportStore()
         store.configure(True)
