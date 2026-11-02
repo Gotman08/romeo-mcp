@@ -85,6 +85,9 @@ A savoir avant toute action :
 - Le noeud de login est en x86_64, les noeuds GPU sont en aarch64. Ne compile
   et n'installe jamais depuis le login : prepare un environnement, des paquets ou des roues avec les outils `python_*`.
   Les commandes arbitraires utilisent `compute_command_prepare` puis `compute_command_run` dans le profil expert.
+- RTK est facultatif : `rtk_status` verifie le login et ses statistiques ;
+  `login_command_run(use_rtk=true)` condense les commandes utilisateur dans expert.
+  Le mode brut reste disponible et les sondes internes ne sont pas reecrites.
 - Les logiciels se chargent via Spack, propre a chaque architecture. Cherche-les
   avec `romeo_software`, puis passe-les en `spack_packages`. Ne conclus jamais
   qu'un outil est absent parce que `command -v` ne le trouve pas sur le login.

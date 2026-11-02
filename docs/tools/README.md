@@ -2,7 +2,7 @@
 
 [Accueil](../../README.md) › [Documentation](../README.md) › [Tools](../Tools.md) › Fiches
 
-Ce dossier contient une fiche Markdown par outil MCP : 98 fiches couvrent les profils `essential`, `full` et `expert`.
+Ce dossier contient une fiche Markdown par outil MCP : 114 fiches couvrent les profils `essential`, `full` et `expert`.
 
 Le [catalogue Tools](../Tools.md#outils-exposés) regroupe les outils par usage. Cliquez sur un nom pour lire son rôle, ses paramètres, un exemple JSON, le résultat attendu, les effets et les limites. Chaque fiche propose des liens vers les outils associés et le code correspondant.
 
@@ -26,6 +26,7 @@ Les anciens noms conservés dans la [section de migration](../Tools.md#migration
 | [Scripts Slurm](../Tools.md#scripts-slurm) | 3 | [`sbatch_validate`](sbatch_validate.md) · [`sbatch_check_paths`](sbatch_check_paths.md) |
 | [Reproductibilité](../Tools.md#reproductibilité) | 4 | [`job_report_collect`](job_report_collect.md) · [`job_report_from_record`](job_report_from_record.md) |
 | [Commandes du profil expert](../Tools.md#commandes-du-profil-expert) | 3 | [`compute_command_prepare`](compute_command_prepare.md) · [`compute_command_run`](compute_command_run.md) |
+| [RTK](../Tools.md#rtk) | 1 | [`rtk_status`](rtk_status.md) |
 
 ## Lire une fiche
 

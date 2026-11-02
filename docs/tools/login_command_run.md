@@ -22,6 +22,8 @@ Fournit une échappatoire expert pour une inspection que les outils dédiés ne 
 | `timeout_seconds` | `int` | Non | `15` | Durée maximale de l’appel, en secondes ; voir les limites de cet outil. |
 | `cwd` | `str \| None` | Non | `null` | Répertoire de travail distant de la commande sur le login. |
 | `allow_heavy` | `bool` | Non | `false` | Lever le refus des commandes lourdes seulement pour un cas autorisé par la documentation ROMEO. |
+| `use_rtk` | `bool` | Non | `false` | Demander une sortie condensée par RTK, si installé. Sans équivalent RTK ou sans binaire, exécuter la commande brute une seule fois. |
+| `max_chars` | `int` | Non | `10000` | Limite de sortie, entre 1 et 64000 caractères. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -42,19 +44,35 @@ Les identifiants, chemins et valeurs en majuscules sont illustratifs : utiliser 
 
 Le code de sortie, la durée, la sortie bornée et l’indication de troncature.
 
+`requested_command` conserve la demande et `executed_command` indique la commande choisie. `rtk` précise si la réécriture a été appliquée, le chemin du binaire et le motif d’un retour au mode brut. Le code de sortie est celui de la commande exécutée ; un échec ou un délai dépassé ne déclenche jamais une seconde exécution.
+
+Pour utiliser RTK dans un dépôt distant :
+
+```json
+{
+  "command": "git status",
+  "cwd": "~/mon-depot",
+  "use_rtk": true,
+  "max_chars": 4000,
+  "timeout_seconds": 15
+}
+```
+
 Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de poursuivre.
 
 ## Prérequis et limites
 
 Le délai maximal est de 20 secondes. Les calculs, compilations et installations sont refusés par défaut ; allow_heavy ne s’emploie que pour un cas explicitement autorisé par la documentation ROMEO.
 
+Ce délai est partagé par la détection de RTK, sa réécriture et la commande. RTK est recherché dans `~/.local/bin/rtk` puis dans le PATH, y compris pour une session SSH ouverte avant son installation. Les hooks des assistants ne couvrent pas les appels MCP. Les refus de RTK, erreurs de réécriture et sorties de réécriture tronquées arrêtent l’appel avant exécution. Les garde-fous analysent la demande puis sa réécriture, notamment les commandes enveloppées par `rtk` et `rtk bypass`. Les exécuteurs RTK opaques sont refusés sur le login.
+
 Les enveloppes reconnues (`env`, `command`, `timeout`, `nice`, `nohup`, `exec`, `sudo`, `stdbuf`, `setsid`, `time`) sont analysées jusqu'à la commande exécutée. Les formes littérales `bash -c` et `sh -c` sont également vérifiées. Les options inconnues, substitutions, commandes dynamiques, scripts shell opaques et constructions composées sont refusés. Les séparateurs cités dans un argument restent du texte. Les refus destructeurs restent actifs avec allow_heavy. Ce garde-fou ne constitue pas une sandbox : les formes courtes `python -c` restent réservées à l'inspection.
 
 ## Voir aussi
 
-[`compute_command_prepare`](compute_command_prepare.md) · [`search_docs`](search_docs.md) · [`list_dir`](list_dir.md)
+[`rtk_status`](rtk_status.md) · [`compute_command_prepare`](compute_command_prepare.md) · [`search_docs`](search_docs.md) · [`list_dir`](list_dir.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L135) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L141) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -48,7 +48,7 @@ Une panne de transport donne une observation incertaine ; elle ne prouve pas la 
 
 [`service_connection_info`](service_connection_info.md) · [`service_stop`](service_stop.md) · [`job_status`](job_status.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L35) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L39) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

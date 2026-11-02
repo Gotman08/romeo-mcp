@@ -57,11 +57,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Utiliser les outils métier lorsqu’ils couvrent l’opération. Relire toutes les commandes : leurs effets sont ceux du shell et ne sont pas limités à une opération métier.
 
+Pour RTK sur un nœud de calcul, inscrire explicitement une commande telle que `"$HOME/.local/bin/rtk" cargo test` dans `commands`. Le script ainsi préparé conserve la commande exacte. Les hooks des assistants ne s’appliquent pas aux jobs ; ne pas dépendre du PATH d’une ancienne session SSH. Utiliser un binaire compatible avec `arch`, ou un lanceur qui choisit l’architecture. [`rtk_status`](rtk_status.md) contrôle seulement le login.
+
 ## Voir aussi
 
 [`compute_command_run`](compute_command_run.md) · [`plan_get`](plan_get.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L109) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L113) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

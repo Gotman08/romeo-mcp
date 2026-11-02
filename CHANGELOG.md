@@ -1,5 +1,12 @@
 # Historique des versions
 
+## Non publié — RTK et commandes du login
+
+- `rtk_status` vérifie RTK et lit ses statistiques JSON dans les profils `full` et `expert`.
+- `login_command_run` propose `use_rtk` et `max_chars`, avec commande demandée, commande exécutée et état de la réécriture. Le mode brut reste le défaut.
+- Détection de `~/.local/bin/rtk` même avec un ancien PATH SSH ; délai partagé entre détection, réécriture et exécution. Les refus, erreurs et délais ne déclenchent aucun replay de la commande utilisateur.
+- Les garde-fous vérifient aussi les commandes enveloppées par RTK ; les sondes internes et les scripts Slurm préparés conservent leur sortie et leurs commandes exactes.
+
 [Accueil](README.md) · [Guide des mises à jour](docs/updates.md)
 
 <details>

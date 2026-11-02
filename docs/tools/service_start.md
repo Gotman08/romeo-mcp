@@ -50,7 +50,7 @@ Le plan doit être soumettable, non expiré et de la bonne famille. Un plan déj
 
 [`service_prepare`](service_prepare.md) · [`service_status`](service_status.md) · [`service_connection_info`](service_connection_info.md) · [`service_stop`](service_stop.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L30) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L34) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

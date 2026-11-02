@@ -77,9 +77,9 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
-| `essential` | 40 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
-| `full` | 96 | Ensemble des outils métier, y compris tableaux, pipelines, services et profilage. |
-| `expert` | 99 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `essential` | 51 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
+| `full` | 111 | Ensemble des outils métier, y compris tableaux, pipelines, services, profilage et état RTK. |
+| `expert` | 114 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -248,6 +248,14 @@ Une liste absente ou vide, ainsi que le nom `python` seul, sont refusés dès la
 | [`job_report_from_record`](tools/job_report_from_record.md) | Créer un relevé à partir du registre local. | `full`, `expert` |
 | [`job_report_get`](tools/job_report_get.md) | Relire un relevé de reproductibilité enregistré. | `full`, `expert` |
 | [`job_report_export`](tools/job_report_export.md) | Exporter un relevé en JSON et Markdown. | `essential`, `full`, `expert` |
+
+### RTK
+
+| Outil | Rôle | Profils |
+|---|---|---|
+| [`rtk_status`](tools/rtk_status.md) | Vérifier RTK et lire ses statistiques bornées sur le login. | `full`, `expert` |
+
+La condensation est explicite avec [`login_command_run(use_rtk=true)`](tools/login_command_run.md). La commande brute reste le défaut. Le délai est global, la sortie est bornée et la réécriture ne dispense pas des garde-fous. Les sondes internes conservent leurs sorties structurées exactes.
 
 ### Commandes du profil expert
 

@@ -1,6 +1,9 @@
 """Interface MCP des services, environnements et executions explicites."""
 from __future__ import annotations
 import re
+import json
+import shlex
+import time
 from typing import Any
 from pydantic import TypeAdapter
 from .cluster import parse_duration
@@ -12,6 +15,7 @@ from .noyau import MUTATING, DESTRUCTIVE, READ_ONLY, _error, _sh, outil
 from .plans import prepare_spec, submit_prepared
 from .service_models import ServiceConfig
 from . import services, python_operations
+from . import rtk
 
 
 @outil(annotations=MUTATING, description=(
@@ -129,7 +133,9 @@ def compute_command_run(plan_id: str, confirm: bool = False) -> dict[str, Any]:
         "calculs sont refuses par defaut : le noeud de login est partage par "
         "tout le laboratoire. `allow_heavy=true` leve ce refus pour les cas que "
         "la documentation ROMEO autorise explicitement, comme un `pip install` "
-        "en environnement virtuel a destination du x86_64. Delai maximal 20 s."
+        "en environnement virtuel a destination du x86_64. Delai global maximal 20 s. "
+        "use_rtk=true condense la sortie via RTK si disponible ; false conserve "
+        "la commande brute. RTK ne contourne pas les garde-fous. max_chars borne la sortie."
     ),
 )
 def login_command_run(
@@ -137,20 +143,35 @@ def login_command_run(
     timeout_seconds: int = 15,
     cwd: str | None = None,
     allow_heavy: bool = False,
+    use_rtk: bool = False,
+    max_chars: int = 10_000,
 ) -> dict[str, Any]:
     """Echappatoire pour ce qu'aucun outil dedie ne couvre."""
-    s = session()
     try:
+        if type(max_chars) is not int or not 1 <= max_chars <= 64_000:
+            raise ValueError("max_chars doit etre un entier entre 1 et 64000.")
+        if type(timeout_seconds) is not int:
+            raise ValueError("timeout_seconds doit etre un entier.")
         check_login_command(command, allow_heavy=allow_heavy)
-    except GuardError as exc:
+    except (GuardError, ValueError) as exc:
         return _error(str(exc), refused=True)
 
     budget = max(1, min(int(timeout_seconds), 20))
+    s = session()
+    deadline = rtk.Deadline(budget)
+    started = time.monotonic()
+    selected = command
+    metadata = {"requested": use_rtk, "applied": False, "reason": "disabled"}
     try:
         target = check_path(cwd, s.home, s.scratch, s.path_aliases) if cwd else None
-        result = _sh(s, command, timeout=budget, cwd=target, max_chars=10_000)
+        if use_rtk:
+            selected, metadata = rtk.rewrite_command(s, command, _sh, deadline, target)
+            check_login_command(selected, allow_heavy=allow_heavy)
+        executable = (rtk.with_environment(selected, metadata["path"])
+                      if metadata["reason"] in {"rewritten", "already_wrapped"} else selected)
+        result = _sh(s, executable, timeout=deadline.remaining(), cwd=target, max_chars=max_chars)
     except GuardError as exc:
-        return _error(str(exc))
+        return _error(str(exc), refused=True)
     except SSHTimeout as exc:
         return _error(str(exc), refused=False)
     except SSHError as exc:
@@ -159,10 +180,45 @@ def login_command_run(
     return {
         "ok": result.ok,
         "exit_code": result.rc,
-        "duration_seconds": round(result.duration, 2),
+        "duration_seconds": round(time.monotonic() - started, 2) if use_rtk else round(result.duration, 2),
         "truncated": result.truncated,
         "output": result.stdout,
+        "requested_command": command,
+        "executed_command": selected,
+        "rtk": metadata,
     }
+
+
+@outil(annotations=READ_ONLY, description=(
+    "Verifie RTK dans l'espace utilisateur ou le PATH du login et lit sa version. "
+    "include_gain=true ajoute les statistiques JSON bornees. N'installe rien, "
+    "ne change aucune configuration et ne soumet aucun job. Les hooks Claude/Codex "
+    "ne couvrent pas le MCP : utilise login_command_run(use_rtk=true) dans expert."))
+def rtk_status(include_gain: bool = True) -> dict[str, Any]:
+    s = session()
+    deadline = rtk.Deadline(15)
+    binary = rtk.find_binary(s, _sh, deadline)
+    if binary is None:
+        return {"ok": True, "available": False, "path": None,
+                "message": "RTK absent du login ; aucune installation effectuee."}
+    command = "RTK_TELEMETRY_DISABLED=1 " + shlex.quote(binary)
+    version = _sh(s, command + " --version", timeout=deadline.remaining(), max_chars=512)
+    if not version.ok or version.truncated or not re.fullmatch(r"rtk \S+", version.stdout.strip()):
+        return _error("Le binaire RTK trouve ne fournit pas une version valide.",
+                      available=False, path=binary)
+    observed = {"ok": True, "available": True, "path": binary, "version": version.stdout.strip()}
+    if include_gain:
+        gain = _sh(s, command + " gain --format json", timeout=deadline.remaining(), max_chars=16_000)
+        if not gain.ok or gain.truncated:
+            return {**observed, "ok": False, "error": "Statistiques RTK indisponibles ou tronquees."}
+        try:
+            stats = json.loads(gain.stdout)
+            if not isinstance(stats, dict):
+                raise ValueError("objet JSON attendu")
+        except ValueError:
+            return {**observed, "ok": False, "error": "Statistiques RTK JSON invalides."}
+        observed["gain"] = stats
+    return observed
 
 @outil(
     annotations=READ_ONLY,

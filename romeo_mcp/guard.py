@@ -286,6 +286,33 @@ def _unwrap(words: list[_Token], depth: int) -> list[list[_Token]]:
         elif head == "time":
             words = _options(args, {"-p", "-v", "-a", "-q", "--portability", "--verbose", "--append", "--quiet"},
                              {"-f", "-o", "--format", "--output"})
+        elif head == "rtk":
+            # RTK est une enveloppe, pas une permission d'executer cargo/pip
+            # sur le login. Les executeurs generiques opaques restent refuses.
+            index = 0
+            while index < len(args) and (args[index].value in {"--verbose", "--skip-env"}
+                                         or re.fullmatch(r"-v+", args[index].value)):
+                index += 1
+            args = args[index:]
+            if not args or args[0].value in {"--help", "-h", "--version", "-V"}:
+                return []
+            if args[0].dynamic:
+                _ambiguous()
+            subcommand = args[0].value
+            if subcommand == "bypass":
+                words = _options(args[1:], set(), set())
+                if words and any(c.isspace() for c in words[0].value):
+                    _ambiguous()
+            elif subcommand in {"read", "smart"}:
+                return [[_Token("cat"), *args[1:]]]
+            elif subcommand in {"gain", "recall", "rewrite", "config", "env", "wc", "help"}:
+                return [words]
+            elif subcommand in {"git", "gh", "glab", "ls", "tree", "find", "grep", "rg",
+                                 "ast-grep", "cargo", "go", "pip", "python", "python3", "uv",
+                                 "npm", "npx", "pnpm", "bun", "bunx", "deno", "curl", "wget"}:
+                words = args
+            else:
+                _ambiguous()
         else:
             return [words]
     _ambiguous()

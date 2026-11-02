@@ -35,7 +35,7 @@ et leur date de collecte.
 
 ## Utiliser les outils
 
-Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **113 fiches** par
+Le [catalogue Tools](Tools.md#outils-exposés) rassemble les **114 fiches** par
 catégorie. Chaque fiche contient une explication, les paramètres, un exemple
 JSON, les résultats attendus et des liens vers les outils associés.
 

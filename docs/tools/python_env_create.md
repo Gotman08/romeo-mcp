@@ -50,7 +50,7 @@ Le plan doit être soumettable, non expiré et de la bonne famille. Un plan déj
 
 [`python_env_prepare`](python_env_prepare.md) · [`plan_get`](plan_get.md) · [`job_status`](job_status.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L56) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L60) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
