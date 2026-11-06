@@ -15,7 +15,7 @@ Les anciens noms conservés dans la [section de migration](../Tools.md#migration
 | Catégorie | Fiches | Exemples |
 |---|---:|---|
 | [Profil et documentation](../Tools.md#profil-et-documentation) | 4 | [`tool_profile_get`](tool_profile_get.md) · [`tool_profile_set`](tool_profile_set.md) |
-| [Mise à jour du MCP](../Tools.md#mise-à-jour-du-mcp) | 5 | [`mcp_update_check`](mcp_update_check.md) · [`mcp_update_policy`](mcp_update_policy.md) |
+| [Mise à jour du MCP](../Tools.md#mise-à-jour-du-mcp) | 2 | [`mcp_update_check`](mcp_update_check.md) · [`mcp_update_status`](mcp_update_status.md) |
 | [Rapports GitHub du MCP](../Tools.md#rapports-github-du-mcp) | 5 | [`mcp_issue_report`](mcp_issue_report.md) · [`mcp_issue_policy_set`](mcp_issue_policy_set.md) |
 | [Cluster et ordonnancement](../Tools.md#cluster-et-ordonnancement) | 8 | [`romeo_status`](romeo_status.md) · [`romeo_software`](romeo_software.md) |
 | [Préparation et gestion des jobs](../Tools.md#préparation-et-gestion-des-jobs) | 13 | [`plan_get`](plan_get.md) · [`job_prepare`](job_prepare.md) |

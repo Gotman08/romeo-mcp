@@ -19,14 +19,21 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit
 import uuid
+import zipfile
 
 from . import __version__
 
 REPOSITORY = "Gotman08/romeo-mcp"
 API = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
+#: Seul ce workflow, execute depuis le tag de la release, peut signer une wheel.
+RELEASE_WORKFLOW = ".github/workflows/ci.yml"
 ORIGIN_ENV = "ROMEO_UPDATE_ORIGIN"
 DISPATCH_ENV = "ROMEO_UPDATE_DISPATCHED"
 MAX_ASSET = 50 * 1024 * 1024
+MAX_BUNDLE = 16 * 1024 * 1024
+MAX_ATTESTATIONS = 20
+LOCKS = Path(__file__).resolve().parent / "locks"
+WHEEL_LOCK = "romeo_mcp/locks/server.lock"
 SLOT = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+-[0-9a-f]{12}-[0-9a-f]{8}")
 
 
@@ -242,12 +249,15 @@ def _windows_run(arguments: list[str], env: dict) -> int:
             process.wait()
 
 
-def _request(url: str):
+def _request(url: str, *, attestation_storage: bool = False):
     response = urlopen(Request(url, headers={"Accept": "application/vnd.github+json",
                                             "User-Agent": "romeo-mcp-updater"}), timeout=10)
     destination = urlsplit(response.geturl())
-    if destination.scheme != "https" or not (destination.hostname in {"github.com", "api.github.com"}
-            or (destination.hostname or "").endswith(".githubusercontent.com")):
+    host = destination.hostname or ""
+    # Le contenu d'un bundle est signe : ce stockage n'a pas besoin d'etre de confiance.
+    if destination.scheme != "https" or not (host in {"github.com", "api.github.com"}
+            or host.endswith(".githubusercontent.com")
+            or (attestation_storage and host.endswith(".blob.core.windows.net"))):
         response.close()
         raise UpdateError("Redirection de telechargement hors de GitHub refusee.")
     return response
@@ -405,6 +415,103 @@ def _download(release: dict, destination: Path) -> None:
         raise UpdateError("L'empreinte ou la taille du telechargement ne correspond pas a la release.")
 
 
+def attestation_bundles(digest: str, repository: str = REPOSITORY) -> list[bytes]:
+    """Bundles publies pour une empreinte, sans leur accorder aucune confiance."""
+    url = f"https://api.github.com/repos/{repository}/attestations/sha256:{digest}"
+    try:
+        with _request(url) as response:
+            raw = response.read(MAX_BUNDLE + 1)
+        if len(raw) > MAX_BUNDLE:
+            raise UpdateError("Reponse d'attestations trop volumineuse.")
+        items = json.loads(raw)["attestations"]
+    except HTTPError as exc:
+        if exc.code == 404:
+            raise UpdateError("Aucune attestation publiee pour cette wheel : installation refusee.") from exc
+        raise UpdateError(f"Attestations indisponibles (HTTP {exc.code}) ; installation refusee.") from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise UpdateError("Attestations injoignables ; installation refusee.") from exc
+    except (ValueError, KeyError, TypeError) as exc:
+        raise UpdateError("Reponse d'attestations invalide ; installation refusee.") from exc
+    bundles = []
+    for item in items[:MAX_ATTESTATIONS] if isinstance(items, list) else ():
+        try:
+            if item.get("bundle"):
+                bundles.append(json.dumps(item["bundle"]).encode())
+            else:
+                with _request(item["bundle_url"], attestation_storage=True) as response:
+                    data = response.read(MAX_BUNDLE + 1)
+                if len(data) <= MAX_BUNDLE:
+                    bundles.append(data)
+        except (HTTPError, URLError, TimeoutError, OSError, AttributeError, KeyError, TypeError, ValueError, UpdateError):
+            # Un bundle illisible ne prouve rien ; le suivant peut etre valide.
+            continue
+    if not bundles:
+        raise UpdateError("Aucune attestation lisible pour cette wheel : installation refusee.")
+    return bundles
+
+
+def install_locked(python: Path, lock: Path, wheel: Path | None = None) -> None:
+    """Chaque dependance doit correspondre a une empreinte du verrou, sans resolution."""
+    base = [str(python), "-I", "-m", "pip", "install", "--disable-pip-version-check", "--no-input"]
+    _run([*base, "--require-hashes", "--only-binary", ":all:", "--no-deps", "-r", str(lock)])
+    if wheel is not None:
+        _run([*base, "--no-deps", "--no-index", str(wheel)])
+
+
+def verifier_python(target: Installation) -> Path:
+    """Venv dedie : Sigstore et ses dependances restent hors du serveur MCP."""
+    lock = LOCKS / "verifier.lock"
+    directory = target.root / "verifier" / hashlib.sha256(lock.read_bytes()).hexdigest()[:16]
+    python = directory / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    ready = directory / "ready"
+    if not ready.is_file():
+        shutil.rmtree(directory, ignore_errors=True)
+        directory.parent.mkdir(parents=True, exist_ok=True)
+        _run([str(target.python), "-I", "-m", "venv", str(directory)])
+        install_locked(python, lock)
+        ready.write_text("ok\n", encoding="utf-8")
+    return python
+
+
+def verify_attestation(target: Installation, digest: str, ref: str, *,
+                       repository: str = REPOSITORY, workflow: str = RELEASE_WORKFLOW) -> dict:
+    """Refuse une empreinte sans provenance signee par ce workflow, sur ce tag precis."""
+    identity = f"https://github.com/{repository}/{workflow}@{ref}"
+    bundles = attestation_bundles(digest, repository)
+    python = verifier_python(target)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("ROMEO_")}
+    with tempfile.TemporaryDirectory(dir=target.root, prefix="attestations-") as temporary:
+        paths = []
+        for index, data in enumerate(bundles):
+            path = Path(temporary) / f"bundle-{index}"
+            path.write_bytes(data)
+            paths.append(str(path))
+        checker = str(Path(__file__).with_name("attestation_check.py"))
+        try:
+            output = _run([str(python), "-I", checker, "--digest", digest, "--identity", identity, *paths],
+                          env=env, timeout=180)
+        except UpdateError as exc:
+            raise UpdateError(f"Attestation Sigstore refusee pour {identity} ; installation annulee.\n{exc}") from exc
+    try:
+        result = json.loads(output)
+    except ValueError as exc:
+        raise UpdateError("Reponse du verificateur d'attestations illisible ; installation annulee.") from exc
+    if result.get("ok") is not True or result.get("sha256") != digest or result.get("identity") != identity:
+        raise UpdateError("Attestation Sigstore non confirmee ; installation annulee.")
+    return result
+
+
+def extract_wheel_lock(wheel: Path, destination: Path) -> Path:
+    """Le verrou vient de la wheel attestee, jamais d'un fichier distant separe."""
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            data = archive.read(WHEEL_LOCK)
+    except (KeyError, OSError, zipfile.BadZipFile) as exc:
+        raise UpdateError("Wheel sans verrou de dependances : installation refusee.") from exc
+    destination.write_bytes(data)
+    return destination
+
+
 def apply_release(target: Installation, release: dict, before: dict, *, progress=None) -> dict:
     """Sous verrou ; aucun fichier de l'environnement actif n'est remplace."""
     validate_release(release)
@@ -421,13 +528,16 @@ def apply_release(target: Installation, release: dict, before: dict, *, progress
             progress("download")
         _download(release, wheel)
         if progress:
+            progress("attestation")
+        attestation = verify_attestation(target, release["sha256"], "refs/tags/" + release["tag"])
+        lock = extract_wheel_lock(wheel, candidate / "server.lock")
+        if progress:
             progress("environment")
         _run([str(target.python), "-I", "-m", "venv", str(candidate / "venv")])
         python = target.executable(slot)
         if progress:
             progress("install")
-        _run([str(python), "-I", "-m", "pip", "install", "--disable-pip-version-check",
-              "--no-input", str(wheel)])
+        install_locked(python, lock, wheel)
         if progress:
             progress("verify")
         if health_check(python) != release["version"]:
@@ -437,7 +547,8 @@ def apply_release(target: Installation, release: dict, before: dict, *, progress
             raise UpdateError("La version active a change pendant la preparation.")
         state = {**before, "schema": 1, "active": slot, "previous": before.get("active"),
                  "can_rollback": True, "base_fingerprint": before.get("base_fingerprint") or _fingerprint(target.package)}
-        _write_json(candidate / "release.json", {k: v for k, v in release.items() if k != "notes"})
+        _write_json(candidate / "release.json", {**{k: v for k, v in release.items() if k != "notes"},
+                                                 "attestation": attestation})
         if progress:
             progress("select")
         _write_json(target.root / "state.json", state)
@@ -492,7 +603,23 @@ def _confirm(yes: bool, label: str) -> bool:
         return False
 
 
-def command(*, check_only: bool = False, revert: bool = False, yes: bool = False, json_output: bool = False) -> None:
+def configure_automatic(enabled: bool) -> None:
+    """Accord donne hors bande : seul un terminal interactif peut l'activer."""
+    from .update_service import configure
+    if enabled:
+        if not sys.stdin.isatty():
+            raise UpdateError("L'accord automatique exige un terminal interactif, sans --yes.")
+        if not _confirm(False, "Installer automatiquement les releases attestees au demarrage du serveur ?"):
+            print("Operation annulee ; accord inchange.")
+            return
+    print(configure(enabled, True)["message"])
+
+
+def command(*, check_only: bool = False, revert: bool = False, yes: bool = False, json_output: bool = False,
+            auto: str | None = None) -> None:
+    if auto is not None:
+        configure_automatic(auto == "on")
+        return
     if check_only:
         result = check()
         if json_output:

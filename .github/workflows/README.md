@@ -39,9 +39,11 @@ nécessaire.
 ## Publication des releases
 
 Un tag stable `vX.Y.Z` ajoute le job `release`, après la réussite des quatre
-combinaisons de tests. Ce job dispose seul de `contents: write`. Il construit
-les distributions et vérifie leur cohérence avec les versions du code et le
-changelog grâce à [prepare_release.py](../../tools/prepare_release.py).
+combinaisons de tests. Ce job dispose seul de `contents: write`, `id-token: write`
+et `attestations: write`. Il construit les distributions et vérifie leur cohérence
+avec les versions du code, le changelog et les verrous de dépendances grâce à
+[prepare_release.py](../../tools/prepare_release.py). Il atteste ensuite ces fichiers :
+le client refuse d’installer une wheel sans cette attestation.
 
 La release est créée en brouillon. La wheel, l’archive source et `SHA256SUMS`
 sont chargés avant sa publication. Si cette étape échoue, le brouillon peut

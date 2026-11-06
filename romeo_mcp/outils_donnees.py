@@ -16,11 +16,11 @@ from pydantic import Field
 from . import files
 from .resource_locks import ResourceLease
 from .remote_reads import LIST_DIRECTORY, READ_TEXT
-from .remote_paths import DIRECTORY_TARGET, directory_command, roots_for
+from .remote_paths import DIRECTORY_TARGET, directory_command, ensure_private_folder, roots_for
 from .validation import validate_script
 from .file_operations import check_script_paths, create_file, replace_file, prepare_secret_file
 from .plans import submit_prepared
-from .guard import GuardError, check_path
+from .guard import GuardError, check_path, check_project_write
 from .ssh import SSHError, SSHTimeout, session
 from .noyau import MUTATING, DESTRUCTIVE, READ_ONLY, _error, _sh, outil
 
@@ -169,6 +169,8 @@ def _upload_to_romeo(local_path, remote_path, verify):
     s = session()
     try:
         target = check_path(remote_path, s.home, s.scratch, s.path_aliases)
+        check_project_write(target, s)
+        ensure_private_folder(s, target)
         with files.confined_paths(roots_for(s), verify):
             resultat = files.upload(s.host, local_path, target)
     except (GuardError, SSHError) as exc:

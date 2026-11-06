@@ -24,6 +24,9 @@ class UpdateToolTests(TemporaryInstallation):
         os.environ.pop("ROMEO_AUTO_UPDATE", None)
         patch.object(u, "latest_release", return_value=self.release).start()
         patch.object(u, "installation", return_value=self.target).start()
+        # L'attestation reelle est couverte par smoke_update_chain_live.py.
+        patch.object(u, "verify_attestation", return_value={"ok": True}).start()
+        patch.object(u, "extract_wheel_lock", return_value=Path("server.lock")).start()
 
     def launch(self, **kwargs):
         with patch.object(service.subprocess, "Popen", return_value=Mock(pid=123)):
@@ -72,6 +75,36 @@ class UpdateToolTests(TemporaryInstallation):
             self.assertTrue(result["saved_automatic"])
         service.configure(False, True, target=self.target)
         self.assertFalse(service.policy(self.target)["automatic_enabled"])
+
+    def test_agreement_saved_by_a_former_model_tool_is_not_carried_over(self):
+        u._write_json(self.target.root / "policy.json", {"schema": 1, "automatic": True, "held_version": None})
+        policy = service.policy(self.target)
+        self.assertFalse(policy["automatic_enabled"])
+        self.assertEqual(policy["policy_source"], "legacy_ignored")
+        with patch.object(service, "start") as start:
+            service.startup(self.target)
+            start.assert_not_called()
+        self.assertTrue(service.configure(True, True, target=self.target)["automatic_enabled"])
+        self.assertEqual(service.policy(self.target)["policy_source"], "saved")
+
+    def test_real_cli_refuses_automatic_agreement_without_a_terminal(self):
+        env = {**os.environ, "PYTHONPATH": str(ROOT), "ROMEO_UPDATES_DIR": str(self.root / "cli-updates"),
+               "ROMEO_CONFIG": str(self.root / "unused-config.json"), "ROMEO_UPDATE_CHECK": "0", "PYTHONIOENCODING": "utf-8",
+               u.ORIGIN_ENV: "", u.DISPATCH_ENV: ""}
+        command = [sys.executable, "-m", "romeo_mcp", "update"]
+        # Un programme qui ecrit la reponse sur un tube ne remplace pas un utilisateur.
+        for extra in (["--auto", "on"], ["--auto", "on", "--yes"]):
+            refused = subprocess.run([*command, *extra], env=env, cwd=self.root, input="o\n",
+                                     capture_output=True, text=True, encoding="utf-8", timeout=60)
+            self.assertNotEqual(refused.returncode, 0, refused.stdout)
+            self.assertIn("terminal interactif", refused.stdout + refused.stderr)
+        policies = list((self.root / "cli-updates").rglob("policy.json")) if (self.root / "cli-updates").exists() else []
+        self.assertEqual(policies, [])
+        off = subprocess.run([*command, "--auto", "off"], env=env, cwd=self.root, stdin=subprocess.DEVNULL,
+                             capture_output=True, text=True, encoding="utf-8", timeout=60)
+        self.assertEqual(off.returncode, 0, off.stderr)
+        saved = next((self.root / "cli-updates").rglob("policy.json"))
+        self.assertEqual(json.loads(saved.read_text(encoding="utf-8"))["set_by"], "terminal")
 
     def test_no_authorization_or_changed_announcement_does_not_launch(self):
         with patch.object(service.subprocess, "Popen") as spawn:
@@ -192,20 +225,6 @@ class UpdateToolTests(TemporaryInstallation):
 
     real_latest_release = staticmethod(u.latest_release)
 
-    def test_rollback_worker_preserves_environment_only_automatic_authorization(self):
-        self.prepared()
-        with patch.dict(os.environ, ROMEO_AUTO_UPDATE="1"), \
-             patch.object(service.subprocess, "Popen", return_value=Mock(pid=123)) as spawn:
-            result = service.start(True, revert=True, target=self.target)
-            child_env = spawn.call_args.kwargs["env"]
-            self.assertEqual(child_env["ROMEO_AUTO_UPDATE"], "1")
-            directory = service._operation_path(self.target, result["operation_id"])
-            with patch.dict(os.environ, child_env, clear=True), \
-                 patch.object(u, "health_check", return_value="1.0.0"):
-                self.assertEqual(worker.run(directory / "plan.json"), 0)
-            self.assertEqual(service.policy(self.target)["held_version"], "8.0.0")
-            self.assertTrue(service.policy(self.target)["automatic_enabled"])
-
     def test_automatic_start_only_with_saved_authorization_and_failure_backoff(self):
         with patch.object(service, "start") as start:
             service.startup(self.target)
@@ -258,7 +277,7 @@ class UpdateToolTests(TemporaryInstallation):
 
 
 class UpdateProtocolTests(TemporaryInstallation):
-    def test_real_stdio_model_visibility_and_persistent_authorization(self):
+    def test_real_stdio_model_can_read_but_never_install_or_authorize(self):
         from mcp import ClientSession, StdioServerParameters, stdio_client
         from romeo_mcp import __version__
         from romeo_mcp.profiles import ESSENTIAL_TOOLS
@@ -274,7 +293,9 @@ class UpdateProtocolTests(TemporaryInstallation):
             async with stdio_client(params) as (read, write):
                 async with ClientSession(read, write) as client:
                     init = await client.initialize()
-                    self.assertIn("mcp_update_check", init.instructions)
+                    self.assertIn("python -m romeo_mcp update", init.instructions)
+                    self.assertNotIn("mcp_update_start", init.instructions)
+                    self.assertNotIn("mcp_update_policy", init.instructions)
                     tools = (await client.list_tools()).tools
                     self.assertEqual({t.name for t in tools}, ESSENTIAL_TOOLS)
                     result = await client.call_tool("mcp_update_check", {})
@@ -282,16 +303,20 @@ class UpdateProtocolTests(TemporaryInstallation):
                     self.assertTrue(value["update_available"])
                     self.assertEqual(value["running_version"], __version__)
                     self.assertEqual(value["latest_version"], "9.0.0")
-                    result = await client.call_tool("mcp_update_start", {})
-                    self.assertFalse(json.loads(result.content[0].text)["ok"])
-                    result = await client.call_tool("mcp_update_policy", {"automatic": True, "confirm": True})
-                    self.assertTrue(json.loads(result.content[0].text)["saved_automatic"])
+                    self.assertIn("python -m romeo_mcp update", value["next_step"])
                     result = await client.call_tool("mcp_update_status", {})
                     self.assertIsNone(json.loads(result.content[0].text)["operation"])
                     await client.call_tool("tool_profile_set", {"profile": "expert"})
-                    self.assertEqual({t.name for t in (await client.list_tools()).tools}, OUTILS_ATTENDUS)
+                    catalog = {t.name for t in (await client.list_tools()).tools}
+                    self.assertEqual(catalog, OUTILS_ATTENDUS)
+                    for removed, arguments in (("mcp_update_start", {"confirm": True}),
+                                               ("mcp_update_policy", {"automatic": True, "confirm": True}),
+                                               ("mcp_update_rollback", {"confirm": True})):
+                        self.assertNotIn(removed, catalog)
+                        self.assertTrue((await client.call_tool(removed, arguments)).is_error)
         asyncio.run(exercise())
-        self.assertTrue(u._read_json(target.root / "policy.json")["automatic"])
+        self.assertFalse((target.root / "policy.json").exists())
+        self.assertFalse((target.root / "operation.json").exists())
 
 
 if __name__ == "__main__":

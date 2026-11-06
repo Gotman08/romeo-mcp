@@ -8,11 +8,39 @@ rediriger l'operation. Aucun module du paquet n'est requis sur le cluster.
 import json
 import shlex
 
-from .guard import allowed_roots
+from .guard import GuardError, allowed_roots, personal_project_folder
 
 
 def roots_for(connection):
     return allowed_roots(connection.home, connection.scratch, connection.path_aliases)
+
+
+#: Attend `d` ; ne suit aucun lien et ne modifie qu'un dossier du compte courant.
+LOCK_FOLDER = r'''if [ -L "$d" ]; then echo 'lien symbolique'; exit 3; fi
+mkdir -m 700 -- "$d" 2>/dev/null
+[ -d "$d" ] || { echo 'creation impossible'; exit 4; }
+[ -O "$d" ] || { stat -c 'proprietaire %U' -- "$d"; exit 5; }
+chmod u=rwx,g=,o=,g+s -- "$d" && stat -c %a -- "$d"'''
+
+
+def ensure_private_folder(connection, path):
+    """Cree si besoin le dossier personnel du login et le reserve a son compte.
+
+    Appele avant chaque ecriture : un dossier rouvert entre-temps est refermé.
+    `g+s` conserve le groupe du projet, seul a disposer d'un quota sous /project.
+    """
+    folder = personal_project_folder(path, connection)
+    if folder is None:
+        return
+    result = connection.run("d={}\n{}".format(shlex.quote(folder), LOCK_FOLDER), timeout=25, max_chars=2000)
+    observed = result.stdout.strip()
+    if not result.ok or observed != "2700":
+        raise GuardError(
+            "dossier personnel {} non reserve a ton compte ({}). Aucune ecriture effectuee. "
+            "Il doit etre un vrai dossier t'appartenant : s'il appartient a un autre compte, "
+            "demande-lui ou a l'administrateur de te le transferer ou de le retirer."
+            .format(folder, observed[:200] or "aucune reponse")
+        )
 
 
 CONFINED_PATHS = r'''

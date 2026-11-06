@@ -100,12 +100,9 @@ Les préparations enregistrent un plan local, valable 24 heures, puis l’action
 | Outil | Rôle | Profils |
 |---|---|---|
 | [`mcp_update_check`](tools/mcp_update_check.md) | Détecter une release et présenter les versions exécutée et sélectionnée. | Tous |
-| [`mcp_update_policy`](tools/mcp_update_policy.md) | Conserver l'autorisation automatique sans la redemander à chaque version. | Tous |
-| [`mcp_update_start`](tools/mcp_update_start.md) | Préparer la release vérifiée dans un environnement séparé. | Tous |
 | [`mcp_update_status`](tools/mcp_update_status.md) | Suivre la progression et relire le résultat après reconnexion. | Tous |
-| [`mcp_update_rollback`](tools/mcp_update_rollback.md) | Revenir à la version précédente après vérification. | Tous |
 
-Voir le [parcours automatique et les limites de l'activation](updates.md#mise-à-jour-par-le-modèle).
+Ces outils lisent seulement l’état des versions : l’installation se fait [depuis le terminal](updates.md#les-trois-commandes).
 
 ### Rapports GitHub du MCP
 

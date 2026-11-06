@@ -97,7 +97,7 @@ la provenance et les limites de cette copie. Le
 - [Reproductibilité](reproducibility.md) : capture des informations d’un job,
   empreintes des entrées, export privé, dates d’observation et données manquantes.
 - [Visuels](assets/README.md) : schéma de fonctionnement, bannière et attributions.
-- [Mises à jour](updates.md) : outils MCP, accord automatique durable, progression, activation et retour arrière.
+- [Mises à jour](updates.md) : installation depuis le terminal, attestations Sigstore, dépendances épinglées, activation et retour arrière.
 - [Tableau de bord terminal](terminal.md) : interface Ratatui facultative, démonstration et traces locales datées.
 - [Énergie et carbone](energy.md) : compteurs attribuables, valeurs inconnues et facteurs RTE datés.
 

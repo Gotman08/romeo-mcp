@@ -25,10 +25,9 @@ processus. Si `restart_required=true`, reconnecter le MCP ou redémarrer le
 client, puis vérifier la version exécutée. Un ancien résultat réussi ne
 prouve pas que cette même version est encore sélectionnée.
 
-Voir [`mcp_update_start`](mcp_update_start.md),
-[`mcp_update_rollback`](mcp_update_rollback.md) et le
-[code](../../romeo_mcp/update_service.py).
+Voir [`mcp_update_check`](mcp_update_check.md), le
+[guide des mises à jour](../updates.md) et le [code](../../romeo_mcp/update_service.py).
 
-[Code de l’outil](../../romeo_mcp/outils_updates.py#L19)
+[Code de l’outil](../../romeo_mcp/outils_updates.py#L14)
 
 Tous les paramètres sont facultatifs : `{}` consulte la dernière opération de mise à jour.

@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 
 from mcp import ClientSession, StdioServerParameters, stdio_client
 from romeo_mcp.config import setting
+from romeo_mcp.profiles import ESSENTIAL_TOOLS
 from romeo_mcp.ssh import RomeoSession
 
 
@@ -62,7 +63,7 @@ async def main(resume=""):
                     return payload
 
                 profile = await call("tool_profile_get", {})
-                assert profile["profile"] == "essential" and profile["count"] == 22
+                assert profile["profile"] == "essential" and profile["count"] == len(ESSENTIAL_TOOLS)
                 spec = {"name": name, "command": "python3 calculation.py", "arch": "x64cpu",
                         "nodes": 1, "cpus_per_task": 1, "mem_gb": 1, "time_limit": "1m",
                         "workdir": remote, "data_files": [remote + "/input.txt"]}

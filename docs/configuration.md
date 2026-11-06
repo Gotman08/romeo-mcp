@@ -6,6 +6,7 @@
 <summary>Sommaire de cette page</summary>
 
 - [Votre profil ROMEO](#votre-profil-romeo)
+- [Espaces projet](#espaces-projet)
 - [Profils d’outils](#profils-doutils)
 - [Diagnostic en lecture seule](#diagnostic-en-lecture-seule)
 - [Autres clients stdio](#autres-clients-stdio)
@@ -46,6 +47,7 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_MCP_DB` | `~/.romeo-mcp/jobs.db` | Registre privé des jobs et scripts soumis |
 | `ROMEO_SCRATCH`, `ROMEO_HOME` | Découverts par SSH | Racines distantes ; permettent aussi une simulation hors ligne |
 | `ROMEO_DOCS_DIR` | Corpus dans le paquet | Corpus externe facultatif ; chemin relatif à la racine d’installation |
+| `ROMEO_PROJECT_DIRS` | Aucune | Dossiers partagés admis à la racine d’un espace projet : noms ou motifs séparés par des virgules, en plus des dossiers de cours |
 
 Les seuils locaux ne changent pas les droits Slurm. La limite effective peut
 venir du projet, de l’utilisateur, de la partition ou de la QOS. Les plafonds
@@ -56,6 +58,39 @@ Pour travailler sur plusieurs projets, utilisez des profils externes et une
 entrée MCP distincte par profil avec `ROMEO_CONFIG`. Une seule instance charge
 un seul profil. `configure` enregistre un fichier mais ne modifie pas les
 variables déjà définies dans le client.
+
+## Espaces projet
+
+Sous `/project/<code>` et `/gpfs/projet/<code>`, le serveur applique la même règle
+à chaque utilisateur, d’après le login de sa session SSH :
+
+- `/project/<code>/<login>` est le dossier personnel. Le serveur le crée s’il
+  manque et le ferme en mode `2700` avant chaque écriture : les autres comptes ne
+  peuvent ni le lire ni le modifier. Le bit `setgid` garde le groupe du projet,
+  seul à disposer d’un quota sous `/project`.
+- Les dossiers de cours (`chps[0-9]*`, `maqao`) restent partagés.
+  `ROMEO_PROJECT_DIRS` en ajoute d’autres.
+- Toute autre écriture est refusée : racine du projet, dossier d’un autre login
+  ou nouveau dossier. La lecture reste libre.
+
+Le contrôle couvre `file_create`, `file_replace`, `upload_to_romeo`, les transferts
+montants et les plans de jobs (dossier de travail, checkpoints, copies et
+environnements Python). `login_command_run` applique la même règle à ses arguments
+littéraux et refuse aussi `rm`, `rmdir`, `unlink`, `chmod`, `chown`, `chgrp` et
+`find -delete` dans ces espaces : ces opérations restent à faire depuis un terminal.
+
+Si le dossier personnel existe mais appartient à un autre compte, le serveur
+n’y écrit rien et nomme ce propriétaire : lui seul ou l’administrateur peut le
+transférer ou le retirer.
+
+Pour ranger un projet : inspecter les propriétaires et les jobs actifs, faire
+valider une liste source → destination, déplacer avec `mv -n`, puis chercher les
+anciens chemins absolus dans les fichiers déplacés. Ne déplacer que ce qui
+appartient à l’utilisateur.
+
+Limites : les commandes d’un job ne sont pas analysées, les administrateurs du
+cluster gardent l’accès, et un membre du projet peut renommer le dossier tant que
+la racine du projet n’a pas de bit `sticky`. Il n’en lit pas pour autant le contenu.
 
 ## Profils d’outils
 
