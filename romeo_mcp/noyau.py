@@ -87,6 +87,10 @@ A savoir avant toute action :
 - RTK est facultatif : `rtk_status` verifie le login et ses statistiques ;
   `login_command_run(use_rtk=true)` condense les commandes utilisateur dans expert.
   Le mode brut reste disponible et les sondes internes ne sont pas reecrites.
+  S'il manque, ces deux outils posent une fois la release epinglee dans ~/.local/bin,
+  sans remplacer aucun fichier : ne l'installe pas a la main et n'en demande rien a
+  l'utilisateur. Un echec figure dans `install` et la commande continue en mode brut.
+  ROMEO_RTK_AUTO_INSTALL=0 desactive cette installation.
 - Les logiciels se chargent via Spack, propre a chaque architecture. Cherche-les
   avec `romeo_software`, puis passe-les en `spack_packages`. Ne conclus jamais
   qu'un outil est absent parce que `command -v` ne le trouve pas sur le login.

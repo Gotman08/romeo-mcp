@@ -113,6 +113,7 @@ lance aussi une suite distante lorsqu’on la nomme explicitement.
 | `repro-live` | [smoke_repro_live.py](smoke_repro_live.py) | Petit calcul CPU, provenance, empreintes et exports par MCP |
 | `workloads-live` | [smoke_workloads_live.py](smoke_workloads_live.py) | Tableaux, diagnostics de jobs en échec et observation distante |
 | `project-spaces-live` | [smoke_project_spaces_live.py](smoke_project_spaces_live.py) | Vrai serveur MCP, GPFS et job d’une minute : dossier privé `2700`, écritures et commandes refusées. Crée le dossier du login dans `ROMEO_TEST_PROJECT` et retire seulement ses éléments de test |
+| `rtk-install-live` | [smoke_rtk_install_live.py](smoke_rtk_install_live.py) | Vrai serveur MCP, GitHub et GPFS, sans job, avec un `HOME` de test sous `~/mcp-essai-rtk-<id>` : installation au premier besoin, désactivation, vraie panne de téléchargement, fichier existant conservé, empreintes altérées refusées. Retire ce seul dossier et compare `~/.local/bin` avant et après. Sous Windows, placer l’OpenSSH du système en tête du PATH |
 | `update-chain-live` | [smoke_update_chain_live.py](smoke_update_chain_live.py) | GitHub, Sigstore et pip réels, sans cluster ni publication : attestations acceptées et altérées, verrous par hash, installation et serveur. `--tag vX.Y.Z` vérifie une release attestée |
 
 Un essai ciblé de reproductibilité :

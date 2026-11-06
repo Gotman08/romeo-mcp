@@ -7,6 +7,11 @@ sa connexion SSH. Les contrôles de commandes réduisent les erreurs courantes ;
 ils ne constituent pas un environnement isolé pour du code hostile. Autorisez
 les actions mutantes de l’assistant selon vos besoins.
 
+Au premier besoin, le MCP installe RTK dans votre home sur le login, depuis une
+release vérifiée par une empreinte fixée dans ce dépôt. Voir
+[RTK sur le login](docs/rtk.md) ; `ROMEO_RTK_AUTO_INSTALL=0` désactive cette
+installation.
+
 **Sur cette page :** [Fichiers privés](#fichiers-privés) · [Signaler un problème](#signaler-un-problème)
 
 ## Fichiers privés
