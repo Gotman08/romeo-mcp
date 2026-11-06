@@ -12,7 +12,7 @@ _Créer un fichier texte sans écraser une cible._
 
 ## Utilisation
 
-Publie atomiquement un nouveau fichier sur ROMEO avec les permissions 600. Le répertoire parent doit déjà exister.
+Publie atomiquement un nouveau fichier sur ROMEO avec les permissions 600. Le répertoire parent doit déjà exister, sauf dans votre dossier d’un [espace projet](../configuration.md#espaces-projet), où il est créé.
 
 ## Paramètres
 

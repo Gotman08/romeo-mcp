@@ -48,10 +48,10 @@ Acces au supercalculateur ROMEO (URCA), ordonnance par SLURM.
 
 A savoir avant toute action :
 
-- Espaces projet : /project/<code> ne contient que des dossiers de cours (chps*,
-  maqao...) et un dossier par login. Ecris dans /project/<code>/<login> (ton login
-  SSH) ou le scratch : les outils refusent la racine et les autres dossiers, la
-  lecture reste libre. Le MCP cree ton dossier en mode 700, reserve a ton compte.
+- Espaces projet : lecture libre partout, y compris les cours (chps*, maqao...).
+  Ecris seulement dans /project/<code>/<login> (ton login SSH) ou le scratch. Pour
+  travailler sur un cours, lis-le a sa place et ecris dans <login>/<cours>, cree au
+  besoin. Le MCP cree ton dossier en mode 700, reserve a ton compte.
   Pour ranger : inspecte (proprietaires, jobs actifs), propose source -> destination,
   attends l'accord, puis `mv -n`. Jamais de rm, chmod ou chown ; ne touche pas
   aux fichiers des autres.

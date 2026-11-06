@@ -66,12 +66,19 @@ class WriteRuleTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(GuardError):
                 guard.check_project_write(path, connection)
 
-    def test_course_and_declared_folders_stay_shared(self):
+    def test_courses_are_read_only_and_the_refusal_names_the_personal_copy(self):
         connection = SimpleNamespace(user="alice")
-        for path in ("/project/demo/chps0903/a", "/project/demo/chps0904", "/project/demo/maqao/a"):
-            guard.check_project_write(path, connection)
-        with self.assertRaises(GuardError):
-            guard.check_project_write("/project/demo/chps/a", connection)
+        for path, copy in (("/project/demo/chps0903/tp/a.c", "/project/demo/alice/chps0903/tp/a.c"),
+                           ("/project/demo/chps0904", "/project/demo/alice/chps0904"),
+                           ("/project/demo/maqao/a", "/project/demo/alice/maqao/a")):
+            with self.subTest(path=path), self.assertRaisesRegex(GuardError, copy):
+                guard.check_project_write(path, connection)
+        guard.check_project_write("/project/demo/alice/chps0903/tp/a.c", connection)
+        self.assertEqual(guard.check_path("/project/demo/chps0903/tp/a.c", "/home/alice", "/scratch_p/alice"),
+                         "/project/demo/chps0903/tp/a.c")
+
+    def test_only_declared_folders_are_shared(self):
+        connection = SimpleNamespace(user="alice")
         with self.assertRaises(GuardError):
             guard.check_project_write("/project/demo/commun/a", connection)
         with patch.dict(os.environ, ROMEO_PROJECT_DIRS=" commun , labo-* "):
@@ -103,7 +110,11 @@ class PrivateFolderTests(unittest.TestCase):
         self.assertEqual(connection.commands, [])
         remote_paths.ensure_private_folder(connection, "/project/demo/alice/a/b")
         self.assertEqual(len(connection.commands), 1)
-        self.assertTrue(connection.commands[0].startswith("d=/project/demo/alice\n"))
+        self.assertTrue(connection.commands[0].startswith("d=/project/demo/alice\np=/project/demo/alice/a\n"))
+        remote_paths.ensure_private_folder(connection, "/project/demo/alice/b")
+        self.assertTrue(connection.commands[1].startswith("d=/project/demo/alice\np=''\n"))
+        remote_paths.ensure_private_folder(connection, "/project/demo/alice")
+        self.assertTrue(connection.commands[2].startswith("d=/project/demo/alice\np=''\n"))
 
     def test_any_other_answer_refuses_and_names_the_cause(self):
         for lock, needle in ((Result(5, "proprietaire rmadmin\n", 0), "rmadmin"), (Result(3, "lien symbolique\n", 0), "lien"),
@@ -126,6 +137,11 @@ class PrivateFolderTests(unittest.TestCase):
             created.chmod(0o755)
             self.assertEqual(lock(created).stdout.strip(), "2700")
             self.assertEqual(stat.S_IMODE(created.stat().st_mode), 0o2700)
+            nested = created / "chps0903" / "tp"
+            with_parent = subprocess.run(["bash", "-c", "d={}\np={}\n{}".format(created, nested, remote_paths.LOCK_FOLDER)],
+                                         capture_output=True, text=True)
+            self.assertEqual(with_parent.stdout.strip(), "2700")
+            self.assertTrue(nested.is_dir())
             (root / "lien").symlink_to(created)
             refused = lock(root / "lien")
             self.assertEqual(refused.returncode, 3)
@@ -205,6 +221,8 @@ class LoginCommandTests(unittest.TestCase):
         self.assertEqual(self.written("touch a", "/project/demo/alice"), ["/project/demo/alice/a"])
         self.assertEqual(self.written("echo x > a", "/project/demo/alice"), ["/project/demo/alice/a"])
         self.assertEqual(self.written("touch /scratch_p/alice/a"), [])
+        self.assertEqual(self.written("cp -r /project/demo/chps0903/tp /project/demo/alice/chps0903/"),
+                         ["/project/demo/alice/chps0903"])
 
     def test_tidying_moves_root_items_into_the_personal_folder(self):
         self.assertEqual(self.written("mv -n forest-1 forest-*.zip alice/forest/", "/project/demo"),
@@ -214,7 +232,9 @@ class LoginCommandTests(unittest.TestCase):
     def test_moves_never_reach_other_folders_or_kept_ones(self):
         for command in ("mv /project/demo/forest-1 /project/demo/bob/", "mv /project/demo/forest-1 /project/demo/rangement",
                         "mv /project/demo/bob/a /project/demo/alice/", "mv /project/demo/chps0903 /project/demo/alice/",
-                        "mv /project/demo/alice /tmp/a", "mv /project/demo /tmp/a", "mv * alice/"):
+                        "mv /project/demo/alice /tmp/a", "mv /project/demo /tmp/a", "mv * alice/",
+                        "mv /project/demo/chps0903/tp /project/demo/alice/", "cp /tmp/a /project/demo/chps0903/a",
+                        "touch /project/demo/maqao/a"):
             with self.subTest(command=command), self.assertRaises(GuardError):
                 self.written(command, "/project/demo")
 
@@ -298,10 +318,10 @@ class JobPlanTests(unittest.TestCase):
 
     def test_every_written_folder_is_checked_at_preparation(self):
         connection = FakeConnection()
-        self.assertTrue(self.prepare(connection, workdir="/project/demo/alice/run")["ok"])
-        self.assertTrue(self.prepare(connection, workdir="/project/demo/chps0903/run")["ok"])
+        self.assertTrue(self.prepare(connection, workdir="/project/demo/alice/chps0903/run")["ok"])
         self.assertTrue(self.prepare(connection)["ok"])
         for fields in ({"workdir": "/project/demo"}, {"workdir": "/project/demo/bob/run"},
+                       {"workdir": "/project/demo/chps0903/run"},
                        {"checkpoint_dir": "/project/demo/ckpt"},
                        {"details": {"env_path": "/project/demo/venv"}}):
             with self.subTest(fields=fields), self.assertRaisesRegex(GuardError, "ecriture refusee"):
@@ -348,6 +368,7 @@ class VisibilityTests(unittest.TestCase):
         self.assertLess(end, 1000)
         self.assertIn("mode 700", noyau.INSTRUCTIONS[:end])
         self.assertIn("mv -n", noyau.INSTRUCTIONS[:end])
+        self.assertIn("<login>/<cours>", noyau.INSTRUCTIONS[:end])
 
     def test_cheatsheet_describes_the_rule(self):
         from romeo_mcp.cluster import cheatsheet

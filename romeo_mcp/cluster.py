@@ -333,9 +333,9 @@ def cheatsheet() -> str:
         "",
         "- `$HOME` : code et sources.",
         "- `/scratch_p/$USER` : espace de travail des jobs, optimise pour les calculs.",
-        "- `/project/<code_projet>` : espace partage de l'equipe, limite aux dossiers de",
-        "  cours et a un dossier par login. `/project/<code_projet>/$USER` est reserve a",
-        "  ton compte (mode 700) ; les outils refusent d'ecrire ailleurs dans le projet.",
+        "- `/project/<code_projet>` : espace partage de l'equipe, lisible partout, cours compris.",
+        "  Les outils n'ecrivent que dans `/project/<code_projet>/$USER`, reserve a ton compte",
+        "  (mode 700). Un travail sur un cours va dans `$USER/<cours>`.",
         "- `/apps` : installations systeme, en lecture seule.",
         "",
         "Quotas par defaut : {} Go souples / {} Go stricts ; les valeurs".format(

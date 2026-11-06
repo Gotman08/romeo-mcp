@@ -18,7 +18,7 @@ encore à cette version avec son ancien contrôle SHA-256.
 
 ### Espaces projet
 
-- Sous `/project/<code>`, les outils n’écrivent plus que dans le dossier du login SSH, les dossiers de cours et ceux déclarés par `ROMEO_PROJECT_DIRS`. La lecture reste libre.
+- Sous `/project/<code>`, les outils n’écrivent plus que dans le dossier du login SSH et ceux déclarés par `ROMEO_PROJECT_DIRS`. La lecture reste libre partout : un travail sur un cours lit le dossier du cours et écrit dans `<login>/<cours>`, créé au besoin.
 - Le dossier personnel est créé et refermé en mode `2700` avant chaque écriture. S’il appartient à un autre compte, rien n’est écrit et le refus nomme son propriétaire.
 - `login_command_run` applique la règle aux arguments littéraux, y compris après `cd` et dans les redirections, et refuse les suppressions et changements de droits dans ces espaces.
 

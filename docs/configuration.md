@@ -48,7 +48,7 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_MCP_DB` | `~/.romeo-mcp/jobs.db` | Registre privé des jobs et scripts soumis |
 | `ROMEO_SCRATCH`, `ROMEO_HOME` | Découverts par SSH | Racines distantes ; permettent aussi une simulation hors ligne |
 | `ROMEO_DOCS_DIR` | Corpus dans le paquet | Corpus externe facultatif ; chemin relatif à la racine d’installation |
-| `ROMEO_PROJECT_DIRS` | Aucune | Dossiers partagés admis à la racine d’un espace projet : noms ou motifs séparés par des virgules, en plus des dossiers de cours |
+| `ROMEO_PROJECT_DIRS` | Aucune | Dossiers partagés où les outils peuvent aussi écrire dans un espace projet : noms ou motifs séparés par des virgules |
 
 Les seuils locaux ne changent pas les droits Slurm. La limite effective peut
 venir du projet, de l’utilisateur, de la partition ou de la QOS. Les plafonds
@@ -69,10 +69,12 @@ Sous `/project/<code>` et `/gpfs/projet/<code>`, le serveur applique la même r�
   manque et le ferme en mode `2700` avant chaque écriture : les autres comptes ne
   peuvent ni le lire ni le modifier. Le bit `setgid` garde le groupe du projet,
   seul à disposer d’un quota sous `/project`.
-- Les dossiers de cours (`chps[0-9]*`, `maqao`) restent partagés.
-  `ROMEO_PROJECT_DIRS` en ajoute d’autres.
-- Toute autre écriture est refusée : racine du projet, dossier d’un autre login
-  ou nouveau dossier. La lecture reste libre.
+- La lecture reste libre partout, y compris dans les dossiers de cours.
+- Toute autre écriture est refusée : racine du projet, dossier de cours, dossier
+  d’un autre login ou nouveau dossier. Le refus propose le même chemin sous votre
+  dossier : un travail sur `chps0903` va dans `<login>/chps0903`, dont les
+  sous-dossiers sont créés au besoin. `ROMEO_PROJECT_DIRS` peut déclarer des
+  dossiers partagés modifiables.
 
 Le contrôle couvre `file_create`, `file_replace`, `upload_to_romeo`, les transferts
 montants et les plans de jobs (dossier de travail, checkpoints, copies et

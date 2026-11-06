@@ -6,6 +6,7 @@ une substitution de lien entre verification et ouverture echoue au lieu de
 rediriger l'operation. Aucun module du paquet n'est requis sur le cluster.
 """
 import json
+import posixpath
 import shlex
 
 from .guard import GuardError, allowed_roots, personal_project_folder
@@ -15,16 +16,19 @@ def roots_for(connection):
     return allowed_roots(connection.home, connection.scratch, connection.path_aliases)
 
 
-#: Attend `d` ; ne suit aucun lien et ne modifie qu'un dossier du compte courant.
+#: Attend `d`, et `p` pour un sous-dossier a creer dedans. Ne suit aucun lien sur `d` et
+#: ne modifie qu'un dossier du compte courant.
 LOCK_FOLDER = r'''if [ -L "$d" ]; then echo 'lien symbolique'; exit 3; fi
 mkdir -m 700 -- "$d" 2>/dev/null
 [ -d "$d" ] || { echo 'creation impossible'; exit 4; }
 [ -O "$d" ] || { stat -c 'proprietaire %U' -- "$d"; exit 5; }
-chmod u=rwx,g=,o=,g+s -- "$d" && stat -c %a -- "$d"'''
+chmod u=rwx,g=,o=,g+s -- "$d" || exit 6
+if [ -n "$p" ]; then mkdir -p -- "$p" || { echo 'sous-dossier impossible'; exit 7; }; fi
+stat -c %a -- "$d"'''
 
 
 def ensure_private_folder(connection, path):
-    """Cree si besoin le dossier personnel du login et le reserve a son compte.
+    """Cree si besoin le dossier personnel du login, le reserve a son compte et prepare le parent.
 
     Appele avant chaque ecriture : un dossier rouvert entre-temps est refermé.
     `g+s` conserve le groupe du projet, seul a disposer d'un quota sous /project.
@@ -32,7 +36,10 @@ def ensure_private_folder(connection, path):
     folder = personal_project_folder(path, connection)
     if folder is None:
         return
-    result = connection.run("d={}\n{}".format(shlex.quote(folder), LOCK_FOLDER), timeout=25, max_chars=2000)
+    parent = posixpath.dirname(posixpath.normpath(path))
+    inner = parent if parent.startswith(folder + "/") else ""
+    result = connection.run("d={}\np={}\n{}".format(shlex.quote(folder), shlex.quote(inner), LOCK_FOLDER),
+                            timeout=25, max_chars=2000)
     observed = result.stdout.strip()
     if not result.ok or observed != "2700":
         raise GuardError(

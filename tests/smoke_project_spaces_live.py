@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import posixpath
 import shlex
 import sys
 import tempfile
@@ -40,6 +41,7 @@ class Essai:
         self.personal = "{}/{}".format(self.root, self.login)
         self.project = project
         self.foreign = foreign
+        self.course = ""
         self.tag = "mcp-essai-" + uuid.uuid4().hex[:10]
         self.count = 0
 
@@ -108,6 +110,26 @@ class Essai:
         self.private()
         self.ok("un dossier rouvert est referme avant l'ecriture suivante")
 
+    async def course_rule(self):
+        print("Cours : lecture partout, travail dans le dossier personnel", flush=True)
+        self.course = self.sh("find {} -mindepth 1 -maxdepth 1 -type d \\( -name 'chps*' -o -name maqao \\) | sort | head -1"
+                              .format(shlex.quote(self.root))).stdout.strip()
+        if not self.course:
+            print("  --  aucun dossier de cours dans ce projet", flush=True)
+            return
+        name = posixpath.basename(self.course)
+        await self.allowed("list_dir", path=self.course)
+        self.ok("lecture de " + self.course)
+        forbidden = "{}/{}.txt".format(self.course, self.tag)
+        copy = "{}/{}/{}/{}.txt".format(self.personal, self.tag, name, self.tag)
+        payload = await self.refused("file_create", "ecriture refusee", path=forbidden, content="non")
+        assert "{}/{}/{}.txt".format(self.personal, name, self.tag) in payload["error"], payload["error"]
+        self.absent(forbidden)
+        await self.allowed("file_create", path=copy, content="note de cours\n")
+        assert (await self.allowed("read_remote_file", path=copy))["content"] == "note de cours\n"
+        self.private()
+        self.ok("ecriture refusee dans le cours, sous-dossiers crees dans le dossier personnel")
+
     async def login_commands(self):
         print("Commandes du login", flush=True)
         target = self.personal + "/" + self.tag + ".txt"
@@ -165,14 +187,17 @@ class Essai:
 
     async def job(self):
         print("Job Slurm reel", flush=True)
-        spec = dict(name=self.tag, command="echo ESPACE_PROJET_OK; id -gn; touch produit.txt", arch="x64cpu",
-                    nodes=1, cpus_per_task=1, mem_gb=1, time_limit="1m")
+        course = shlex.quote(self.course) if self.course else "/tmp"
+        spec = dict(name=self.tag, command="echo ESPACE_PROJET_OK; id -gn; ls {} > lecture.txt; touch produit.txt".format(course),
+                    arch="x64cpu", nodes=1, cpus_per_task=1, mem_gb=1, time_limit="1m")
         await self.refused("job_prepare", "ecriture refusee", workdir=self.root, **spec)
         await self.refused("job_prepare", "ecriture refusee", workdir=self.root + "/" + self.tag, **spec)
+        if self.course:
+            await self.refused("job_prepare", "ecriture refusee", workdir=self.course + "/" + self.tag, **spec)
         await self.refused("python_env_prepare", "ecriture refusee", env_path=self.root + "/" + self.tag + "-venv",
                            arch="x64cpu", spack_packages=["python@3.11"])
-        self.ok("job_prepare et python_env_prepare refusent la racine du projet")
-        workdir = "{}/{}/job".format(self.personal, self.tag)
+        self.ok("job_prepare et python_env_prepare refusent la racine et le cours")
+        workdir = "{}/{}/{}/job".format(self.personal, self.tag, posixpath.basename(self.course) if self.course else "autre")
         plan = await self.allowed("job_prepare", workdir=workdir, **spec)
         submitted = await self.allowed("job_submit", plan_id=plan["plan_id"], confirm=True)
         job_id = submitted["job_id"]
@@ -187,6 +212,7 @@ class Essai:
         logs = await self.call("job_log_tail", job_id=job_id, lines=50)
         assert state == "COMPLETED", "etat {} : {}".format(state, json.dumps(logs)[:1500])
         assert "ESPACE_PROJET_OK" in json.dumps(logs), json.dumps(logs)[:1500]
+        self.sh("test -f " + shlex.quote(workdir + "/lecture.txt")).check("lecture du cours par le job")
         produced = self.mode(workdir + "/produit.txt")
         assert produced.endswith(" {} {}".format(self.login, self.project)), produced
         self.private()
@@ -243,6 +269,7 @@ async def run(args):
                 print("Login {} ; dossier {}".format(essai.login, essai.personal), flush=True)
                 try:
                     await essai.file_rule()
+                    await essai.course_rule()
                     await essai.login_commands()
                     await essai.transfers()
                     await essai.job()

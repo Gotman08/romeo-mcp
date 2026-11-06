@@ -480,11 +480,11 @@ def check_path(
 
 
 # =============================================================================
-# Espaces projet : un dossier par login et des dossiers de cours
+# Espaces projet : lecture partout, ecriture dans le dossier du login
 # =============================================================================
 
-#: Dossiers de cours admis a la racine d'un espace projet, en plus du dossier
-#: propre a chaque login. `ROMEO_PROJECT_DIRS` en ajoute d'autres.
+#: Dossiers de cours : lisibles par tous, jamais modifies ni deplaces par le MCP. Un
+#: travail sur un cours va dans `<login>/<cours>`.
 PROJECT_COURSE_DIRS = ("chps[0-9]*", "maqao")
 
 #: Code du projet, dossier a sa racine, puis reste du chemin.
@@ -499,32 +499,38 @@ _PROJECT_COPIES = {"mv", "cp", "ln", "install", "rsync"}
 
 
 def project_dirs() -> tuple[str, ...]:
-    """Motifs des dossiers partages admis a la racine des espaces projet."""
+    """Dossiers partages declares, seuls modifiables en plus du dossier du login."""
     extra = os.environ.get("ROMEO_PROJECT_DIRS", "")
-    return (*PROJECT_COURSE_DIRS, *(name.strip() for name in extra.split(",") if name.strip()))
+    return tuple(name.strip() for name in extra.split(",") if name.strip())
 
 
-def _project_folder_allowed(folder: str, connection) -> bool:
+def _project_folder_writable(folder: str, connection) -> bool:
     return (folder == getattr(connection, "user", "")
             or any(fnmatchcase(folder, pattern) for pattern in project_dirs()))
 
 
+def _project_folder_kept(folder: str, connection) -> bool:
+    """Dossiers qui restent a la racine : ceux qu'on peut modifier et les cours."""
+    return (_project_folder_writable(folder, connection)
+            or any(fnmatchcase(folder, pattern) for pattern in PROJECT_COURSE_DIRS))
+
+
 def check_project_write(path: str, connection) -> None:
-    """Refuse d'ecrire dans un espace projet hors du dossier du login et des cours.
+    """Refuse d'ecrire dans un espace projet hors du dossier du login.
 
     La regle vaut pour chaque utilisateur : le login vient de la session SSH et
-    n'est lu que pour un chemin de projet. Les lectures ne passent pas par ici.
+    n'est lu que pour un chemin de projet. Les lectures ne passent pas par ici. Le
+    refus propose le meme chemin sous le dossier du login, ou le travail a sa place.
     """
     normal = posixpath.normpath(path)
     match = _PROJECT_PATH.fullmatch(normal)
-    if match is None or (match[2] and _project_folder_allowed(match[2], connection)):
+    if match is None or (match[2] and _project_folder_writable(match[2], connection)):
         return
+    personal = "/project/{}/{}".format(match[1] or "<code>", getattr(connection, "user", "") or "<login>")
     raise GuardError(
-        "ecriture refusee : {}. Un espace projet ne contient que des dossiers de "
-        "cours et un dossier par login. Ecris sous /project/{}/{}/ ou dans un dossier "
-        "de cours ({}) ; ROMEO_PROJECT_DIRS en declare d'autres. La lecture reste "
-        "possible.".format(normal, match[1] or "<code>", getattr(connection, "user", "") or "<login>",
-                           ", ".join(project_dirs()))
+        "ecriture refusee : {}. Dans un espace projet, tu n'ecris que dans ton dossier ; "
+        "la lecture reste libre partout. Travaille dans {}{}, les sous-dossiers sont "
+        "crees au besoin.".format(normal, personal, "/" + match[2] + (match[3] or "") if match[2] else "")
     )
 
 
@@ -572,12 +578,12 @@ def _project_operands(head: str, args: list[_Token]) -> tuple[list[_Token], list
 
 
 def _check_project_move(path: str, connection) -> None:
-    """Un element de la racine peut rejoindre un dossier admis ; ceux-ci restent en place."""
+    """Un element de la racine peut rejoindre ton dossier ; les dossiers gardes restent en place."""
     match = _PROJECT_PATH.fullmatch(path)
     if match is None:
         return
     if match[2] and match[3] is None:
-        if (_project_folder_allowed(match[2], connection)
+        if (_project_folder_kept(match[2], connection)
                 or fnmatchcase(getattr(connection, "user", ""), match[2])):
             raise GuardError("{} doit rester a la racine de l'espace projet.".format(path))
         return

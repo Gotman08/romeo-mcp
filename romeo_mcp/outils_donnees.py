@@ -139,7 +139,7 @@ def read_remote_file(
 
 @outil(annotations=MUTATING, description=(
     "Cree un fichier texte sur ROMEO. Refuse toute cible existante, y compris un lien symbolique. "
-    "Le repertoire parent doit exister ; publication atomique du contenu, permissions 600."))
+    "Le repertoire parent doit exister, sauf dans ton dossier d'un espace projet ou il est cree ; publication atomique du contenu, permissions 600."))
 def file_create(path: str, content: str) -> dict[str, Any]:
     return create_file(session(longue=True), path, content)
 
