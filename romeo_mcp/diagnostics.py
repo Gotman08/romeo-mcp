@@ -196,7 +196,7 @@ _MOTIFS: list[tuple[str, Cause]] = [
             "Le job n'a pas les droits sur un fichier ou un repertoire.",
             [
                 "Verifie le chemin avec `list_dir`.",
-                "Ecris dans `/scratch_p/$USER` ou `/project/<code>` ; `/apps` "
+                "Ecris dans `/scratch_p/$USER` ou `/project/<code>/$USER` ; `/apps` "
                 "est en lecture seule.",
             ],
         ),

@@ -75,7 +75,10 @@ def progress(status):
     elif (value.get("bytes_total") is not None or value.get("source") != "rsync_progress2"
           or percent is None or percent > 100):
         return None
-    return {"bytes_transferred": done, "bytes_total": total,
+    source = value.get("source")
+    if source not in ("rsync_progress2", "scp_destination_size"):
+        source = ""
+    return {"source": source, "bytes_transferred": done, "bytes_total": total,
             "percent_reported": percent,
             "bytes_per_second": number(value.get("bytes_per_second")),
             "eta_seconds": number(value.get("eta_seconds")), "observed_at": observed}

@@ -4,8 +4,8 @@ import json
 import re
 import shlex
 
-from .guard import allowed_roots, check_path
-from .remote_paths import CONFINED_PATHS, roots_for
+from .guard import allowed_roots, check_path, check_project_write
+from .remote_paths import CONFINED_PATHS, ensure_private_folder, roots_for
 from .resource_locks import remote_source
 
 
@@ -88,6 +88,8 @@ def _write(connection, path, content, action, expected=None):
     if len(raw) > 65536:
         raise ValueError('Contenu texte limite a 64 Kio par appel.')
     target = check_path(path, connection.home, connection.scratch, connection.path_aliases)
+    check_project_write(target, connection)
+    ensure_private_folder(connection, target)
     request = json.dumps({'path': target, 'content': base64.b64encode(raw).decode(),
                           'action': action, 'expected': expected.lower() if expected else None,
                           'lock_root': connection.home + '/.romeo-mcp/concurrency',

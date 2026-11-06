@@ -16,10 +16,12 @@ difficiles, pas les malveillances impossibles.
 
 from __future__ import annotations
 
+import os
 import posixpath
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 
 #: Binaires qui n'ont rien a faire sur un noeud de login.
 HEAVY_COMMANDS = {
@@ -189,6 +191,9 @@ def _commands(text: str, depth: int = 0) -> list[list[_Token]]:
                 _ambiguous()
             if token.value != "<" and re.match(r"/dev/(?:sd|nvme|vd)", target.value):
                 _destructive("ecriture sur un disque brut")
+            if token.value in {">", ">>", "&>", "&>>"}:
+                # Pseudo-commande : garde la cible ecrite, dans l'ordre des `cd`.
+                segments.append([_Token(">"), target])
             if words and words[-1].value.isdecimal():
                 words.pop()  # descripteur de fichier, pas un argument executable
         else:
@@ -286,6 +291,33 @@ def _unwrap(words: list[_Token], depth: int) -> list[list[_Token]]:
         elif head == "time":
             words = _options(args, {"-p", "-v", "-a", "-q", "--portability", "--verbose", "--append", "--quiet"},
                              {"-f", "-o", "--format", "--output"})
+        elif head == "rtk":
+            # RTK est une enveloppe, pas une permission d'executer cargo/pip
+            # sur le login. Les executeurs generiques opaques restent refuses.
+            index = 0
+            while index < len(args) and (args[index].value in {"--verbose", "--skip-env"}
+                                         or re.fullmatch(r"-v+", args[index].value)):
+                index += 1
+            args = args[index:]
+            if not args or args[0].value in {"--help", "-h", "--version", "-V"}:
+                return []
+            if args[0].dynamic:
+                _ambiguous()
+            subcommand = args[0].value
+            if subcommand == "bypass":
+                words = _options(args[1:], set(), set())
+                if words and any(c.isspace() for c in words[0].value):
+                    _ambiguous()
+            elif subcommand in {"read", "smart"}:
+                return [[_Token("cat"), *args[1:]]]
+            elif subcommand in {"gain", "recall", "rewrite", "config", "env", "wc", "help"}:
+                return [words]
+            elif subcommand in {"git", "gh", "glab", "ls", "tree", "find", "grep", "rg",
+                                 "ast-grep", "cargo", "go", "pip", "python", "python3", "uv",
+                                 "npm", "npx", "pnpm", "bun", "bunx", "deno", "curl", "wget"}:
+                words = args
+            else:
+                _ambiguous()
         else:
             return [words]
     _ambiguous()
@@ -445,3 +477,140 @@ def check_path(
             resolved, ", ".join(roots)
         )
     )
+
+
+# =============================================================================
+# Espaces projet : un dossier par login et des dossiers de cours
+# =============================================================================
+
+#: Dossiers de cours admis a la racine d'un espace projet, en plus du dossier
+#: propre a chaque login. `ROMEO_PROJECT_DIRS` en ajoute d'autres.
+PROJECT_COURSE_DIRS = ("chps[0-9]*", "maqao")
+
+#: Code du projet, dossier a sa racine, puis reste du chemin.
+_PROJECT_PATH = re.compile(r"(?:/project|/gpfs/projet)(?:/([^/]+)(?:/([^/]+)(/.*)?)?)?")
+
+#: Commandes du login que le serveur ne lance jamais dans un espace projet.
+_PROJECT_IRREVERSIBLE = {"rm", "rmdir", "unlink", "chmod", "chown", "chgrp"}
+#: Commandes qui ecrivent chaque operande ; `>` represente une redirection.
+_PROJECT_WRITERS = {"touch", "mkdir", "tee", ">"}
+#: Commandes qui n'ecrivent que leur destination.
+_PROJECT_COPIES = {"mv", "cp", "ln", "install", "rsync"}
+
+
+def project_dirs() -> tuple[str, ...]:
+    """Motifs des dossiers partages admis a la racine des espaces projet."""
+    extra = os.environ.get("ROMEO_PROJECT_DIRS", "")
+    return (*PROJECT_COURSE_DIRS, *(name.strip() for name in extra.split(",") if name.strip()))
+
+
+def _project_folder_allowed(folder: str, connection) -> bool:
+    return (folder == getattr(connection, "user", "")
+            or any(fnmatchcase(folder, pattern) for pattern in project_dirs()))
+
+
+def check_project_write(path: str, connection) -> None:
+    """Refuse d'ecrire dans un espace projet hors du dossier du login et des cours.
+
+    La regle vaut pour chaque utilisateur : le login vient de la session SSH et
+    n'est lu que pour un chemin de projet. Les lectures ne passent pas par ici.
+    """
+    normal = posixpath.normpath(path)
+    match = _PROJECT_PATH.fullmatch(normal)
+    if match is None or (match[2] and _project_folder_allowed(match[2], connection)):
+        return
+    raise GuardError(
+        "ecriture refusee : {}. Un espace projet ne contient que des dossiers de "
+        "cours et un dossier par login. Ecris sous /project/{}/{}/ ou dans un dossier "
+        "de cours ({}) ; ROMEO_PROJECT_DIRS en declare d'autres. La lecture reste "
+        "possible.".format(normal, match[1] or "<code>", getattr(connection, "user", "") or "<login>",
+                           ", ".join(project_dirs()))
+    )
+
+
+def personal_project_folder(path: str, connection) -> str | None:
+    """Dossier personnel du login lorsque `path` s'y trouve, sinon None."""
+    normal = posixpath.normpath(path)
+    match = _PROJECT_PATH.fullmatch(normal)
+    if match is None or not match[2] or match[2] != getattr(connection, "user", ""):
+        return None
+    return normal[:match.end(2)]
+
+
+def _project_operand(token: _Token, directory: str) -> str | None:
+    """Chemin absolu d'un argument litteral ; None s'il depend du shell ou du home."""
+    value = token.value
+    if token.dynamic or value.startswith("~"):
+        return None
+    if not value.startswith("/"):
+        if not directory:
+            return None
+        value = posixpath.join(directory, value)
+    return posixpath.normpath(re.sub(r"^/+", "/", value))
+
+
+def _project_operands(head: str, args: list[_Token]) -> tuple[list[_Token], list[_Token]]:
+    """Repartit les arguments d'une commande : chemins ecrits, chemins deplaces."""
+    operands, destination, options = [], None, True
+    remaining = iter(args)
+    for arg in remaining:
+        value = arg.value
+        if options and value == "--":
+            options = False
+        elif not options or not value.startswith("-"):
+            operands.append(arg)
+        elif head in _PROJECT_COPIES and head != "rsync":
+            if value.startswith("--target-directory="):
+                destination = _Token(value.split("=", 1)[1], dynamic=arg.dynamic)
+            elif value == "--target-directory" or re.fullmatch(r"-[A-Za-z]*t", value):
+                destination = next(remaining, None)
+    if head not in _PROJECT_COPIES:
+        return operands, []
+    if destination is None and len(operands) > 1:
+        destination = operands.pop()
+    return [destination] if destination else [], operands if head == "mv" else []
+
+
+def _check_project_move(path: str, connection) -> None:
+    """Un element de la racine peut rejoindre un dossier admis ; ceux-ci restent en place."""
+    match = _PROJECT_PATH.fullmatch(path)
+    if match is None:
+        return
+    if match[2] and match[3] is None:
+        if (_project_folder_allowed(match[2], connection)
+                or fnmatchcase(getattr(connection, "user", ""), match[2])):
+            raise GuardError("{} doit rester a la racine de l'espace projet.".format(path))
+        return
+    check_project_write(path, connection)
+
+
+def check_project_command(command: str, connection, cwd: str | None = None) -> list[str]:
+    """Applique la regle des espaces projet aux arguments litteraux d'une commande.
+
+    Rend les chemins de projet qu'elle ecrira, afin de verrouiller le dossier
+    personnel avant son execution. Comme le reste de ce module, ce controle rend
+    les erreurs frequentes difficiles : un argument dynamique reste hors d'analyse.
+    """
+    directory, written = cwd or "", []
+    for words in _commands(command):
+        head, args = posixpath.basename(words[0].value), words[1:]
+        if head == "cd":
+            target = next((arg for arg in args if not arg.value.startswith("-")), None)
+            directory = (_project_operand(target, directory) if target else None) or ""
+        elif head in _PROJECT_IRREVERSIBLE or (head == "find" and any(a.value == "-delete" for a in args)):
+            for arg in args:
+                path = _project_operand(arg, directory) if not arg.value.startswith("-") else None
+                if path and _PROJECT_PATH.fullmatch(path):
+                    _destructive("{} dans un espace projet".format(head))
+        elif head in _PROJECT_WRITERS or head in _PROJECT_COPIES:
+            targets, moved = _project_operands(head, args)
+            for arg in moved:
+                path = _project_operand(arg, directory)
+                if path:
+                    _check_project_move(path, connection)
+            for arg in targets:
+                path = _project_operand(arg, directory)
+                if path and _PROJECT_PATH.fullmatch(path):
+                    check_project_write(path, connection)
+                    written.append(path)
+    return written

@@ -48,7 +48,7 @@ La demande d’arrêt ne constitue pas une confirmation de fin. Consulter ensuit
 
 [`service_status`](service_status.md) · [`service_start`](service_start.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L45) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L50) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

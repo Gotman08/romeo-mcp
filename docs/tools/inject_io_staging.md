@@ -52,7 +52,7 @@ La mémoire réservée doit couvrir la taille décompressée, et /dev/shm est pa
 
 [`job_prepare`](job_prepare.md) · [`sbatch_validate`](sbatch_validate.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L176) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L241) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

@@ -24,7 +24,8 @@ soumettre un calcul, utiliser les [outils MCP](../docs/Tools.md).
 | [install_mcp.py](install_mcp.py) | Enregistrer le serveur dans un client IA | Peut modifier les fichiers personnels du client, avec sauvegarde préalable |
 | [check_privacy.py](check_privacy.py) | Vérifier les contenus qui seront publiés | Lit l’index Git et, sur demande, l’historique ; affiche les emplacements signalés |
 | [verify_corpus.py](verify_corpus.py) | Contrôler la copie documentaire | Lit les liens, images, ancres, casse des noms de fichiers, accès depuis le sommaire et empreintes du manifeste |
-| [prepare_release.py](prepare_release.py) | Préparer une release stable | Vérifie le tag et les distributions puis écrit les empreintes et notes dans `dist/` |
+| [prepare_release.py](prepare_release.py) | Préparer une release stable | Vérifie le tag, les distributions et les verrous puis écrit les empreintes et notes dans `dist/` |
+| [lock_dependencies.py](lock_dependencies.py) | Actualiser les verrous de dépendances | Régénère avec `uv` `romeo_mcp/locks/`, épinglé par hash pour tous les systèmes |
 | [romeo_doc_scraper.py](romeo_doc_scraper.py) | Renouveler la copie du site ROMEO | Accède au site officiel et écrit dans le dossier de sortie choisi |
 | [merge_corpus.py](merge_corpus.py) | Intégrer une collecte au corpus versionné | Compare sans rien écrire ; avec `--write`, met à jour le corpus puis le vérifie |
 

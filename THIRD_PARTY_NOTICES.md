@@ -8,6 +8,7 @@
 - [Documentation officielle ROMEO / URCA](#documentation-officielle-romeo--urca)
 - [Visuel du README](#visuel-du-readme)
 - [Dépendances logicielles](#dépendances-logicielles)
+- [RTK](#rtk)
 
 </details>
 
@@ -54,6 +55,14 @@ L'interface terminal facultative dépend de [Ratatui](https://ratatui.rs/)
 (licence MIT), de Crossterm et des crates listées dans `terminal/Cargo.toml`
 et `terminal/Cargo.lock`. Cargo les installe séparément avec leurs licences
 respectives. Les distributions Python ne contiennent pas le binaire natif.
+
+## RTK
+
+Ce projet ne redistribue pas [RTK](https://github.com/rtk-ai/rtk). Au premier
+besoin, [le MCP télécharge](docs/rtk.md) depuis le login l’archive `rtk-oss` de la
+release officielle épinglée : l’édition placée sous licence Apache-2.0, sans le
+moteur sous BUSL-1.1. Le binaire reste soumis à la licence de ses auteurs, jointe
+à l’archive et non copiée à l’installation.
 
 ---
 

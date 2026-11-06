@@ -22,6 +22,7 @@ DIAGNOSTICS = {
 CATEGORIES = ("bug", "performance", "maintainability", "documentation")
 # Catalogue public controle. Le controle docs verifie sa couverture avec tools/list.
 PUBLIC_TOOLS = frozenset((
+    'rtk_status',
     'romeollm_catalog', 'romeollm_status', 'romeollm_engines', 'romeollm_doctor', 'romeollm_stats',
     'romeollm_launch_prepare', 'romeollm_launch', 'romeollm_stop', 'romeollm_logs', 'romeollm_endpoint',
     'romeollm_gateway_status', 'romeollm_gateway_start', 'romeollm_gateway_stop', 'romeollm_chat',
@@ -79,9 +80,6 @@ PUBLIC_TOOLS = frozenset((
     'login_command_run',
     'mcp_diagnostics',
     'mcp_update_check',
-    'mcp_update_policy',
-    'mcp_update_rollback',
-    'mcp_update_start',
     'mcp_update_status',
     'plan_get',
     'profile_report',

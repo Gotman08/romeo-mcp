@@ -50,7 +50,7 @@ Le plan doit être soumettable, non expiré et de la bonne famille. Un plan déj
 
 [`cluster_allocation_prepare`](cluster_allocation_prepare.md) · [`plan_get`](plan_get.md) · [`job_status`](job_status.md) · [`cluster_allocation_connection_info`](cluster_allocation_connection_info.md) · [`cancel_job`](cancel_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L96) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L101) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

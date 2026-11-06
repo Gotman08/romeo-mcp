@@ -29,10 +29,14 @@ RACINE = Path(__file__).resolve().parents[1]
 
 #: (cle, chemin, description, besoin du cluster)
 SUITES = [
+    ("rtk", "tests/test_rtk.py",
+     "reecriture RTK, garde-fous, delai global, absence de replay et statistiques", False),
     ("romeollm", "tests/test_romeollm.py",
      "CLI RomeoLLMTool simulee, plans, gateway, limites et protocole MCP", False),
     ("units", "tests/test_units.py",
      "durees, partitions, architectures, sbatch, garde-fous", False),
+    ("project-spaces", "tests/test_project_spaces.py",
+     "dossier par login, cours, dossier prive, commandes du login et plans de jobs", False),
     ("workloads", "tests/test_workloads.py",
      "diagnostic, lanceurs, gabarits, materiel", False),
     ("regressions", "tests/test_regressions.py",
@@ -95,6 +99,12 @@ SUITES = [
      "bout en bout : soumission, suivi, efficacite", True),
     ("repro-live", "tests/smoke_repro_live.py",
      "fiche de reproductibilite d'un petit calcul CPU reel", True),
+    ("project-spaces-live", "tests/smoke_project_spaces_live.py",
+     "vrai serveur, GPFS et job Slurm : dossier prive et ecritures refusees (ROMEO_TEST_PROJECT)", True),
+    ("rtk-install-live", "tests/smoke_rtk_install_live.py",
+     "vrais serveur, GitHub et GPFS : installation de RTK au premier besoin dans un HOME de test, retire ensuite", True),
+    ("update-chain-live", "tests/smoke_update_chain_live.py",
+     "vrais GitHub, Sigstore et pip : attestations, verrous et installation", True),
     ("workloads-live", "tests/smoke_workloads_live.py",
      "jobs defaillants, tableaux, telemetrie", True),
 ]

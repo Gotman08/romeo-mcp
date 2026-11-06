@@ -4,17 +4,21 @@ from __future__ import annotations
 import base64
 import contextlib
 import errno
+import hashlib
 import heapq
 import io
 import json
 import os
 from pathlib import Path
+import queue
+import select
 import shlex
 import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -478,15 +482,351 @@ class ConfinedPaths(unittest.TestCase):
         self.assertEqual((self.outside/'file').read_text(), 'outside-original')
 
 
+class TransferGuardProtocolTests(unittest.TestCase):
+    def guard(self):
+        guard = confined_transfers.TransferGuard('offline', '/fixture/file', ['/fixture'],
+                                                 'upload', 'source', bytes_total=100)
+        guard.process = Mock(stdin=io.StringIO())
+        return guard
+
+    def assert_commit_refused(self, guard):
+        self.assertTrue(guard.broken)
+        written = guard.process.stdin.getvalue()
+        with self.assertRaises(SSHError):
+            guard.commit()
+        self.assertEqual(guard.process.stdin.getvalue(), written)
+        self.assertTrue(written)
+        self.assertTrue(all(json.loads(line)['action'] == 'sample' for line in written.splitlines()))
+        guard.process.stdout.readline.assert_not_called()
+
+    def test_pending_sample_does_not_flood_or_expire_after_the_old_five_second_limit(self):
+        guard = self.guard()
+        with patch.object(time, 'monotonic', return_value=0):
+            self.assertIsNone(guard.sample())
+        with patch.object(time, 'monotonic', return_value=600):
+            for _ in range(1000):
+                self.assertIsNone(guard.sample())
+            self.assertFalse(guard.broken)
+            self.assertEqual(guard.request_id, 1)
+            self.assertEqual(guard.pending_sample, 1)
+            delayed = {'ok': True, 'kind': 'sample', 'request_id': 1,
+                       'valid': True, 'bytes_present': 40, 'bytes_total': 100}
+            guard.messages.put(json.dumps(delayed))
+            received = guard.sample()
+            self.assertEqual({key: received[key] for key in delayed}, delayed)
+            self.assertEqual(received['observed_monotonic'], 0)
+        self.assertIsNone(guard.pending_sample)
+        self.assertEqual([json.loads(line) for line in guard.process.stdin.getvalue().splitlines()],
+                         [{'action': 'sample', 'request_id': 1}])
+
+    def test_sample_keeps_its_local_send_time_when_a_delayed_response_claims_another_time(self):
+        guard = self.guard()
+        stream = guard.process.stdin
+        guard.process.stdin = Mock(wraps=stream)
+
+        def send(line):
+            request = json.loads(line)
+            self.assertEqual(guard.sample_times[request['request_id']], (1000, 10))
+            return stream.write(line)
+
+        guard.process.stdin.write.side_effect = send
+        with patch.object(time, 'time', return_value=1000), patch.object(time, 'monotonic', return_value=10):
+            self.assertIsNone(guard.sample())
+        guard.messages.put(json.dumps({'ok': True, 'kind': 'sample', 'request_id': 1,
+                                       'valid': True, 'bytes_present': 40, 'bytes_total': 100,
+                                       'observed_at': 99999, 'observed_monotonic': 99999}))
+        with patch.object(time, 'time', return_value=1030), patch.object(time, 'monotonic', return_value=40):
+            received = guard.sample()
+        self.assertEqual(received['observed_at'], 1000)
+        self.assertEqual(received['observed_monotonic'], 10)
+        self.assertEqual(guard.sample_times, {})
+
+    def test_invalid_or_unrelated_pending_response_prevents_poll_and_commit(self):
+        responses = [None, 'not JSON', '[]',
+                     json.dumps({'ok': True, 'kind': 'commit', 'request_id': 1}),
+                     json.dumps({'ok': True, 'kind': 'sample', 'request_id': 2}),
+                     json.dumps({'ok': False, 'kind': 'sample', 'request_id': 1, 'error': 'fixture refusal'}),
+                     json.dumps({'ok': 1, 'kind': 'sample', 'request_id': 1})]
+        for response in responses:
+            for action in ('poll', 'commit'):
+                with self.subTest(response=response, action=action):
+                    guard = self.guard()
+                    self.assertIsNone(guard.sample())
+                    guard.messages.put(response)
+                    with self.assertRaises(SSHError):
+                        guard.sample() if action == 'poll' else guard.commit()
+                    self.assert_commit_refused(guard)
+
+    def test_sample_timeout_breaks_channel_and_prevents_commit(self):
+        guard = self.guard()
+        with self.assertRaises(SSHError):
+            guard._exchange('sample', timeout=.01)
+        self.assert_commit_refused(guard)
+
+    def test_final_sample_drains_the_old_partial_response_then_requests_a_fresh_one(self):
+        guard = self.guard()
+        self.assertIsNone(guard.sample())
+        guard.messages.put(json.dumps({'ok': True, 'kind': 'sample', 'request_id': 1,
+                                       'valid': True, 'bytes_present': 40, 'bytes_total': 100}))
+        stream = guard.process.stdin
+        guard.process.stdin = Mock(wraps=stream)
+        final = {'ok': True, 'kind': 'sample', 'request_id': 2,
+                 'valid': True, 'bytes_present': 100, 'bytes_total': 100}
+
+        def request_fresh(line):
+            packet = json.loads(line)
+            self.assertIsNone(guard.pending_sample)
+            self.assertEqual(packet, {'action': 'sample', 'request_id': 2})
+            written = stream.write(line)
+            guard.messages.put(json.dumps(final))
+            return written
+
+        guard.process.stdin.write.side_effect = request_fresh
+        received = guard.finish_sample()
+        self.assertEqual({key: received[key] for key in final}, final)
+        self.assertIsNone(guard.pending_sample)
+        self.assertEqual([json.loads(line) for line in stream.getvalue().splitlines()],
+                         [{'action': 'sample', 'request_id': 1}, {'action': 'sample', 'request_id': 2}])
+
+    def test_commit_drains_a_pending_sample_before_writing_its_own_request(self):
+        guard = self.guard()
+        self.assertIsNone(guard.sample())
+        guard.messages.put(json.dumps({'ok': True, 'kind': 'sample', 'request_id': 1,
+                                       'valid': False, 'bytes_present': None, 'bytes_total': 100}))
+        stream = guard.process.stdin
+        guard.process.stdin = Mock(wraps=stream)
+
+        def publish(line):
+            packet = json.loads(line)
+            self.assertIsNone(guard.pending_sample)
+            self.assertEqual(packet['action'], 'commit')
+            self.assertEqual(packet['request_id'], 2)
+            written = stream.write(line)
+            guard.messages.put(json.dumps({'ok': True, 'kind': 'commit', 'request_id': 2, 'sha256': None}))
+            return written
+
+        guard.process.stdin.write.side_effect = publish
+        committed = guard.commit()
+        self.assertEqual(committed['kind'], 'commit')
+        self.assertEqual(committed['request_id'], 2)
+        self.assertEqual([json.loads(line)['action'] for line in stream.getvalue().splitlines()],
+                         ['sample', 'commit'])
+
+    def test_drain_and_final_sample_check_cancellation_between_bounded_queue_reads(self):
+        class ProbeCancelled(RuntimeError):
+            pass
+
+        for pending in (False, True):
+            with self.subTest(pending=pending):
+                guard = self.guard()
+                if pending:
+                    self.assertIsNone(guard.sample())
+                cancelled = [False]
+
+                def check_cancelled():
+                    if cancelled[0]:
+                        raise ProbeCancelled('local cancellation witness')
+
+                def no_response(*, timeout):
+                    self.assertLessEqual(timeout, .25)
+                    cancelled[0] = True
+                    raise queue.Empty()
+
+                guard.messages = Mock(get=Mock(side_effect=no_response))
+                token = files._CANCEL_CHECK.set(check_cancelled)
+                try:
+                    began = time.monotonic()
+                    with self.assertRaises(ProbeCancelled):
+                        guard.finish_sample()
+                    self.assertLessEqual(time.monotonic() - began, .25)
+                finally:
+                    files._CANCEL_CHECK.reset(token)
+                guard.messages.get.assert_called_once()
+                self.assert_commit_refused(guard)
+
+
 @unittest.skipUnless(os.name == 'posix', 'superviseur POSIX et /proc ; aucun SSH dans cette suite')
 class ConfinedTransfers(unittest.TestCase):
     def setUp(self):
         ConfinedPaths.setUp(self)
-        native_popen = subprocess.Popen
+        self.native_popen = subprocess.Popen
         def supervisor(argv, **kwargs):
             words = shlex.split(argv[-1])
-            return native_popen([sys.executable, '-u', '-c', words[3], words[4]], **kwargs)
+            return self.native_popen([sys.executable, '-u', '-c', words[3], words[4]], **kwargs)
         self.enterContext(patch.object(confined_transfers.subprocess, 'Popen', side_effect=supervisor))
+
+    @contextlib.contextmanager
+    def supervisor(self, direction, path, *, recursive=False, verify=True):
+        """Exercise the remote protocol in a real local process, without SSH."""
+        request = dict(path=str(path), roots=self.roots, direction=direction,
+                       basename=Path(path).name, recursive=recursive, verify=verify,
+                       lock_root=str(self.root/'locks'),
+                       bytes_total=100 if direction == 'upload' else None)
+        process = self.native_popen(
+            [sys.executable, '-u', '-c', confined_transfers.SUPERVISOR, json.dumps(request)],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding='utf-8')
+        try:
+            yield process, self.receive(process)
+        finally:
+            process.stdin.close()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.terminate()
+                process.wait(timeout=3)
+            process.stdout.close()
+            process.stderr.close()
+
+    def receive(self, process):
+        self.assertTrue(select.select([process.stdout], [], [], 5)[0],
+                        'Le superviseur local ne repond pas.')
+        line = process.stdout.readline()
+        self.assertTrue(line, 'Le superviseur local a ferme sa sortie.')
+        return json.loads(line)
+
+    def request(self, process, action, request_id, **values):
+        process.stdin.write(json.dumps(dict(action=action, request_id=request_id, **values)) + '\n')
+        process.stdin.flush()
+        response = self.receive(process)
+        self.assertEqual(response.get('kind'), action, response)
+        self.assertEqual(response.get('request_id'), request_id, response)
+        return response
+
+    def test_local_source_invalidation_leaves_pending_sample_for_unverified_commit_to_drain(self):
+        source, target = self.root/'local-source', self.inside/'destination'
+        source.write_bytes(b'original')
+        original = files._source_signature(source)
+        with confined_transfers.TransferGuard('offline', str(target), self.roots, 'upload',
+                                               source.name, verify=False, bytes_total=8) as guard:
+            with files.transfer_runner(lambda *_: self.fail('Aucun processus de copie attendu')):
+                probe = files._upload_probe(guard, source, original)
+                with patch.object(guard.messages, 'get_nowait', side_effect=queue.Empty):
+                    self.assertIsNone(probe.sample())
+                self.assertEqual(guard.pending_sample, 1)
+                source.write_bytes(b'changed!')
+                os.utime(source, ns=(source.stat().st_atime_ns, original[3] + 5_000_000_000))
+                self.assertIsNone(probe.sample())
+                self.assertTrue(probe.invalid)
+                self.assertEqual(guard.pending_sample, 1)
+                Path(guard.ready['proxy']).write_bytes(source.read_bytes())
+                committed = guard.commit()
+                self.assertTrue(committed['ok'], committed)
+                self.assertEqual(committed['kind'], 'commit')
+                self.assertEqual(committed['request_id'], 2)
+                self.assertIsNone(committed['sha256'])
+                self.assertIsNone(guard.pending_sample)
+        self.assertEqual(target.read_bytes(), b'changed!')
+        self.assertFalse(list(self.inside.rglob('.romeo-transfer-*')))
+
+    def test_supervisor_samples_only_its_private_payload_and_preserves_commit_integrity(self):
+        target = self.inside/'file'
+        target.write_bytes(b'original')
+        with self.supervisor('upload', target) as (process, ready):
+            self.assertTrue(ready['ok'], ready)
+            self.assertEqual(ready['kind'], 'ready')
+            absent = self.request(process, 'sample', 17, path=str(self.outside/'file'))
+            self.assertTrue(absent['valid'], absent)
+            self.assertEqual(absent['bytes_present'], 0)
+            payload = Path(ready['proxy'])
+            payload.write_bytes(b'copy')
+            first = self.request(process, 'sample', 18, path=str(self.outside/'file'))
+            self.assertTrue(first['valid'], first)
+            self.assertEqual(first['bytes_present'], 4)
+            self.assertEqual(first['bytes_total'], 100)
+            with payload.open('ab') as stream:
+                stream.write(b'-complete')
+            second = self.request(process, 'sample', 19)
+            self.assertTrue(second['valid'], second)
+            self.assertEqual(second['bytes_present'], len(b'copy-complete'))
+            committed = self.request(process, 'commit', 20,
+                                     expected_sha256=hashlib.sha256(b'copy-complete').hexdigest())
+            self.assertTrue(committed['ok'], committed)
+            self.assertEqual(committed['sha256'], hashlib.sha256(b'copy-complete').hexdigest())
+        self.assertEqual(target.read_bytes(), b'copy-complete')
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+        self.assertFalse(list(self.inside.rglob('.romeo-transfer-*')))
+
+    def test_supervisor_sample_remains_anchored_when_the_parent_path_is_replaced(self):
+        parent, swap = ConfinedPaths.parent_fixture(self)
+        with self.supervisor('upload', parent/'file') as (process, ready):
+            payload = Path(ready['proxy'])
+            payload.write_bytes(b'new')
+            self.assertEqual(self.request(process, 'sample', 1)['bytes_present'], 3)
+            swap()
+            with payload.open('ab') as stream:
+                stream.write(b'-copy')
+            sampled = self.request(process, 'sample', 2)
+            self.assertTrue(sampled['valid'], sampled)
+            self.assertEqual(sampled['bytes_present'], 8)
+            self.assertTrue(self.request(process, 'commit', 3)['ok'])
+        self.assertEqual((self.inside/'held'/'file').read_bytes(), b'new-copy')
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_supervisor_rejects_special_payloads_without_following_or_waiting(self):
+        for kind in ('symlink', 'fifo'):
+            with self.subTest(kind=kind), self.supervisor('upload', self.inside/kind) as (process, ready):
+                payload = Path(ready['proxy'])
+                if kind == 'symlink':
+                    payload.symlink_to(self.outside/'file')
+                else:
+                    os.mkfifo(payload)
+                sampled = self.request(process, 'sample', 1)
+                self.assertFalse(sampled['valid'], sampled)
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+        self.assertFalse(list(self.inside.rglob('.romeo-transfer-*')))
+
+    def test_supervisor_latches_payload_regression_or_inode_replacement_as_unmeasurable(self):
+        for change in ('shrink', 'replace'):
+            with self.subTest(change=change), self.supervisor('upload', self.inside/change) as (process, ready):
+                payload = Path(ready['proxy'])
+                payload.write_bytes(b'12345678')
+                self.assertTrue(self.request(process, 'sample', 1)['valid'])
+                if change == 'replace':
+                    payload.rename(payload.with_name('old-payload'))
+                payload.write_bytes(b'123')
+                self.assertFalse(self.request(process, 'sample', 2)['valid'])
+                payload.write_bytes(b'123456789')
+                self.assertFalse(self.request(process, 'sample', 3)['valid'])
+        self.assertFalse((self.inside/'shrink').exists())
+        self.assertFalse((self.inside/'replace').exists())
+
+    def test_supervisor_download_uses_held_source_and_invalidates_changed_content(self):
+        for verify in (False, True):
+            with self.subTest(verify=verify):
+                parent = self.inside/('source-parent-' + str(verify))
+                held = self.inside/('held-parent-' + str(verify))
+                parent.mkdir()
+                source = parent/'file'
+                source.write_bytes(b'original')
+                with self.supervisor('download', source, verify=verify) as (process, ready):
+                    self.assertEqual(ready['kind'], 'ready')
+                    self.assertEqual(ready['bytes_total'], 8)
+                    first = self.request(process, 'sample', 1, path=str(self.outside/'file'))
+                    self.assertTrue(first['valid'], first)
+                    self.assertEqual(first['bytes_total'], 8)
+                    self.assertIsNone(first['bytes_present'])
+                    parent.rename(held)
+                    parent.symlink_to(self.outside, target_is_directory=True)
+                    self.assertEqual(Path(ready['proxy']).read_bytes(), b'original')
+                    self.assertTrue(self.request(process, 'sample', 2)['valid'])
+                    (held/'file').write_bytes(b'changed!')
+                    self.assertFalse(self.request(process, 'sample', 3)['valid'])
+                    (held/'file').write_bytes(b'original')
+                    self.assertFalse(self.request(process, 'sample', 4)['valid'])
+                    (held/'file').write_bytes(b'changed!')
+                    committed = self.request(process, 'commit', 5)
+                    self.assertEqual(committed['ok'], not verify, committed)
+                    if not verify:
+                        self.assertIsNone(committed['sha256'])
+        self.assertEqual((self.outside/'file').read_text(), 'outside-original')
+
+    def test_empty_source_has_no_numeric_progress(self):
+        source = self.inside/'empty'
+        source.touch()
+        with self.supervisor('download', source, verify=False) as (process, ready):
+            self.assertIsNone(ready['bytes_total'])
+            self.assertFalse(self.request(process, 'sample', 1)['valid'])
 
     def test_file_transfer_uses_held_descriptors_after_parent_swap(self):
         parent, swap = ConfinedPaths.parent_fixture(self)

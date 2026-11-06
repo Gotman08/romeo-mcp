@@ -425,13 +425,14 @@ def romeo_quota(project: str = "") -> dict[str, Any]:
         "paths": {
             "home": s.home,
             "scratch": s.scratch,
-            "project": "/project/<code_projet>",
+            "project": "/project/<code_projet>/{}".format(s.user),
         },
         "advice": (
             "Les quotas peuvent differer entre home, scratch et projet : utilise "
             "les valeurs relevees ci-dessus. /scratch_p/$USER est l'espace des "
             "calculs en cours ; /project contient les donnees partagees, "
-            "comptabilisees au groupe du projet."
+            "comptabilisees au groupe du projet. Tes fichiers y vont dans ton "
+            "dossier, reserve a ton compte."
         ),
     }
 

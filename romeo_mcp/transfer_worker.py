@@ -54,9 +54,21 @@ def _run_owned(plan_path):
         argv, measured = progress_command(argv, environment)
         log = directory / "transfer.log"
         observer = ProgressLog(log) if measured else None
+        probe = files._PROGRESS_PROBE.get()
+        result.pop("progress", None)
 
-        def observe():
-            if observer is not None:
+        def observe(final=False):
+            if probe is not None:
+                try:
+                    sample = probe.finish() if final else probe.sample()
+                except Exception:
+                    result.pop("progress", None)
+                    raise
+                if sample is None:
+                    result.pop("progress", None)
+                else:
+                    result["progress"] = sample
+            elif observer is not None:
                 sample = observer.sample()
                 if sample is not None:
                     result["progress"] = sample
@@ -82,9 +94,9 @@ def _run_owned(plan_path):
                         last = time.monotonic()
                     time.sleep(0.1)
                 result["transfer_return_code"] = child.wait()
-                observe()
                 if child.returncode:
                     raise SSHError(what + " : echec du processus de transfert")
+                observe(final=True)
         finally:
             if child is not None and child.poll() is None:
                 child.terminate()
@@ -115,10 +127,14 @@ def _run_owned(plan_path):
         validated = response.get("verifie") is True
         result.update(ok=response["ok"], result=response, result_validated=validated,
                       state="failed" if not response["ok"] else "completed" if validated else "completed_unverified")
+        if not response["ok"]:
+            result.pop("progress", None)
     except TransferCancelled:
+        result.pop("progress", None)
         result.update(ok=False, state="cancelled", cancellation_observed=True, partial_output_possible=True,
                       cancellation_scope="owned_transfer_process", descendants_stopped_verified=False)
     except Exception as exc:
+        result.pop("progress", None)
         result.update(ok=False, state="failed", error=str(exc), partial_output_possible=True)
     result.update(finished_at=time.time(), phase=None)
     publish()

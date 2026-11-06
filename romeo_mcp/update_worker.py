@@ -34,7 +34,7 @@ def run(plan_path: Path) -> int:
     target = u.installation()
     plan = u._read_json(plan_path)
     if (not isinstance(plan, dict) or plan.get("schema") != 1 or plan.get("sha256") != service.seal(plan)
-            or plan.get("origin") != target.origin or plan.get("action") not in {"update", "rollback"}):
+            or plan.get("origin") != target.origin or plan.get("action") != "update"):
         raise u.UpdateError("Plan de mise a jour invalide ou altere.")
     operation_id = plan["operation_id"]
     directory = service._operation_path(target, operation_id)
@@ -64,11 +64,8 @@ def run(plan_path: Path) -> int:
                 raise u.UpdateError("Cette operation a ete remplacee ; aucune installation effectuee.")
             publish()
             thread.start()
-            if plan["action"] == "rollback":
-                outcome = u.rollback(target, plan["before"], progress=publish)
-            else:
-                u.validate_release(plan["release"])
-                outcome = u.apply_release(target, plan["release"], plan["before"], progress=publish)
+            u.validate_release(plan["release"])
+            outcome = u.apply_release(target, plan["release"], plan["before"], progress=publish)
             with mutex:
                 result.update(**outcome, ok=True, state="ready", phase=None, result_validated=True,
                               message=f"Version {outcome['version']} verifiee et selectionnee. Reconnecter le MCP ou redemarrer l'application pour l'executer.")

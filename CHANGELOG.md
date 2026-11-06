@@ -5,14 +5,39 @@
 <details>
 <summary>Sommaire de cette page</summary>
 
-- [Non publié — intentions et cycles de vie explicites](#non-publié--intentions-et-cycles-de-vie-explicites)
-- [Non publié](#non-publié)
+- [1.5.0](#150)
 - [1.4.0](#140)
 - [1.3.0](#130)
 
 </details>
 
-## Non publié — intentions et cycles de vie explicites
+## 1.5.0
+
+Cette version vérifie les mises à jour suivantes : une installation 1.4.0 passe
+encore à cette version avec son ancien contrôle SHA-256.
+
+### Espaces projet
+
+- Sous `/project/<code>`, les outils n’écrivent plus que dans le dossier du login SSH, les dossiers de cours et ceux déclarés par `ROMEO_PROJECT_DIRS`. La lecture reste libre.
+- Le dossier personnel est créé et refermé en mode `2700` avant chaque écriture. S’il appartient à un autre compte, rien n’est écrit et le refus nomme son propriétaire.
+- `login_command_run` applique la règle aux arguments littéraux, y compris après `cd` et dans les redirections, et refuse les suppressions et changements de droits dans ces espaces.
+
+### Chaîne de mise à jour
+
+- Une wheel n’est installée qu’avec une attestation Sigstore valide : provenance SLSA signée par le workflow de release du dépôt, sur le tag de cette version. La vérification tourne dans un venv dédié, épinglé par hash.
+- Les dépendances d’une mise à jour viennent d’un verrou livré dans la wheel attestée et s’installent avec `pip --require-hashes --no-deps --only-binary :all:`.
+- Les mises à jour se décident hors du modèle : `mcp_update_check` et `mcp_update_status` lisent seulement l’état. L’installation, le retour arrière et l’accord automatique passent par le terminal, et `python -m romeo_mcp update --auto on` exige un terminal interactif. Un accord enregistré sans cette voie n’est pas repris.
+- Le workflow de release atteste la wheel, les sources et `SHA256SUMS`.
+
+### RTK et commandes du login
+
+- `rtk_status` vérifie RTK et lit ses statistiques JSON dans les profils `full` et `expert`.
+- `login_command_run` propose `use_rtk` et `max_chars`, avec commande demandée, commande exécutée et état de la réécriture. Le mode brut reste le défaut.
+- Détection de `~/.local/bin/rtk` même avec un ancien PATH SSH ; délai partagé entre détection, réécriture et exécution. Les refus, erreurs et délais ne déclenchent aucun replay de la commande utilisateur.
+- Les garde-fous vérifient aussi les commandes enveloppées par RTK ; les sondes internes et les scripts Slurm préparés conservent leur sortie et leurs commandes exactes.
+- [Installation automatique](docs/rtk.md) : au premier besoin, `login_command_run(use_rtk=true)` ou `rtk_status` pose RTK 1.1.0 (édition Apache-2.0, x86_64) dans `~/.local/bin`, sans action de l’utilisateur et jamais au démarrage du serveur. Version, taille et SHA-256 sont épinglés dans le dépôt et toute différence est refusée. Un fichier déjà présent n’est pas remplacé. Un échec laisse la commande en mode brut, figure dans le champ `install` et n’est retenté qu’au démarrage suivant du serveur. `ROMEO_RTK_AUTO_INSTALL=0` désactive cette installation. `rtk_status` n’est donc plus annoncé en lecture seule.
+
+### Intentions et cycles de vie explicites
 
 - Quatorze outils RomeoLLMTool : catalogue, préparation et lancement Slurm sans
   attente, suivi, journaux, accès, gateway, chat ponctuel et diagnostics. Plans
@@ -24,9 +49,6 @@
   Création suivie d'une relecture, protection contre les doublons locaux,
   plafonds d'envoi et absence de deuxième POST après résultat incertain.
   Connexion GitHub CLI ou jeton privé ; aucun journal ou argument collecté.
-- Mises à jour pilotables par cinq outils MCP dans tous les profils : contrôle
-  visible, autorisation automatique persistante, préparation détachée, suivi
-  après reconnexion et retour arrière avec écartement de la version annulée.
 - Erreurs GitHub distinctes d'une absence de mise à jour, cache daté, protection
   contre les doubles installations et distinction version prête/version exécutée.
 - Inventaire du test protocole remis à jour et vérifié hors ligne ; remplacement
@@ -50,8 +72,7 @@
 - Environnements Python structurés ; exécuteurs génériques limités au catalogue `expert`.
 - Migration incompatible des anciens outils composites : voir `docs/Tools.md`.
 
-
-## Non publié
+### Corpus, énergie, rapports et divers
 
 - Corpus ROMEO recollecté le 16 octobre 2026 : 50 pages officielles et
   34 images au lieu de 42 et 21. Ajout de RomeoLLMTool (lancement de LLM par

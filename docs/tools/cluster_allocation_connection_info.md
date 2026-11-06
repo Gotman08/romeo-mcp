@@ -48,7 +48,7 @@ Le job doit être RUNNING. L’outil fournit la commande mais n’ouvre aucun sh
 
 [`cluster_allocation_start`](cluster_allocation_start.md) · [`job_status`](job_status.md) · [`cancel_job`](cancel_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L101) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L106) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

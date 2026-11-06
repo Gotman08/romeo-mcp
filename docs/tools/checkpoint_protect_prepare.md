@@ -24,7 +24,7 @@ Les identifiants et chemins sont illustratifs.
 ```json
 {
   "job_id": "123456",
-  "backup_dir": "/project/VOTRE_PROJET/checkpoints",
+  "backup_dir": "/project/VOTRE_PROJET/VOTRE_IDENTIFIANT/checkpoints",
   "quota_fileset": "fileset_projet",
   "quota_group": "groupe_projet"
 }

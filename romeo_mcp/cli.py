@@ -50,6 +50,7 @@ def main() -> None:
     operation = update.add_mutually_exclusive_group()
     operation.add_argument("--check", action="store_true", help="consulter la derniere release sans installer")
     operation.add_argument("--rollback", action="store_true", help="reactiver l'environnement precedent")
+    operation.add_argument("--auto", choices=("on", "off"), help="installation automatique des releases attestees ; on exige un terminal interactif")
     update.add_argument("--yes", action="store_true", help="confirmation explicite sans dialogue interactif")
     update.add_argument("--json", action="store_true", help="reponse structuree pour --check uniquement")
     issues = sub.add_parser("issues", help="autoriser les rapports GitHub automatiques ou relire les rapports locaux")
@@ -81,7 +82,7 @@ def main() -> None:
         elif args.action == "update":
             if args.json and not args.check:
                 parser.error("--json s'utilise avec update --check")
-            updates.command(check_only=args.check, revert=args.rollback, yes=args.yes, json_output=args.json)
+            updates.command(check_only=args.check, revert=args.rollback, yes=args.yes, json_output=args.json, auto=args.auto)
         elif args.action == "configure":
             values = {key: value for key, value in (
                 ("ROMEO_ACCOUNT", args.account), ("ROMEO_HOST", args.host),

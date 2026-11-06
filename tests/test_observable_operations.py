@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import offline
 from romeo_mcp import server as assembled
 from romeo_mcp import outils_calcul as jobs, outils_contexte as context, outils_diagnostics as diagnostics
-from romeo_mcp import transfers, transfer_worker, transfer_progress, outils_donnees as data, files, noyau, services
+from romeo_mcp import transfers, transfer_worker, outils_donnees as data, files, noyau, services
+from romeo_mcp import confined_transfers, transfer_progress
 from romeo_mcp.observability import ReadCache
 from romeo_mcp.registry import Registry
 from romeo_mcp.ssh import RomeoSession, Result, SSHError
@@ -276,6 +277,127 @@ class ObservableTests(unittest.TestCase):
         self.assertEqual(observed["state"], "completed_unverified")
         self.assertFalse(observed["result_validated"])
 
+    @unittest.skipUnless(os.name == 'posix', 'vrai superviseur POSIX local ; aucun SSH')
+    def test_worker_saves_confined_scp_destination_progress_in_both_directions(self):
+        remote = self.root/'remote'
+        remote.mkdir()
+        self.connection.home = self.connection.scratch = str(remote)
+        native_popen = transfer_worker.subprocess.Popen
+        copy_program = (
+            'import sys,time\n'
+            'with open(sys.argv[1],"rb") as source, open(sys.argv[2],"wb") as target:\n'
+            ' while True:\n'
+            '  block=source.read(65536)\n'
+            '  if not block: break\n'
+            '  target.write(block); target.flush(); time.sleep(.2)\n'
+        )
+        launched = []
+
+        def local_process(argv, **kwargs):
+            launched.append(argv[0])
+            if argv[0] == 'ssh':
+                words = shlex.split(argv[-1])
+                argv = [sys.executable, '-u', '-c', words[3], words[4]]
+            elif argv[0] == 'scp':
+                source, destination = argv[-2:]
+                prefix = self.connection.host + ':'
+                source = source.removeprefix(prefix)
+                destination = destination.removeprefix(prefix)
+                argv = [sys.executable, '-u', '-c', copy_program, source, destination]
+            else:
+                self.fail('Processus inattendu dans la copie locale : ' + repr(argv))
+            return native_popen(argv, **kwargs)
+
+        for direction, verify in (('upload', True), ('download', True), ('upload', False)):
+            with self.subTest(direction=direction, verify=verify):
+                source = self.root/'source.bin' if direction == 'upload' else remote/'source.bin'
+                destination = remote/'upload.bin' if direction == 'upload' else self.root/'download.bin'
+                source.write_bytes(os.urandom(1024 ** 2))
+                local = source if direction == 'upload' else destination
+                distant = destination if direction == 'upload' else source
+                prepared = transfers.prepare(direction, str(local), str(distant), verify=verify)
+                directory, _ = transfers.load(prepared['transfer_id'])
+                seen = None
+                with patch.object(confined_transfers.subprocess, 'Popen', side_effect=local_process):
+                    worker = threading.Thread(target=transfer_worker.run, args=(directory/'plan.json',))
+                    worker.start()
+                    try:
+                        deadline = time.monotonic() + 8
+                        while worker.is_alive() and time.monotonic() < deadline:
+                            observed = transfers.status(prepared['transfer_id'])
+                            progress = observed.get('progress') or {}
+                            if 0 < progress.get('percent_reported', 100) < 100:
+                                seen = observed
+                            time.sleep(.02)
+                        worker.join(2)
+                        self.assertFalse(worker.is_alive())
+                    finally:
+                        if worker.is_alive():
+                            transfers.cancel(prepared['transfer_id'], True)
+                            worker.join(5)
+                completed = transfers.status(prepared['transfer_id'])
+                self.assertIsNotNone(seen, completed)
+                self.assertEqual(seen['state'], 'running')
+                self.assertFalse(seen['result_validated'])
+                self.assertEqual(seen['progress']['source'], 'scp_destination_size')
+                self.assertEqual(seen['progress']['bytes_total'], source.stat().st_size)
+                self.assertGreater(seen['progress']['bytes_per_second'], 0)
+                self.assertGreater(seen['progress']['eta_seconds'], 0)
+                self.assertEqual(completed['state'], 'completed' if verify else 'completed_unverified', completed)
+                self.assertIs(completed['result_validated'], verify)
+                self.assertEqual(completed['result']['transport'], 'scp')
+                self.assertEqual(completed['progress']['percent_reported'], 100)
+                self.assertEqual(completed['progress']['bytes_transferred'], source.stat().st_size)
+                self.assertEqual(completed['progress']['bytes_total'], source.stat().st_size)
+                self.assertEqual(source.read_bytes(), destination.read_bytes())
+                self.assertIsNone(files._PROGRESS_PROBE.get())
+        self.assertEqual(launched, ['ssh', 'scp'] * 3)
+        self.assertFalse(list(remote.rglob('.romeo-transfer-*')))
+        self.assertFalse(list(self.root.glob('.romeo-download-*')))
+
+    def test_worker_removes_progress_after_a_probe_becomes_invalid(self):
+        source = self.root/'source.bin'
+        source.write_bytes(b'test')
+        prepared = transfers.prepare('upload', str(source), '/scratch/test-user/copy', verify=False)
+        directory, _ = transfers.load(prepared['transfer_id'])
+        readings = iter([{'valid': True, 'bytes_present': 1, 'bytes_total': 4},
+                         {'valid': False, 'bytes_present': None, 'bytes_total': 4}])
+        probe = transfer_progress.DestinationProgress(4, lambda: next(readings))
+
+        def copy(*args):
+            token = files._PROGRESS_PROBE.set(probe)
+            try:
+                files._run([sys.executable, '-c', 'import time; time.sleep(2.2)'], 'local bounded probe')
+            finally:
+                files._PROGRESS_PROBE.reset(token)
+            return {'sent': str(source), 'transport': 'scp'}
+
+        with patch.object(files, 'upload', side_effect=copy):
+            worker = threading.Thread(target=transfer_worker.run, args=(directory/'plan.json',))
+            worker.start()
+            seen, removed = False, False
+            try:
+                deadline = time.monotonic() + 6
+                while worker.is_alive() and time.monotonic() < deadline:
+                    observed = transfers.status(prepared['transfer_id'])
+                    if observed.get('progress'):
+                        seen = True
+                    elif seen and observed['state'] == 'running':
+                        removed = True
+                    time.sleep(.02)
+                worker.join(2)
+                self.assertFalse(worker.is_alive())
+            finally:
+                if worker.is_alive():
+                    transfers.cancel(prepared['transfer_id'], True)
+                    worker.join(5)
+        completed = transfers.status(prepared['transfer_id'])
+        self.assertTrue(seen, completed)
+        self.assertTrue(removed, completed)
+        self.assertNotIn('progress', completed)
+        self.assertEqual(completed['state'], 'completed_unverified', completed)
+        self.assertFalse(completed['result_validated'])
+
     @unittest.skipUnless(shutil.which("rsync"), "rsync facultatif absent ; repli scp conserve")
     def test_worker_saves_real_rsync_progress_without_claiming_integrity(self):
         source, destination = self.root / "source.bin", self.root / "copy.bin"
@@ -360,6 +482,176 @@ class ObservableTests(unittest.TestCase):
             names = {t.name for t in asyncio.run(noyau.server.list_tools())}
             groups = diagnostics.romeo_capabilities()["groups"]
         self.assertTrue(all(t["name"] in names for g in groups for t in g["tools"]))
+
+
+class DestinationProgressTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'nt', 'horodatages des fichiers Windows')
+    def test_real_windows_file_signature_survives_a_modified_timestamp(self):
+        with tempfile.TemporaryDirectory(prefix='romeo-progress-windows-') as temporary:
+            path = Path(temporary)/'source'
+            path.write_bytes(b'original')
+            before = path.lstat()
+            os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns + 5_000_000_000))
+            current = path.lstat()
+            observed = transfer_progress.regular_file_signature(path)
+            self.assertEqual(observed[:4], (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns))
+            self.assertIsNone(observed[4])
+            self.assertEqual(transfer_progress.regular_file_signature(path), observed)
+
+    def test_real_local_source_signature_detects_mtime_and_size_changes(self):
+        with tempfile.TemporaryDirectory(prefix='romeo-progress-changed-') as temporary:
+            path = Path(temporary)/'source'
+            path.write_bytes(b'original')
+            original = transfer_progress.regular_file_signature(path)
+            os.utime(path, ns=(path.stat().st_atime_ns, original[3] + 5_000_000_000))
+            changed_time = transfer_progress.regular_file_signature(path)
+            self.assertEqual(changed_time[:3], original[:3])
+            self.assertNotEqual(changed_time[3], original[3])
+            with path.open('ab') as stream:
+                stream.write(b'x')
+            os.utime(path, ns=(path.stat().st_atime_ns, original[3]))
+            changed_size = transfer_progress.regular_file_signature(path)
+            self.assertEqual(changed_size[3], original[3])
+            self.assertEqual(changed_size[2], original[2] + 1)
+            self.assertNotEqual(changed_size, original)
+
+    def test_destination_bytes_define_percentage_but_not_integrity(self):
+        readings = iter([{'valid': True, 'bytes_present': done, 'bytes_total': 100}
+                         for done in (0, 40, 100)])
+        observer = transfer_progress.DestinationProgress(100, lambda: next(readings))
+        with patch.object(transfer_progress.time, 'monotonic', side_effect=[10, 12, 14]), \
+                patch.object(transfer_progress.time, 'time', side_effect=[1000, 999, 998]):
+            first, middle, final = observer.sample(), observer.sample(), observer.sample()
+        self.assertEqual(first['source'], 'scp_destination_size')
+        self.assertIsNone(first['bytes_per_second'])
+        self.assertIsNone(first['eta_seconds'])
+        self.assertEqual(middle['percent_reported'], 40)
+        self.assertEqual(middle['bytes_per_second'], 20)
+        self.assertEqual(middle['eta_seconds'], 3)
+        self.assertEqual(final['percent_reported'], 100)
+        self.assertEqual(final['bytes_transferred'], 100)
+        self.assertEqual(final['bytes_total'], 100)
+        self.assertEqual(final['eta_seconds'], 0)
+        self.assertNotIn('result_validated', final)
+
+    def test_pending_measurements_preserve_cached_timestamp_and_rate_baseline(self):
+        readings = iter([None, {'valid': True, 'bytes_present': 40, 'bytes_total': 100},
+                         None, None, {'valid': True, 'bytes_present': 60, 'bytes_total': 100}])
+        observer = transfer_progress.DestinationProgress(100, lambda: next(readings))
+        with patch.object(transfer_progress.time, 'monotonic', side_effect=[10, 20]) as measured, \
+                patch.object(transfer_progress.time, 'time', side_effect=[1000, 1001]) as dated:
+            self.assertIsNone(observer.sample())
+            self.assertIsNone(observer.previous)
+            first = observer.sample()
+            baseline = observer.previous
+            pending = observer.sample()
+            self.assertEqual(pending, first)
+            self.assertIsNot(pending, first)
+            self.assertEqual(observer.previous, baseline)
+            pending['bytes_transferred'] = 999
+            self.assertEqual(observer.sample(), first)
+            self.assertEqual(observer.previous, baseline)
+            following = observer.sample()
+        self.assertEqual(measured.call_count, 2)
+        self.assertEqual(dated.call_count, 2)
+        self.assertEqual(first['observed_at'], 1000)
+        self.assertEqual(following['observed_at'], 1001)
+        self.assertEqual(following['bytes_per_second'], 2)
+        self.assertEqual(following['eta_seconds'], 20)
+
+    def test_finish_uses_the_fresh_final_callback_instead_of_the_poll_callback(self):
+        poll = Mock(return_value={'valid': True, 'bytes_present': 40, 'bytes_total': 100})
+        final = Mock(return_value={'valid': True, 'bytes_present': 100, 'bytes_total': 100})
+        observer = transfer_progress.DestinationProgress(100, poll, final)
+        self.assertEqual(observer.sample()['percent_reported'], 40)
+        self.assertEqual(observer.finish()['percent_reported'], 100)
+        poll.assert_called_once_with()
+        final.assert_called_once_with()
+
+    def test_delayed_replies_and_final_measurement_use_request_times_for_age_and_rate(self):
+        readings = iter([{'valid': True, 'bytes_present': 20, 'bytes_total': 100,
+                          'observed_at': 1000, 'observed_monotonic': 10},
+                         {'valid': True, 'bytes_present': 60, 'bytes_total': 100,
+                          'observed_at': 1010, 'observed_monotonic': 20}, None])
+        final = Mock(return_value={'valid': True, 'bytes_present': 100, 'bytes_total': 100,
+                                   'observed_at': 1020, 'observed_monotonic': 30})
+        observer = transfer_progress.DestinationProgress(100, lambda: next(readings), final)
+        clock = [1030, 40]
+        with patch.object(transfer_progress.time, 'time', side_effect=lambda: clock[0]), \
+                patch.object(transfer_progress.time, 'monotonic', side_effect=lambda: clock[1]):
+            first = observer.sample()
+            clock[:] = [1045, 55]
+            middle = observer.sample()
+            baseline = observer.previous
+            clock[:] = [1050, 60]
+            self.assertEqual(observer.sample(), middle)
+            self.assertEqual(observer.previous, baseline)
+            clock[:] = [1060, 70]
+            completed = observer.finish()
+        self.assertEqual(first['observed_at'], 1000)
+        self.assertEqual(middle['observed_at'], 1010)
+        self.assertEqual(middle['bytes_per_second'], 4)
+        self.assertEqual(middle['eta_seconds'], 10)
+        self.assertEqual(completed['observed_at'], 1020)
+        self.assertEqual(completed['bytes_per_second'], 4)
+        self.assertEqual(completed['eta_seconds'], 0)
+        final.assert_called_once_with()
+
+    def test_inconsistent_or_unavailable_measurements_permanently_remove_the_gauge(self):
+        invalid = [{'valid': False},
+                   {'valid': True, 'bytes_present': -1, 'bytes_total': 100},
+                   {'valid': True, 'bytes_present': 101, 'bytes_total': 100},
+                   {'valid': True, 'bytes_present': 20, 'bytes_total': 99},
+                   {'valid': True, 'bytes_present': True, 'bytes_total': 100}]
+        for bad in invalid:
+            with self.subTest(bad=bad):
+                readings = iter([{'valid': True, 'bytes_present': 40, 'bytes_total': 100},
+                                 bad, {'valid': True, 'bytes_present': 50, 'bytes_total': 100}])
+                observer = transfer_progress.DestinationProgress(100, lambda: next(readings))
+                self.assertIsNotNone(observer.sample())
+                self.assertIsNone(observer.sample())
+                self.assertIsNone(observer.sample())
+        with self.assertRaises(ValueError):
+            transfer_progress.DestinationProgress(0, lambda: self.fail('Aucun total fiable'))
+
+    def test_regressing_destination_size_permanently_removes_the_gauge(self):
+        readings = iter([{'valid': True, 'bytes_present': done, 'bytes_total': 100}
+                         for done in (40, 20, 50)])
+        observer = transfer_progress.DestinationProgress(100, lambda: next(readings))
+        self.assertIsNotNone(observer.sample())
+        self.assertIsNone(observer.sample())
+        self.assertIsNone(observer.sample())
+
+    def test_local_destination_is_zero_until_created_then_latches_inode_replacement(self):
+        with tempfile.TemporaryDirectory(prefix='romeo-progress-local-') as temporary:
+            path = Path(temporary)/'destination'
+            observer = transfer_progress.LocalDestination(path)
+            self.assertEqual(observer.sample(), 0)
+            path.write_bytes(b'12345678')
+            self.assertEqual(observer.sample(), 8)
+            path.rename(path.with_name('old-destination'))
+            path.write_bytes(b'12345678')
+            self.assertIsNone(observer.sample())
+            path.write_bytes(b'123456789')
+            self.assertIsNone(observer.sample())
+
+    @unittest.skipUnless(os.name == 'posix', 'liens et FIFO POSIX')
+    def test_local_destination_refuses_symlink_and_fifo_without_following_or_waiting(self):
+        with tempfile.TemporaryDirectory(prefix='romeo-progress-special-') as temporary:
+            root = Path(temporary)
+            outside = root/'outside'
+            outside.write_bytes(b'private')
+            for kind in ('symlink', 'fifo'):
+                with self.subTest(kind=kind):
+                    path = root/kind
+                    if kind == 'symlink':
+                        path.symlink_to(outside)
+                    else:
+                        os.mkfifo(path)
+                    with self.assertRaises(ValueError):
+                        transfer_progress.regular_file_signature(path)
+                    self.assertIsNone(transfer_progress.LocalDestination(path).sample())
+            self.assertEqual(outside.read_bytes(), b'private')
 
 
 class TransportTests(unittest.TestCase):

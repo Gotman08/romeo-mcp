@@ -172,8 +172,16 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
         .filter(|progress| progress.percent().is_some())
     {
         lines.push(progress::bar(Some(progress), 32));
+        let destination_size = progress.source == "scp_destination_size";
+        if destination_size {
+            lines.push(line("Mesure", "Taille présente dans la copie (SCP)"));
+        }
         lines.push(line(
-            "Octets traités",
+            if destination_size {
+                "Octets présents"
+            } else {
+                "Octets traités"
+            },
             if let Some(total) = progress.bytes_total {
                 format!(
                     "{} / {}",
@@ -188,7 +196,11 @@ fn transfer(app: &App) -> Vec<Line<'static>> {
             Line::from(""),
             section("Temps"),
             line(
-                "Débit utile",
+                if destination_size {
+                    "Débit observé"
+                } else {
+                    "Débit utile"
+                },
                 progress
                     .bytes_per_second
                     .map(|speed| format!("{}/s", bytes(speed)))

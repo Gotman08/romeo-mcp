@@ -5,11 +5,12 @@ import json
 import time
 from .resource_locks import ResourceLease, ResourceBusy
 from .cluster import DEFAULT_HOST, require_account
-from .guard import check_path
+from .guard import GuardError, check_path, check_project_write
 from .pipeline import clause_dependance
 from .registry import PLAN_TTL_SECONDS, registry
+from .remote_paths import ensure_private_folder
 from .slurm import JobSpec, Plan, plan_job
-from .ssh import session
+from .ssh import SSHError, session
 from .execution_backend import (_contexte_chemins, _controle_du_script_genere,
                                 _doublon_recent, _error, _soumettre_sbatch)
 
@@ -29,6 +30,13 @@ def _submission_target(s, home: str, scratch: str) -> dict:
             "home": home, "scratch": scratch}
 
 
+def _written_paths(plan, preview) -> list[str]:
+    """Dossiers qu'un job ecrira : travail, checkpoints, copies et environnement."""
+    contract = plan.spec.checkpoint_contract or {}
+    candidates = (plan.workdir, plan.spec.checkpoint_dir, contract.get("backup_dir"), preview.get("env_path"))
+    return [path for path in candidates if path]
+
+
 def prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dict:
     """Fige les scripts ; une simulation illustrative ne devient jamais executable."""
     from .checkpoint_jobs import runtime_files
@@ -36,6 +44,9 @@ def prepare_submission(kind, s, home, scratch, offline, entries, preview) -> dic
     for entry in entries:
         value = entry["plan"]
         plan = Plan(**{**value, "spec": JobSpec(**value["spec"])})
+        if not offline:
+            for path in _written_paths(plan, preview):
+                check_project_write(path, s)
         for item in runtime_files(plan):
             previous = generated.get(item["path"])
             if previous and previous["sha256"] != item["sha256"]:
@@ -120,6 +131,14 @@ def _submit_prepared(kind: str, plan_id: str, confirm: bool, fingerprint=None) -
         if previous:
             return _error("Un job identique est deja actif. Consulte job_status.",
                           duplicate_of=previous["job_id"], submitted=False)
+    try:
+        # Avant la reservation : un plan refuse reste consultable et rien n'est ecrit.
+        for _, plan in plans:
+            for path in _written_paths(plan, payload["preview"]):
+                check_project_write(path, s)
+                ensure_private_folder(s, path)
+    except (GuardError, SSHError) as exc:
+        return _error(str(exc), submitted=False)
     if not store.claim_submission(plan_id, fingerprint):
         return _error("Plan ou intention identique deja reserve, actif, incertain ou expire. "
                       "Consulte list_jobs et job_status avant une nouvelle tentative.", plan_id=plan_id, submitted=False)

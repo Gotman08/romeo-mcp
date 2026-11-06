@@ -73,7 +73,7 @@ Aucune dépendance n’est installée pendant cette préparation. vLLM exige un 
 
 [`service_start`](service_start.md) · [`python_env_prepare`](python_env_prepare.md) · [`python_packages_prepare`](python_packages_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L21) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L26) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

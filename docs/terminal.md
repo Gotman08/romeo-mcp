@@ -172,13 +172,28 @@ pour les jobs et 60 pour les transferts. `--job-stale-after` et
 Une date future incohérente reste une alerte. Les listes larges et les détails
 affichent ces badges ; les petites listes privilégient état et validation.
 
-Les nouveaux transferts détachés utilisent `rsync --info=progress2` si rsync
-local est en version 3.1 ou supérieure. L'inventaire initial complet peut
-consommer davantage de mémoire sur un gros répertoire. Le pourcentage arrondi
-fourni par rsync n'est pas converti en taille totale prétendument exacte. Sans
-mesures (scp, ancien rsync ou ancien statut), la progression reste non mesurée.
-Ces statistiques sont enregistrées par le worker sans sondage SSH supplémentaire.
-Les transferts synchrones conservent leur comportement.
+Les transferts détachés de fichiers réguliers par le chemin SCP confiné
+mesurent la taille présente dans leur copie temporaire, avant publication.
+La taille totale vient du fichier source observé. Le détail précise cette
+provenance : ce compteur ne mesure pas le trafic réseau et ne prouve pas
+l'intégrité. Le débit observé et l'estimation utilisent la croissance entre
+deux mesures, sans déduire une progression du temps écoulé. Atteindre 100 %
+laisse la validation SHA-256 indépendante.
+
+Les mesures d'envoi utilisent le canal du superviseur déjà ouvert ; les
+mesures de réception lisent la copie locale privée. Les chemins autorisés,
+les descripteurs conservés et les contrôles avant publication restent actifs.
+Une seule demande de mesure peut être en attente ; elle ne bloque pas SCP.
+L'âge de sa preuve part de la date locale de demande, par prudence : une
+réponse retardée ne paraît pas plus récente et un heartbeat ne la rafraîchit
+pas. Après la copie, une nouvelle mesure est demandée avant publication.
+Une source modifiée, une copie remplacée ou une mesure incohérente rend la
+progression inconnue. Les répertoires, fichiers vides et anciens statuts sans
+mesure restent sans jauge numérique.
+
+Les observations `rsync --info=progress2` déjà enregistrées restent lisibles.
+Leur pourcentage arrondi n'est pas converti en taille totale prétendument
+exacte. Les transferts synchrones conservent leur comportement.
 
 ## Couverture et coût des lectures
 

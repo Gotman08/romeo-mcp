@@ -39,27 +39,30 @@ def policy(target: u.Installation) -> dict:
     if held is not None:
         u.version_tuple(held)
     override = os.environ.get("ROMEO_AUTO_UPDATE")
-    automatic = value["automatic"]
+    # Un accord sans cette origine pouvait venir du modele : il n'est pas repris.
+    legacy = value["automatic"] and value.get("set_by") != "terminal"
+    automatic = value["automatic"] and not legacy
     if override is not None:
         if override.casefold() not in {"0", "false", "no", "1", "true", "yes"}:
             raise u.UpdateError("ROMEO_AUTO_UPDATE doit valoir 0 ou 1.")
         automatic = override.casefold() in {"1", "true", "yes"}
-    return {"automatic_enabled": automatic, "held_version": held,
-            "policy_source": "environment" if override is not None else "saved"}
+    source = "environment" if override is not None else "legacy_ignored" if legacy else "saved"
+    return {"automatic_enabled": automatic, "held_version": held, "policy_source": source}
 
 
 def configure(automatic: bool, confirm: bool = False, *, target=None) -> dict:
+    """Appele par le terminal uniquement : aucun outil MCP ne modifie cet accord."""
     if confirm is not True:
-        raise u.UpdateError("L'autorisation automatique exige confirm=true apres accord de l'utilisateur.")
+        raise u.UpdateError("L'autorisation automatique exige une confirmation de l'utilisateur.")
     if type(automatic) is not bool:
         raise u.UpdateError("automatic doit etre un booleen.")
     target = target or u.installation()
     with u.file_lock(target.root / "control.lock"):
-        u._write_json(target.root / "policy.json", {"schema": 1, "automatic": automatic, "held_version": None})
+        u._write_json(target.root / "policy.json", {"schema": 1, "automatic": automatic, "held_version": None, "set_by": "terminal"})
     result = policy(target)
     return {"ok": True, **result, "saved_automatic": automatic,
-            "message": "Autorisation enregistree ; le modele doit annoncer les nouvelles versions et suivre leur preparation.",
-            "next_step": "mcp_update_check puis mcp_update_start si une version est disponible."}
+            "message": ("Installation automatique activee : seules les releases attestees seront preparees au demarrage."
+                        if automatic else "Installation automatique desactivee.")}
 
 
 def hold_version(target: u.Installation, before: dict) -> None:
@@ -180,7 +183,7 @@ def check(refresh: bool = False, *, target=None) -> dict:
             "update_available": None if cached.get("error") else available, "installation_needed": needed,
             "automatic_held": auto_held, "checked_at": cached["checked_at"], "check_age_seconds": cached["check_age_seconds"],
             "check_error": cached.get("error"), "release": public_release, "operation": operation,
-            "message": message, "next_step": "Signaler ce statut a l'utilisateur ; mcp_update_status pour une preparation en cours."}
+            "message": message, "next_step": "Signaler ce statut a l'utilisateur : lui seul installe, depuis son terminal, avec python -m romeo_mcp update."}
 
 
 def seal(plan: dict) -> str:
@@ -195,9 +198,10 @@ def _in_progress(target):
     return None
 
 
-def start(confirm: bool = False, expected_version: str = "", *, revert=False, target=None) -> dict:
+def start(confirm: bool = False, expected_version: str = "", *, target=None) -> dict:
+    """Preparation detachee, lancee au demarrage apres un accord donne dans le terminal."""
     if confirm is not True:
-        raise u.UpdateError("La mise a jour exige confirm=true ; un accord automatique deja donne suffit.")
+        raise u.UpdateError("La mise a jour exige une confirmation ; un accord automatique deja donne suffit.")
     target = target or u.installation()
     # Une repetition d'appel ne doit pas interroger GitHub ni echouer parce
     # que GitHub est momentanement indisponible pendant un transfert existant.
@@ -205,10 +209,10 @@ def start(confirm: bool = False, expected_version: str = "", *, revert=False, ta
         pending = _in_progress(target)
         if pending:
             return pending
-    checked = None if revert else check(True, target=target)
-    if checked and not checked["ok"]:
+    checked = check(True, target=target)
+    if not checked["ok"]:
         return {**checked, "started": False}
-    if checked and expected_version and checked["latest_version"] != expected_version:
+    if expected_version and checked["latest_version"] != expected_version:
         raise u.UpdateError("La release disponible a change ; l'annoncer avant de relancer.")
     with u.file_lock(target.root / "control.lock"):
         pending = _in_progress(target)
@@ -216,19 +220,14 @@ def start(confirm: bool = False, expected_version: str = "", *, revert=False, ta
             return pending
         with u.file_lock(target.root / "update.lock"):
             before = target.state()
-            if revert:
-                if not before.get("can_rollback"):
-                    raise u.UpdateError("Aucune version precedente n'est enregistree.")
-                release = None
-            else:
-                release = checked["release"]
-                info = overview(target)
-                if (not release or u.version_tuple(release["version"]) <= u.version_tuple(info["next_start_version"])
-                        or u.version_tuple(release["version"]) <= u.version_tuple(info["running_version"])):
-                    return {**info, "ok": True, "started": False, "message": checked["message"]}
+            release = checked["release"]
+            info = overview(target)
+            if (not release or u.version_tuple(release["version"]) <= u.version_tuple(info["next_start_version"])
+                    or u.version_tuple(release["version"]) <= u.version_tuple(info["running_version"])):
+                return {**info, "ok": True, "started": False, "message": checked["message"]}
             operation_id = uuid.uuid4().hex
             directory = _operation_path(target, operation_id)
-            plan = {"schema": 1, "operation_id": operation_id, "action": "rollback" if revert else "update",
+            plan = {"schema": 1, "operation_id": operation_id, "action": "update",
                     "before": before, "release": release, "origin": target.origin, "created_at": time.time()}
             plan["sha256"] = seal(plan)
             u._write_json(directory / "plan.json", plan)
@@ -240,10 +239,6 @@ def start(confirm: bool = False, expected_version: str = "", *, revert=False, ta
             env = {k: v for k, v in os.environ.items() if not k.startswith("ROMEO_")}
             env.update({u.ORIGIN_ENV: json.dumps(target.origin), "ROMEO_UPDATES_DIR": str(target.root.parent),
                         "ROMEO_UPDATE_CHECK": "0", "ROMEO_CONFIG": str(directory / "unused-config.json")})
-            # Cette seule preference publique doit aussi s'appliquer au
-            # retour arriere execute dans un autre processus.
-            if "ROMEO_AUTO_UPDATE" in os.environ:
-                env["ROMEO_AUTO_UPDATE"] = os.environ["ROMEO_AUTO_UPDATE"]
             options = {"start_new_session": True} if os.name != "nt" else {"creationflags": subprocess.CREATE_NO_WINDOW}
             if os.name == "nt" and os.environ.get(u.DISPATCH_ENV) == "1":
                 options["creationflags"] |= subprocess.CREATE_BREAKAWAY_FROM_JOB
@@ -263,7 +258,7 @@ def start(confirm: bool = False, expected_version: str = "", *, revert=False, ta
     return {"ok": True, "started": True, "operation_id": operation_id, "worker_pid": child.pid,
             "result_validated": False, "restart_required": False,
             "message": "Preparation demarree ; attendre l'etat ready avant de reconnecter le MCP.",
-            "next_step": "mcp_update_status(operation_id=...)"}
+            "next_step": "mcp_update_status lit la progression."}
 
 
 def status(operation_id: str = "", *, target=None) -> dict:
