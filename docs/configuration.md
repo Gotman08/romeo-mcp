@@ -37,6 +37,7 @@ compte configuré. Le fichier ne contient ni clé SSH ni mot de passe.
 | `ROMEO_TOOL_PROFILE` | `full` | Catalogue annoncé : `essential`, `full` ou `expert` |
 | `ROMEO_AUTO_UPDATE` | Accord local, désactivé initialement | `1` autorise les installations automatiques ; `0` les bloque, même après un accord enregistré |
 | `ROMEO_UPDATE_CHECK` | `1` | `0` désactive le contrôle au démarrage ; les outils et le CLI restent utilisables |
+| `ROMEO_RTK_AUTO_INSTALL` | `1` | `0` empêche [l’installation automatique de RTK](rtk.md) au premier besoin ; un RTK déjà présent reste utilisé |
 | `ROMEO_UPDATES_DIR` | Dossier utilisateur hors Git | Racine des versions isolées, de la politique et des observations |
 | `ROMEO_AUTO_ISSUES` | Accord local, désactivé initialement | `1` autorise les rapports GitHub automatiques ; `0` désactive ces envois |
 | `ROMEO_REPORTS_DIR` | `issue-reports/` à côté de `ROMEO_CONFIG` | Registre SQLite privé et autorisation persistante, obligatoirement hors Git |

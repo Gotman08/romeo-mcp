@@ -9,4 +9,5 @@ os.environ["ROMEO_CONCURRENCY_ROOT"] = os.path.join(_TEST_STATE.name, "concurren
 os.environ.update(
     ROMEO_ACCOUNT="test-project", ROMEO_HOST="invalid-offline-host", ROMEO_QOS="normal",
     ROMEO_MAX_CPUS="1024", ROMEO_MAX_GPUS="16", ROMEO_MAX_JOBS="80",
+    ROMEO_RTK_AUTO_INSTALL="0",
 )

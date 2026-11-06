@@ -135,8 +135,8 @@ def compute_command_run(plan_id: str, confirm: bool = False) -> dict[str, Any]:
         "tout le laboratoire. `allow_heavy=true` leve ce refus pour les cas que "
         "la documentation ROMEO autorise explicitement, comme un `pip install` "
         "en environnement virtuel a destination du x86_64. Delai global maximal 20 s. "
-        "use_rtk=true condense la sortie via RTK si disponible ; false conserve "
-        "la commande brute. RTK ne contourne pas les garde-fous. max_chars borne la sortie."
+        "use_rtk=true condense la sortie via RTK, pose une fois au premier besoin, hors de ce delai ; "
+        "false conserve la commande brute. RTK ne contourne pas les garde-fous. max_chars borne la sortie."
     ),
 )
 def login_command_run(
@@ -194,24 +194,28 @@ def login_command_run(
     }
 
 
-@outil(annotations=READ_ONLY, description=(
-    "Verifie RTK dans l'espace utilisateur ou le PATH du login et lit sa version. "
-    "include_gain=true ajoute les statistiques JSON bornees. N'installe rien, "
-    "ne change aucune configuration et ne soumet aucun job. Les hooks Claude/Codex "
-    "ne couvrent pas le MCP : utilise login_command_run(use_rtk=true) dans expert."))
+@outil(annotations=MUTATING, description=(
+    "Verifie RTK dans l'espace utilisateur ou le PATH du login et lit sa version. S'il manque, pose une fois la release "
+    "epinglee dans ~/.local/bin, sauf ROMEO_RTK_AUTO_INSTALL=0 ; le champ install en rend compte. include_gain=true ajoute "
+    "les statistiques JSON bornees. Ne remplace aucun fichier, ne change aucune configuration et ne soumet aucun job. "
+    "Les hooks Claude/Codex ne couvrent pas le MCP : utilise login_command_run(use_rtk=true) dans expert."))
 def rtk_status(include_gain: bool = True) -> dict[str, Any]:
     s = session()
     deadline = rtk.Deadline(15)
     binary = rtk.find_binary(s, _sh, deadline)
+    details: dict[str, Any] = {"pinned_version": rtk.PINNED.version}
     if binary is None:
-        return {"ok": True, "available": False, "path": None,
-                "message": "RTK absent du login ; aucune installation effectuee."}
+        details["install"] = rtk.provision(s, deadline)
+        binary = details["install"].get("path")
+    if binary is None:
+        return {"ok": True, "available": False, "path": None, **details,
+                "message": "RTK absent du login ; le champ install indique pourquoi."}
     command = "RTK_TELEMETRY_DISABLED=1 " + shlex.quote(binary)
     version = _sh(s, command + " --version", timeout=deadline.remaining(), max_chars=512)
     if not version.ok or version.truncated or not re.fullmatch(r"rtk \S+", version.stdout.strip()):
         return _error("Le binaire RTK trouve ne fournit pas une version valide.",
-                      available=False, path=binary)
-    observed = {"ok": True, "available": True, "path": binary, "version": version.stdout.strip()}
+                      available=False, path=binary, **details)
+    observed = {"ok": True, "available": True, "path": binary, "version": version.stdout.strip(), **details}
     if include_gain:
         gain = _sh(s, command + " gain --format json", timeout=deadline.remaining(), max_chars=16_000)
         if not gain.ok or gain.truncated:

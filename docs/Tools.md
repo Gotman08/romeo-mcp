@@ -69,6 +69,7 @@ Chaque fiche explique son rôle, ses paramètres, un exemple d’appel, son rés
 | Fichiers, stockage et données | [11 fiches](#fichiers-stockage-et-données) | [Transferts vérifiés](#transferts-vérifiés) |
 | Scripts Slurm | [3 fiches](#scripts-slurm) | [Jobs et journaux](#jobs-et-journaux) |
 | Reproductibilité | [4 fiches](#reproductibilité) | [Fiches et limites](reproducibility.md) |
+| RTK | [1 fiche](#rtk) | [Installation automatique et release épinglée](rtk.md) |
 | Commandes du profil expert | [3 fiches](#commandes-du-profil-expert) | [Profils et autorisations](configuration.md#profils-doutils) |
 
 Les exemples JSON sont des arguments à transmettre au client MCP, après adaptation des chemins et identifiants. Les commandes shell de ce guide s’exécutent depuis la racine du dépôt.
@@ -77,9 +78,9 @@ Les exemples JSON sont des arguments à transmettre au client MCP, après adapta
 
 | Profil | Outils annoncés | Usage |
 |---|---:|---|
-| `essential` | 51 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
-| `full` | 111 | Ensemble des outils métier, y compris tableaux, pipelines, services, profilage et état RTK. |
-| `expert` | 114 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
+| `essential` | 48 | Documentation, contexte cluster, jobs, reprise, mises à jour, rapports MCP et relevés courants. |
+| `full` | 108 | Ensemble des outils métier, y compris tableaux, pipelines, services, profilage et état RTK. |
+| `expert` | 111 | Catalogue complet, avec les trois exécuteurs de commandes arbitraires. |
 
 Le profil par défaut est `full`. [`tool_profile_set`](tools/tool_profile_set.md) change le catalogue de la connexion ; [`tool_profile_get`](tools/tool_profile_get.md) permet de le vérifier.
 Les profils règlent la découverte des outils ; les autorisations restent celles du client et de ROMEO. Voir la [configuration des profils](configuration.md#profils-doutils).
@@ -250,9 +251,11 @@ Une liste absente ou vide, ainsi que le nom `python` seul, sont refusés dès la
 
 | Outil | Rôle | Profils |
 |---|---|---|
-| [`rtk_status`](tools/rtk_status.md) | Vérifier RTK et lire ses statistiques bornées sur le login. | `full`, `expert` |
+| [`rtk_status`](tools/rtk_status.md) | Vérifier RTK, l’installer s’il manque et lire ses statistiques bornées sur le login. | `full`, `expert` |
 
 La condensation est explicite avec [`login_command_run(use_rtk=true)`](tools/login_command_run.md). La commande brute reste le défaut. Le délai est global, la sortie est bornée et la réécriture ne dispense pas des garde-fous. Les sondes internes conservent leurs sorties structurées exactes.
+
+Personne n’a à installer RTK : [le MCP le pose au premier besoin](rtk.md) dans `~/.local/bin`, jamais au démarrage. Version et SHA-256 sont épinglés dans le dépôt, l’architecture est vérifiée et un fichier déjà présent n’est pas remplacé. Un échec laisse la commande en mode brut et figure dans le champ `install`. `ROMEO_RTK_AUTO_INSTALL=0` désactive cette installation.
 
 ### Commandes du profil expert
 

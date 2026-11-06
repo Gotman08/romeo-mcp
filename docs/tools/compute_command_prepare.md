@@ -57,7 +57,7 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Utiliser les outils métier lorsqu’ils couvrent l’opération. Relire toutes les commandes : leurs effets sont ceux du shell et ne sont pas limités à une opération métier.
 
-Pour RTK sur un nœud de calcul, inscrire explicitement une commande telle que `"$HOME/.local/bin/rtk" cargo test` dans `commands`. Le script ainsi préparé conserve la commande exacte. Les hooks des assistants ne s’appliquent pas aux jobs ; ne pas dépendre du PATH d’une ancienne session SSH. Utiliser un binaire compatible avec `arch`, ou un lanceur qui choisit l’architecture. [`rtk_status`](rtk_status.md) contrôle seulement le login.
+Pour RTK sur un nœud de calcul, inscrire explicitement une commande telle que `"$HOME/.local/bin/rtk" cargo test` dans `commands`. Le script ainsi préparé conserve la commande exacte. Les hooks des assistants ne s’appliquent pas aux jobs ; ne pas dépendre du PATH d’une ancienne session SSH. Utiliser un binaire compatible avec `arch`, ou un lanceur qui choisit l’architecture : [l’installation automatique](../rtk.md) pose un binaire x86_64, inutilisable sur les nœuds aarch64. [`rtk_status`](rtk_status.md) contrôle seulement le login.
 
 ## Voir aussi
 

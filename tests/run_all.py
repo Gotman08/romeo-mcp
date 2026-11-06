@@ -101,6 +101,8 @@ SUITES = [
      "fiche de reproductibilite d'un petit calcul CPU reel", True),
     ("project-spaces-live", "tests/smoke_project_spaces_live.py",
      "vrai serveur, GPFS et job Slurm : dossier prive et ecritures refusees (ROMEO_TEST_PROJECT)", True),
+    ("rtk-install-live", "tests/smoke_rtk_install_live.py",
+     "vrais serveur, GitHub et GPFS : installation de RTK au premier besoin dans un HOME de test, retire ensuite", True),
     ("update-chain-live", "tests/smoke_update_chain_live.py",
      "vrais GitHub, Sigstore et pip : attestations, verrous et installation", True),
     ("workloads-live", "tests/smoke_workloads_live.py",

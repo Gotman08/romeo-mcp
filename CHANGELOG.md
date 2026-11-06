@@ -35,6 +35,7 @@ encore à cette version avec son ancien contrôle SHA-256.
 - `login_command_run` propose `use_rtk` et `max_chars`, avec commande demandée, commande exécutée et état de la réécriture. Le mode brut reste le défaut.
 - Détection de `~/.local/bin/rtk` même avec un ancien PATH SSH ; délai partagé entre détection, réécriture et exécution. Les refus, erreurs et délais ne déclenchent aucun replay de la commande utilisateur.
 - Les garde-fous vérifient aussi les commandes enveloppées par RTK ; les sondes internes et les scripts Slurm préparés conservent leur sortie et leurs commandes exactes.
+- [Installation automatique](docs/rtk.md) : au premier besoin, `login_command_run(use_rtk=true)` ou `rtk_status` pose RTK 1.1.0 (édition Apache-2.0, x86_64) dans `~/.local/bin`, sans action de l’utilisateur et jamais au démarrage du serveur. Version, taille et SHA-256 sont épinglés dans le dépôt et toute différence est refusée. Un fichier déjà présent n’est pas remplacé. Un échec laisse la commande en mode brut, figure dans le champ `install` et n’est retenté qu’au démarrage suivant du serveur. `ROMEO_RTK_AUTO_INSTALL=0` désactive cette installation. `rtk_status` n’est donc plus annoncé en lecture seule.
 
 ### Intentions et cycles de vie explicites
 
