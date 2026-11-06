@@ -46,7 +46,7 @@ publication, le choix du compte bot local ou personnel et la suppression locale.
 La suite `energy` vérifie la conversion des compteurs, l'attribution au job,
 les valeurs inconnues et la couverture temporelle du facteur RTE, avec des
 données fictives. `tool-docs` compare les exemples JSON, paramètres, défauts
-et liens source des 113 outils au catalogue MCP complet, sans appeler les outils.
+et liens source des 110 outils au catalogue MCP complet, sans appeler les outils.
 
 Le [tableau de bord terminal facultatif](../docs/terminal.md) possède aussi des
 tests Rust : `cargo test --locked --manifest-path terminal/Cargo.toml`.
@@ -64,6 +64,7 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 |---|---|---|
 | `romeollm` | [test_romeollm.py](test_romeollm.py) | CLI simulée, plans persistants, coupures SSH, absence de double lancement, gateway conservant les jobs et protocole MCP stdio |
 | `units` | [test_units.py](test_units.py) | Durées, ressources, partitions, scripts et garde-fous |
+| `project-spaces` | [test_project_spaces.py](test_project_spaces.py) | Dossier par login pour tout utilisateur, dossiers de cours, verrouillage en `2700`, commandes du login et plans de jobs |
 | `workloads` | [test_workloads.py](test_workloads.py) | Lanceurs, gabarits, diagnostics et modèles matériels |
 | `regressions` | [test_regressions.py](test_regressions.py) | Corrections de défauts déjà rencontrés |
 | `context-boundaries` | [test_context_boundaries.py](test_context_boundaries.py) | Erreurs métier et de schéma compactes par stdio, relevés invalides et cache, débordements avant SSH, filtrage de grands identifiants sans fuite de secrets |
@@ -111,6 +112,8 @@ lance aussi une suite distante lorsqu’on la nomme explicitement.
 | `live` | [smoke_live.py](smoke_live.py) | Soumission, suivi et efficacité de jobs réels |
 | `repro-live` | [smoke_repro_live.py](smoke_repro_live.py) | Petit calcul CPU, provenance, empreintes et exports par MCP |
 | `workloads-live` | [smoke_workloads_live.py](smoke_workloads_live.py) | Tableaux, diagnostics de jobs en échec et observation distante |
+| `project-spaces-live` | [smoke_project_spaces_live.py](smoke_project_spaces_live.py) | Vrai serveur MCP, GPFS et job d’une minute : dossier privé `2700`, écritures et commandes refusées. Crée le dossier du login dans `ROMEO_TEST_PROJECT` et retire seulement ses éléments de test |
+| `update-chain-live` | [smoke_update_chain_live.py](smoke_update_chain_live.py) | GitHub, Sigstore et pip réels, sans cluster ni publication : attestations acceptées et altérées, verrous par hash, installation et serveur. `--tag vX.Y.Z` vérifie une release attestée |
 
 Un essai ciblé de reproductibilité :
 

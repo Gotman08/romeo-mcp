@@ -11,6 +11,20 @@ import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+#: Verrous exiges dans la wheel, avec le paquet qu'ils doivent figer.
+REQUIRED_LOCKS = {"romeo_mcp/locks/server.lock": "mcp", "romeo_mcp/locks/verifier.lock": "sigstore"}
+
+
+def lock_problem(text: str, package: str) -> str | None:
+    """Chaque exigence doit etre figee a une version et porter au moins une empreinte."""
+    requirements = [line for line in re.sub(r"\\\n\s*", " ", text).splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")]
+    if not any(line.startswith(package + "==") for line in requirements):
+        return f"{package} absent du verrou"
+    for line in requirements:
+        if not re.match(r"[A-Za-z0-9._-]+==[^ ;]+", line) or "--hash=sha256:" not in line:
+            return "exigence sans version figee ou sans empreinte"
+    return None
 
 
 def prepare(tag: str, root: Path = ROOT) -> list[Path]:
@@ -29,6 +43,10 @@ def prepare(tag: str, root: Path = ROOT) -> list[Path]:
         packaged = Parser().parsestr(archive.read(f"romeo_mcp-{version}.dist-info/METADATA").decode())
         if packaged["Version"] != version or packaged["Name"] != "romeo-mcp":
             raise ValueError("Metadonnees de wheel incoherentes.")
+        for name, package in REQUIRED_LOCKS.items():
+            problem = lock_problem(archive.read(name).decode(), package)
+            if problem:
+                raise ValueError(f"{name} : {problem}.")
     with tarfile.open(sdist) as archive:
         stream = archive.extractfile(f"romeo_mcp-{version}/pyproject.toml")
         if stream is None or tomllib.loads(stream.read().decode())["project"]["version"] != version:

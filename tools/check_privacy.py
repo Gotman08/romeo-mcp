@@ -57,9 +57,10 @@ def inspect_text(path: str, raw: bytes, metadata: bool = False) -> list[tuple[in
             # Identifiant technique public des remotes SSH, pas une adresse personnelle.
             ssh_remote = (not metadata and match[0].split("@")[0] == "git" and domain == "github.com"
                           and line[match.end():].startswith(":"))
-            github_service = match[0] == "noreply@github.com"
+            # Adresses publiques de service, jamais celles d'une personne.
+            public_service = match[0] in {"noreply@github.com", "noreply@anthropic.com"}
             allowed = (domain in PUBLIC_DOMAINS or (official and domain.endswith("univ-reims.fr"))
-                       or ssh_remote or github_service)
+                       or ssh_remote or public_service)
             if not allowed:
                 findings.append((number, "adresse de commit non noreply" if metadata else "adresse a verifier"))
         if not official:

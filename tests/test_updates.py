@@ -130,16 +130,26 @@ class ReleaseTests(TemporaryInstallation):
 
 
 class TransactionTests(TemporaryInstallation):
-    def test_failed_install_health_or_download_preserves_active(self):
+    def setUp(self):
+        super().setUp()
+        # L'attestation reelle est couverte par smoke_update_chain_live.py.
+        self.attestation = patch.object(u, "verify_attestation", return_value={"ok": True}).start()
+        patch.object(u, "extract_wheel_lock", return_value=Path("server.lock")).start()
+
+    def test_failed_install_health_download_or_attestation_preserves_active(self):
         before = self.prepared()
-        for stage in ("download", "install", "health"):
+        for stage in ("download", "attestation", "install", "health"):
             with self.subTest(stage=stage), patch.object(u, "_download") as download, \
                  patch.object(u, "_run") as run, patch.object(u, "health_check", return_value="9.0.0") as health:
-                {"download": download, "install": run, "health": health}[stage].side_effect = u.UpdateError("fixture failure")
+                failing = {"download": download, "attestation": self.attestation, "install": run, "health": health}[stage]
+                failing.side_effect = u.UpdateError("fixture failure")
                 with self.assertRaises(u.UpdateError):
                     u.apply_release(self.target, release(), before)
+                failing.side_effect = None
                 self.assertEqual(self.target.state(), before)
                 self.assertEqual(list((self.target.root / "versions").iterdir()), [self.target.slot_dir(before["active"])])
+                if stage in {"download", "attestation"}:
+                    run.assert_not_called()
 
     def test_pointer_changed_after_confirmation_rejected(self):
         before = self.target.state()
@@ -246,10 +256,32 @@ class TransactionTests(TemporaryInstallation):
         thread.assert_not_called()
 
 
-def fixture_wheel() -> bytes:
-    """Une vraie wheel minuscule, sans dependances ni acces a un index externe."""
+def dependency_wheel() -> bytes:
+    """Une vraie dependance, installee par pip depuis un dossier local."""
+    files = {
+        "romeo_fixture_dep/__init__.py": 'VALUE = "installee"\n',
+        "romeo_fixture_dep-1.0.0.dist-info/METADATA": "Metadata-Version: 2.1\nName: romeo-fixture-dep\nVersion: 1.0.0\n",
+        "romeo_fixture_dep-1.0.0.dist-info/WHEEL": "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+    }
+    record = "romeo_fixture_dep-1.0.0.dist-info/RECORD"
+    files[record] = "".join(f"{name},,\n" for name in [*files, record])
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        for name, text in files.items():
+            archive.writestr(name, text)
+    return output.getvalue()
+
+
+def fixture_lock(digest=None) -> str:
+    digest = digest or hashlib.sha256(dependency_wheel()).hexdigest()
+    return f"romeo-fixture-dep==1.0.0 \\\n    --hash=sha256:{digest}\n"
+
+
+def fixture_wheel(locks=None) -> bytes:
+    """Une vraie wheel minuscule, dont le verrou ne vise qu'une dependance locale."""
     files = {
         "romeo_mcp/__init__.py": '__version__ = "9.0.0"\n',
+        **(locks or {"romeo_mcp/locks/server.lock": fixture_lock()}),
         "romeo_mcp/server.py": "server = object()\n",
         "romeo_mcp/__main__.py": """import json, os, sys
 from . import __version__
@@ -311,6 +343,9 @@ class ProcessIntegrationTests(TemporaryInstallation):
             target = u.installation()
         data = fixture_wheel()
         expected = release(data)
+        wheelhouse = self.root / "wheelhouse"
+        wheelhouse.mkdir()
+        (wheelhouse / "romeo_fixture_dep-1.0.0-py3-none-any.whl").write_bytes(dependency_wheel())
         private = self.root / "private-config.json"
         private.write_text('{"ROMEO_ACCOUNT":"test-project"}', encoding="utf-8")
         private_before = private.read_bytes()
@@ -324,8 +359,9 @@ class ProcessIntegrationTests(TemporaryInstallation):
             code = ("import sys; sys.path.insert(0, " + repr(str(ROOT)) + "); "
                     "import base64, io; from romeo_mcp import updates as u; "
                     "u._request = lambda url: io.BytesIO(base64.b64decode(" + repr(encoded) + ")); "
+                    "u.verify_attestation = lambda *args, **kwargs: {'ok': True}; "
                     "original_run = u._run; "
-                    "u._run = lambda command, **kwargs: original_run([*command[:-1], '--no-index', '--no-deps', command[-1]] if 'pip' in command else command, **kwargs); "
+                    "u._run = lambda command, **kwargs: original_run([*command, '--no-index', '--find-links', " + repr(str(wheelhouse)) + "] if 'pip' in command else command, **kwargs); "
                     "from romeo_mcp.update_worker import main; main()")
             child = original_spawn([command[0], "-I", "-c", code, command[-1]], **kwargs)
             children.append(child)
@@ -345,6 +381,10 @@ class ProcessIntegrationTests(TemporaryInstallation):
         self.assertEqual(result["state"], "ready")
         self.assertTrue(result["result_validated"])
         self.assertEqual(result["version"], "9.0.0")
+        installed = subprocess.run([str(target.executable(result["active"])), "-I", "-c",
+                                    "import romeo_fixture_dep as dep; print(dep.VALUE)"],
+                                   capture_output=True, text=True, timeout=30)
+        self.assertEqual(installed.stdout.strip(), "installee", installed.stderr)
         self.assertEqual(u._fingerprint(self.package), source_before)
         self.assertEqual(private.read_bytes(), private_before)
         launcher = [sys.executable, "-m", "romeo_mcp"]
@@ -383,6 +423,93 @@ class ProcessIntegrationTests(TemporaryInstallation):
         # Revenir de nouveau sur l'environnement conserve est possible.
         self.assertEqual(u.rollback(target, target.state())["version"], "9.0.0")
 
+    def test_real_pip_installs_exact_hash_and_refuses_any_other(self):
+        environment = self.root / "venv"
+        subprocess.run([sys.executable, "-I", "-m", "venv", str(environment)], check=True, timeout=120)
+        python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        wheelhouse = self.root / "wheelhouse"
+        wheelhouse.mkdir()
+        (wheelhouse / "romeo_fixture_dep-1.0.0-py3-none-any.whl").write_bytes(dependency_wheel())
+        local_index = ["--no-index", "--find-links", str(wheelhouse)]
+        original = u._run
+        offline = lambda command, **kwargs: original([*command, *local_index], **kwargs)
+        wrong, right = self.root / "wrong.lock", self.root / "right.lock"
+        wrong.write_text(fixture_lock("0" * 64), encoding="utf-8")
+        right.write_text(fixture_lock(), encoding="utf-8")
+        probe = [str(python), "-I", "-c", "import romeo_fixture_dep"]
+        with patch.object(u, "_run", side_effect=offline):
+            with self.assertRaisesRegex(u.UpdateError, "(?i)hash"):
+                u.install_locked(python, wrong)
+            self.assertNotEqual(subprocess.run(probe, capture_output=True, timeout=30).returncode, 0)
+            u.install_locked(python, right)
+        self.assertEqual(subprocess.run(probe, capture_output=True, timeout=30).returncode, 0)
+
+    def test_lock_is_read_from_the_wheel_and_required(self):
+        with_lock, without = self.root / "with.whl", self.root / "without.whl"
+        with_lock.write_bytes(fixture_wheel())
+        self.assertEqual(u.extract_wheel_lock(with_lock, self.root / "lock").read_text(encoding="utf-8"), fixture_lock())
+        with zipfile.ZipFile(without, "w") as archive:
+            archive.writestr("romeo_mcp/__init__.py", "")
+        for path in (without, self.root / "absente.whl"):
+            with self.assertRaisesRegex(u.UpdateError, "sans verrou"):
+                u.extract_wheel_lock(path, self.root / "lock-2")
+
+    def test_attestation_identity_binds_repository_workflow_and_tag(self):
+        calls = []
+        def checker(command, **kwargs):
+            calls.append(command)
+            digest, identity = command[command.index("--digest") + 1], command[command.index("--identity") + 1]
+            return json.dumps({"ok": True, "sha256": digest, "identity": identity})
+        with patch.object(u, "attestation_bundles", return_value=[b"{}"]), \
+             patch.object(u, "verifier_python", return_value=Path("python")), patch.object(u, "_run", side_effect=checker):
+            self.target.root.mkdir(parents=True)
+            result = u.verify_attestation(self.target, "a" * 64, "refs/tags/v9.0.0")
+        self.assertEqual(result["identity"], f"https://github.com/{u.REPOSITORY}/.github/workflows/ci.yml@refs/tags/v9.0.0")
+        self.assertIn("-I", calls[0])
+        lying = lambda command, **kwargs: json.dumps({"ok": True, "sha256": "b" * 64, "identity": "autre"})
+        for answer in (lying, lambda command, **kwargs: "pas du json",
+                       lambda command, **kwargs: json.dumps({"ok": False, "error": "refus"})):
+            with patch.object(u, "attestation_bundles", return_value=[b"{}"]), \
+                 patch.object(u, "verifier_python", return_value=Path("python")), patch.object(u, "_run", side_effect=answer):
+                with self.assertRaises(u.UpdateError):
+                    u.verify_attestation(self.target, "a" * 64, "refs/tags/v9.0.0")
+
+    def test_missing_or_unavailable_attestations_refuse_installation(self):
+        for error, needle in ((HTTPError(u.API, 404, "missing", {}, None), "Aucune attestation"),
+                              (HTTPError(u.API, 403, "limit", {}, None), "HTTP 403"),
+                              (URLError("offline"), "injoignables")):
+            with patch.object(u, "_request", side_effect=error), self.assertRaisesRegex(u.UpdateError, needle):
+                u.attestation_bundles("a" * 64)
+        for body in (b"{}", b"pas du json", b'{"attestations": []}', b'{"attestations": "x"}', b'{"attestations": [{}]}'):
+            with patch.object(u, "_request", return_value=io.BytesIO(body)), self.assertRaises(u.UpdateError):
+                u.attestation_bundles("a" * 64)
+
+    def test_attestation_storage_is_only_allowed_for_bundles(self):
+        class Response(io.BytesIO):
+            def geturl(self):
+                return "https://tmaproduction.blob.core.windows.net/attestations/1.json"
+        with patch.object(u, "urlopen", side_effect=lambda *args, **kwargs: Response(b"")):
+            with self.assertRaisesRegex(u.UpdateError, "Redirection"):
+                u._request(u.API)
+            self.assertEqual(u._request(u.API, attestation_storage=True).read(), b"")
+
+    def test_snappy_decoder_handles_literals_copies_and_corruption(self):
+        from romeo_mcp.attestation_check import decode_snappy
+        # "abcd" litteral puis copie de 8 octets a l'offset 4 (format bloc Snappy).
+        self.assertEqual(decode_snappy(bytes([12, 3 << 2]) + b"abcd" + bytes([(8 - 1) << 2 | 2, 4, 0])), b"abcdabcdabcd")
+        self.assertEqual(decode_snappy(bytes([5, 4 << 2]) + b"hello"), b"hello")
+        for corrupted in (b"", bytes([5, 4 << 2]) + b"he", bytes([12, 3 << 2]) + b"abcd" + bytes([(8 - 1) << 2 | 2, 9, 0]),
+                          bytes([4, 3 << 2]) + b"abcd" + bytes([(8 - 1) << 2 | 2, 4, 0]), b"\xff\xff\xff\xff\xff\xff"):
+            with self.assertRaises((ValueError, IndexError)):
+                decode_snappy(corrupted)
+
+    def test_repository_locks_pin_every_requirement_by_hash(self):
+        from tools.prepare_release import REQUIRED_LOCKS, lock_problem
+        for name, package in REQUIRED_LOCKS.items():
+            self.assertIsNone(lock_problem((ROOT / name).read_text(encoding="utf-8"), package), name)
+        self.assertEqual(lock_problem("mcp==2.0.0\n", "mcp"), "exigence sans version figee ou sans empreinte")
+        self.assertEqual(lock_problem("mcp>=2 --hash=sha256:aa\n", "mcp"), "mcp absent du verrou")
+
     def test_release_preparation_rejects_version_mismatch_and_selects_assets(self):
         from tools.prepare_release import prepare
         (self.root / "romeo_mcp").mkdir()
@@ -393,7 +520,8 @@ class ProcessIntegrationTests(TemporaryInstallation):
         dist = self.root / "dist"
         dist.mkdir()
         wheel = dist / "romeo_mcp-9.0.0-py3-none-any.whl"
-        wheel.write_bytes(fixture_wheel())
+        wheel.write_bytes(fixture_wheel({"romeo_mcp/locks/server.lock": "mcp==2.3.0 \\\n    --hash=sha256:" + "a" * 64 + "\n",
+                                         "romeo_mcp/locks/verifier.lock": "sigstore==4.5.1 \\\n    --hash=sha256:" + "b" * 64 + "\n"}))
         with tarfile.open(dist / "romeo_mcp-9.0.0.tar.gz", "w:gz") as archive:
             info = tarfile.TarInfo("romeo_mcp-9.0.0/pyproject.toml")
             info.size = len(metadata)
@@ -406,6 +534,16 @@ class ProcessIntegrationTests(TemporaryInstallation):
         self.assertIn(hashlib.sha256(wheel.read_bytes()).hexdigest(), (dist / "SHA256SUMS").read_text())
         with self.assertRaisesRegex(ValueError, "correspondre"):
             prepare("v9.0.1", self.root)
+        wheel.write_bytes(fixture_wheel({"romeo_mcp/locks/server.lock": "mcp==2.3.0 --hash=sha256:aa\n"}))
+        with self.assertRaises(KeyError):
+            prepare("v9.0.0", self.root)
+        wheel.write_bytes(fixture_wheel())
+        with self.assertRaisesRegex(ValueError, "mcp absent"):
+            prepare("v9.0.0", self.root)
+        wheel.write_bytes(fixture_wheel({"romeo_mcp/locks/server.lock": "mcp==2.3.0\n",
+                                         "romeo_mcp/locks/verifier.lock": "sigstore==4.5.1 --hash=sha256:bb\n"}))
+        with self.assertRaisesRegex(ValueError, "empreinte"):
+            prepare("v9.0.0", self.root)
 
 
 if __name__ == "__main__":

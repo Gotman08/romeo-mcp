@@ -3,7 +3,8 @@
 [Catalogue](../Tools.md#mise-à-jour-du-mcp) · [Guide des mises à jour](../updates.md)
 
 Détecte les releases stables du dépôt officiel sans les installer. Disponible
-dans les trois profils. Le modèle doit annoncer toute nouvelle version ou erreur.
+dans les trois profils. Le modèle signale une nouvelle version ou une erreur ;
+l’installation se fait dans le terminal avec `python -m romeo_mcp update`.
 
 | Paramètre | Défaut | Effet |
 |---|---|---|
@@ -23,8 +24,7 @@ Un accord automatique persistant est visible dans `automatic_enabled` ;
 `automatic_held` indique une version écartée après retour arrière. Ce contrôle
 ne fait aucun accès SSH et peut écrire son cache local hors Git.
 
-Voir [`mcp_update_policy`](mcp_update_policy.md),
-[`mcp_update_start`](mcp_update_start.md) et le
-[code](../../romeo_mcp/outils_updates.py).
+Voir [`mcp_update_status`](mcp_update_status.md), le
+[guide des mises à jour](../updates.md) et le [code](../../romeo_mcp/outils_updates.py).
 
 [Code de l’outil](../../romeo_mcp/outils_updates.py#L9)

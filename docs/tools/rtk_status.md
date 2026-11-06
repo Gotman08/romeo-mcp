@@ -44,4 +44,4 @@ Le MCP ne passe pas par les hooks Claude Code/Codex : demander `login_command_ru
 
 [`login_command_run`](login_command_run.md) · [`compute_command_prepare`](compute_command_prepare.md) · [`tool_profile_set`](tool_profile_set.md)
 
-[Code de l’outil](../../romeo_mcp/outils_execution.py#L197) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_execution.py#L202) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)

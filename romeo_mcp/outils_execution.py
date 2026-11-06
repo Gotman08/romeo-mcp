@@ -7,7 +7,8 @@ import time
 from typing import Any
 from pydantic import TypeAdapter
 from .cluster import parse_duration
-from .guard import GuardError, check_login_command, check_path
+from .guard import GuardError, check_login_command, check_path, check_project_command
+from .remote_paths import ensure_private_folder
 from .templates import SHM_TOTAL_GO, preambule_staging_shm
 from .slurm import JobSpec
 from .ssh import SSHError, SSHTimeout, session
@@ -164,9 +165,13 @@ def login_command_run(
     metadata = {"requested": use_rtk, "applied": False, "reason": "disabled"}
     try:
         target = check_path(cwd, s.home, s.scratch, s.path_aliases) if cwd else None
+        written = check_project_command(command, s, target)
         if use_rtk:
             selected, metadata = rtk.rewrite_command(s, command, _sh, deadline, target)
             check_login_command(selected, allow_heavy=allow_heavy)
+            written = check_project_command(selected, s, target)
+        for path in written:
+            ensure_private_folder(s, path)
         executable = (rtk.with_environment(selected, metadata["path"])
                       if metadata["reason"] in {"rewritten", "already_wrapped"} else selected)
         result = _sh(s, executable, timeout=deadline.remaining(), cwd=target, max_chars=max_chars)

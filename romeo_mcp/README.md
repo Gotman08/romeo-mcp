@@ -60,7 +60,7 @@ complet. Ce choix de découverte est géré par [profiles.py](profiles.py).
 |---|---|
 | Entrées et version | [Lancement par module](__main__.py), [cli.py](cli.py), [version du paquet](__init__.py) |
 | Configuration personnelle et diagnostic | [config.py](config.py), [doctor.py](doctor.py) |
-| Mises à jour et lancement des versions | [updates.py](updates.py), [guide utilisateur](../docs/updates.md) |
+| Mises à jour et lancement des versions | [updates.py](updates.py), [attestation_check.py](attestation_check.py), [verrous](locks/), [guide utilisateur](../docs/updates.md) |
 | Ressources et vérification du modèle | [cluster.py](cluster.py), [verification.py](verification.py) |
 | Transport et fichiers | [ssh.py](ssh.py), [files.py](files.py), [remote_paths.py](remote_paths.py), [confined_transfers.py](confined_transfers.py), [sortie.py](sortie.py) |
 | Validation locale | [validation.py](validation.py), [guard.py](guard.py) |

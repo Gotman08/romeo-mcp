@@ -232,7 +232,7 @@ La page [Tools](docs/Tools.md) propose un catalogue cliquable : chaque outil pos
 
 ## Un profil essentiel pour commencer
 
-Le profil `essential` présente **22 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
+Le profil `essential` présente **48 outils** : documentation, état du cluster, quotas, logiciels, soumission simple, suivi et diagnostic des jobs, transferts et export de fiches. Il réduit le catalogue envoyé au modèle.
 
 Pour accéder aux tableaux de paramètres, aux pipelines, aux services interactifs ou au profilage, demandez à l’assistant :
 

@@ -13,8 +13,9 @@ import uuid
 from pathlib import Path
 
 from .cluster import DEFAULT_ACCOUNT
-from .guard import check_path
+from .guard import check_path, check_project_write
 from .registry import registry
+from .remote_paths import ensure_private_folder
 from .ssh import session
 
 
@@ -110,6 +111,8 @@ def prepare(direction, local_path, remote_path, recursive=False, verify=True):
         raise ValueError("Choisis le chemin exact du fichier ou du repertoire de destination")
     connection = session()
     remote = check_path(remote_path, connection.home, connection.scratch, connection.path_aliases)
+    if direction == "upload":
+        check_project_write(remote, connection)
     plan = {"id": uuid.uuid4().hex, "created_at": time.time(), "direction": direction,
             "local_path": str(local), "remote_path": remote, "recursive": recursive, "verify": verify,
             "target": {"host": connection.host, "user": connection.user, "account": DEFAULT_ACCOUNT}}
@@ -128,6 +131,9 @@ def start(transfer_id, confirm=False):
     connection = session()
     if plan["target"] != {"host": connection.host, "user": connection.user, "account": DEFAULT_ACCOUNT}:
         raise ValueError("La cible SSH ou le compte ont change")
+    if plan["direction"] == "upload":
+        check_project_write(plan["remote_path"], connection)
+        ensure_private_folder(connection, plan["remote_path"])
     try:
         descriptor = os.open(directory / "started.claim", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:

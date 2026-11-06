@@ -31,7 +31,7 @@ def job_observation_get(job_id: str) -> dict[str, Any]:
 def romeo_capabilities(task: Literal["all", "jobs", "resume", "parallel", "services", "llm", "python", "files", "updates", "issues"] = "all") -> dict[str, Any]:
     groups = {
         "issues": ["mcp_issue_policy_get", "mcp_issue_policy_set", "mcp_issue_report", "mcp_issue_publish", "mcp_issue_status"],
-        "updates": ["mcp_update_check", "mcp_update_policy", "mcp_update_start", "mcp_update_status", "mcp_update_rollback"],
+        "updates": ["mcp_update_check", "mcp_update_status"],
         "jobs": ["job_prepare", "plan_get", "job_submit", "job_status", "job_observation_get", "job_log_tail", "job_efficiency"],
         "resume": ["checkpoint_inspect", "job_checkpoint_request", "job_resilient_prepare", "job_resilient_submit", "job_resume_prepare", "job_resume_submit",
                    "job_resume_status", "checkpoint_protect_prepare", "checkpoint_protect_submit", "checkpoint_export_prepare", "transfer_start", "checkpoint_export_status"],

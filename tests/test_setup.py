@@ -165,6 +165,8 @@ print("allocation guards passed")
         address = b"student" + b"@github.com"
         self.assertTrue(check_privacy.inspect_text("source.py", address))
         self.assertFalse(check_privacy.inspect_text("commit", b"GitHub <noreply@github.com>", metadata=True))
+        self.assertFalse(check_privacy.inspect_text("commit", b"Co-Authored-By: Claude <noreply@anthropic.com>", metadata=True))
+        self.assertTrue(check_privacy.inspect_text("commit", b"Co-Authored-By: Alice <alice@" + b"anthropic.com>", metadata=True))
 
 
 class ClientApprovalTests(unittest.TestCase):
