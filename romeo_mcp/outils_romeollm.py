@@ -35,13 +35,13 @@ def romeollm_stats(days: Annotated[int, Field(strict=True, ge=1, le=365)] = 30) 
     return romeollm.stats(days)
 
 
-@outil(annotations=MUTATING, description="Prepare un lancement RomeoLLMTool : lit la fiche et --dry-run, conserve localement un plan de 24 h. Aucun job soumis. project_code utilise ROMEO_ACCOUNT si omis ; duree 1 min a 24 h. La CLI regenerera son script au lancement.")
+@outil(annotations=MUTATING, description="Prepare un lancement RomeoLLMTool : lit la fiche et --dry-run, conserve localement un plan de 24 h. Aucun job soumis. project_code utilise ROMEO_ACCOUNT si omis ; duree 1 min a 24 h. La CLI regenerera son script au lancement. Avertit (node_tmp_risk) : le /tmp des noeuds est tres petit, le saturer met le noeud en DRAIN ; caches et temporaires vont au scratch.")
 def romeollm_launch_prepare(fiche: str, project_code: str | None = None,
                            time_limit: str = "1h", reservation: str | None = None) -> dict[str, Any]:
     return romeollm.prepare_launch(fiche, project_code, time_limit, reservation)
 
 
-@outil(annotations=MUTATING, description="Execute une fois le plan RomeoLLMTool relu ; exige confirm=true. Reverifie la fiche et utilise --no-wait : le modele peut encore attendre ou charger. Une tentative SSH incertaine ne se rejoue pas.")
+@outil(annotations=MUTATING, description="Execute une fois le plan RomeoLLMTool relu ; exige confirm=true. Reverifie la fiche et utilise --no-wait : le modele peut encore attendre ou charger. Une tentative SSH incertaine ne se rejoue pas. Rappelle le risque /tmp (noeud en DRAIN si sature).")
 def romeollm_launch(plan_id: str, confirm: bool = False) -> dict[str, Any]:
     return romeollm.launch(plan_id, confirm)
 
