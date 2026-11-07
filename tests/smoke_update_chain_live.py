@@ -242,8 +242,9 @@ class RealChain(unittest.TestCase):
             self.assertNotIn(removed, instructions)
         self.assertEqual(json.loads(status.content[0].text)["running_version"], __version__)
 
-    @unittest.skipUnless(TAG, "indiquer --tag apres une release attestee")
     def test_a_published_release_passes_every_check(self):
+        if not TAG:
+            self.skipTest("indiquer --tag apres une release attestee")
         release = self.release_of(TAG)
         result = u.verify_attestation(self.target, release["sha256"], "refs/tags/" + TAG)
         self.assertEqual(result["identity"], f"https://github.com/{u.REPOSITORY}/{u.RELEASE_WORKFLOW}@refs/tags/{TAG}")
@@ -256,5 +257,4 @@ if __name__ == "__main__":
     parser.add_argument("--tag", default="")
     known, remaining = parser.parse_known_args()
     TAG = known.tag
-    RealChain.test_a_published_release_passes_every_check.__unittest_skip__ = not TAG
     unittest.main(argv=[sys.argv[0], *remaining], verbosity=2)
