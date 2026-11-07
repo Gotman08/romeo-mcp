@@ -28,6 +28,24 @@ _KEY_LINE = re.compile(r"^.*\b(?:api\s+key|gateway\s+key|internal\s+key|cl[eé](
 _MISSING = "ROMEOLLMTOOL_EXECUTABLE_UNAVAILABLE"
 _KIND = "romeollm_launch"
 SHARED_EXECUTABLE = "/apps/romeotools/romeollmtool/romeollmtool"
+# /tmp local d'un noeud de calcul est tres petit : le remplir (cache de poids,
+# compilation, telechargement) peut faire tomber le noeud en DRAIN, ce qui
+# bloque ensuite toute ecriture dans son /tmp pour tous les utilisateurs.
+_TMP_REF = re.compile(r"(?<![\w./-])/tmp(?![\w.-])")
+TMP_WARNING = ("ATTENTION /tmp : le /tmp local des noeuds ROMEO est tres petit. Un modele, un cache "
+               "(HF_HOME, TRANSFORMERS_CACHE, VLLM_CACHE_ROOT, TRITON_CACHE_DIR, TORCHINDUCTOR_CACHE_DIR) "
+               "ou un TMPDIR qui ecrit dans /tmp peut le saturer, faire crasher le noeud et le mettre en "
+               "DRAIN, ce qui interdit ensuite l'ecriture dans /tmp. Placer caches et fichiers temporaires "
+               "dans le scratch ou /project.")
+
+
+def tmp_risk(**texts: str) -> dict:
+    """Signale, par apercu, les lignes qui citent /tmp ; ne modifie rien."""
+    found = {name: [n for n, line in enumerate(text.splitlines(), 1) if _TMP_REF.search(line)][:50]
+             for name, text in texts.items()}
+    found = {name: lines for name, lines in found.items() if lines}
+    return {"level": "high" if found else "notice", "tmp_referenced": bool(found),
+            "line_numbers": found, "message": TMP_WARNING}
 
 
 def _name(value: str, label: str = "fiche") -> str:
@@ -192,9 +210,13 @@ def prepare_launch(fiche: str, project_code: str | None, time_limit: str,
     if not dry_run["ok"] or not dry_run["complete"] or not dry_run["output"].strip():
         return {**dry_run, "ok": False, "error": "Apercu du lancement absent ou incomplet ; aucun plan executable.", "submitted": False}
     target = _target(s)
+    risk = tmp_risk(config_preview=config["output"], script_preview=dry_run["output"])
+    tmp_warning = TMP_WARNING if not risk["tmp_referenced"] else (
+        TMP_WARNING + " L'apercu cite /tmp (voir node_tmp_risk.line_numbers) : corriger la fiche avant de lancer.")
     preview = {"fiche": fiche, "project_code": account, "time_limit": format_slurm_time(seconds),
         "command": shlex.join([executable, *args]), "config_preview": config["output"],
-        "script_preview": dry_run["output"], "warnings": [
+        "script_preview": dry_run["output"], "node_tmp_risk": risk, "warnings": [
+            tmp_warning,
             "Chaque nouveau plan lance un job distinct. Le meme plan ne peut etre execute qu'une fois.",
             "La CLI regenerera son script ; le MCP reverifie la fiche avant le lancement, sans figer les fichiers distants."]}
     saved = registry().prepare_submission({"kind": _KIND, "target": target, "entries": [],
@@ -238,6 +260,7 @@ def launch(plan_id: str, confirm: bool) -> dict:
             result = _error("Lancement interrompu ; resultat distant inconnu.", execution_outcome="unknown")
         success = result["ok"] and result.get("complete", False)
         result.update(plan_id=plan_id, plan_sha256=saved["sha256"],
+            warnings=[TMP_WARNING], node_tmp_risk=payload["preview"].get("node_tmp_risk", tmp_risk()),
             command_succeeded=bool(success), ready=None, result_validated=False,
             retry_safe=False, next_step="Consulter romeollm_status, puis romeollm_logs et romeollm_endpoint avec le numero de job.")
         match = re.search(r"^Submitted batch job ([1-9][0-9]{0,19})\s*$", result.get("output", ""), re.M)

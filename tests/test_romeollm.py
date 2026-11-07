@@ -81,6 +81,33 @@ class RomeoLLMTests(unittest.TestCase):
         self.assertIn("--project-code test-project", plan["command"])
         self.assertEqual(self.store.prepared_submission(plan["plan_id"])["state"], "ready")
 
+    def test_prepare_and_launch_always_warn_about_small_node_tmp(self):
+        plan = self.prepare()
+        self.assertIn("/tmp", plan["warnings"][0])
+        self.assertIn("DRAIN", plan["warnings"][0])
+        self.assertEqual(plan["node_tmp_risk"]["level"], "notice")
+        self.assertFalse(plan["node_tmp_risk"]["tmp_referenced"])
+        result = llm.launch(plan["plan_id"], True)
+        self.assertTrue(result["ok"], result)
+        self.assertIn("DRAIN", result["warnings"][0])
+        self.assertEqual(result["node_tmp_risk"]["level"], "notice")
+
+    def test_tmp_usage_in_preview_raises_risk_with_line_numbers(self):
+        self.config += "cache_dir: /tmp/hf\n"
+        self.script += "export HF_HOME=/tmp/cache\nexport TMPDIR=/tmp\n"
+        plan = self.prepare()
+        risk = plan["node_tmp_risk"]
+        self.assertEqual(risk["level"], "high")
+        self.assertEqual(risk["line_numbers"], {"config_preview": [4], "script_preview": [4, 5]})
+        self.assertIn("corriger la fiche", plan["warnings"][0])
+        self.assertEqual(llm.launch(plan["plan_id"], True)["node_tmp_risk"]["level"], "high")
+
+    def test_tmp_detection_ignores_lookalike_paths(self):
+        risk = llm.tmp_risk(script_preview="/scratch/projet/tmp\n/project/demo/tmp/x\n/tmpfs\nmy/tmp\n")
+        self.assertFalse(risk["tmp_referenced"])
+        self.assertTrue(llm.tmp_risk(s="cd /tmp\n")["tmp_referenced"])
+        self.assertTrue(llm.tmp_risk(s='X="/tmp/a"\n')["tmp_referenced"])
+
     def test_explicit_account_duration_and_reservation(self):
         plan = llm.prepare_launch("example", "other-project", "90m", "reserved-test")
         self.assertTrue(plan["ok"], plan)
