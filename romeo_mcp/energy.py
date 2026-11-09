@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import math
 import re
 import shlex
+import time
 
 from .carbon import CarbonUnavailable, finite_factor, rte_factor
 from .hardware import estimer_energie
@@ -38,9 +39,34 @@ def parse_accounting(text: str, job_id: str) -> dict:
             "start": _date(row[6]), "end": _date(row[7])}
 
 
+#: `AcctGatherEnergyType` ne change qu'a une reconfiguration du controleur.
+CONFIG_TTL_SECONDS = 3600
+
+
+def _energy_plugin(run, config_cache: dict | None) -> str | None:
+    """Valeur brute de AcctGatherEnergyType, ou None si elle n'a pas pu etre lue.
+
+    Avec `config_cache`, une lecture reussie sert pendant CONFIG_TTL_SECONDS :
+    `scontrol show config` est une requete au controleur, inutile a chaque job.
+    """
+    key = "AcctGatherEnergyType"
+    now = time.monotonic()
+    if config_cache is not None:
+        entry = config_cache.get(key)
+        if entry is not None and now - entry[0] < CONFIG_TTL_SECONDS:
+            return entry[1]
+    config = run("scontrol show config", timeout=20, max_chars=20000)
+    match = re.search(r"(?m)^\s*AcctGatherEnergyType\s*=\s*(\S+)", config.stdout) if config.ok else None
+    if match is None:
+        return None
+    if config_cache is not None:
+        config_cache[key] = (now, match[1])
+    return match[1]
+
+
 def footprint(job_id: str, run, *, estimate: bool = False, gpu_load_factor: float = 0.6,
               carbon_source: str = "rte", carbon_intensity: float | None = None,
-              carbon_reference: str = "", carbon_lookup=None) -> dict:
+              carbon_reference: str = "", carbon_lookup=None, config_cache: dict | None = None) -> dict:
     """`run` ne lit que Slurm ; l'acces RTE est separe et injectable pour les tests."""
     if not isinstance(job_id, str) or not JOB_ID.fullmatch(job_id):
         raise ValueError("Identifiant d'un job Slurm individuel attendu, sans etape ni plage de tableau.")
@@ -61,9 +87,7 @@ def footprint(job_id: str, run, *, estimate: bool = False, gpu_load_factor: floa
         raise ValueError("Lecture sacct refusee ; aucune estimation ne remplace une erreur de lecture.")
     row = parse_accounting(result.stdout, job_id)
     checked_at = datetime.now(timezone.utc)
-    config = run("scontrol show config", timeout=20, max_chars=20000)
-    match = re.search(r"(?m)^\s*AcctGatherEnergyType\s*=\s*(\S+)", config.stdout) if config.ok else None
-    plugin = match[1] if match else None
+    plugin = _energy_plugin(run, config_cache)
     if plugin in ("(null)", "none", "acct_gather_energy/none"):
         plugin = None
         plugin_enabled = False

@@ -54,7 +54,7 @@ class ObservableTests(unittest.TestCase):
         self.assertTrue(response["ok"], response)
         self.assertFalse(response["result_validated"])
         with patch.object(jobs, "_sh", side_effect=SSHError("disconnected")):
-            failed = jobs.job_status("12")
+            failed = jobs.job_status("12", max_age_seconds=0)
         self.assertFalse(failed["ok"])
         self.assertEqual(failed["last_observation"]["result"]["state"], "RUNNING")
         self.assertFalse(failed["current_state_observed"])
@@ -88,7 +88,7 @@ class ObservableTests(unittest.TestCase):
         for field,expected in [("afterok:11(unfulfilled)","afterok:11(unfulfilled)"),("(null)","")]:
             reply=Result(0,"###LIVE\n12|test|cpu|PENDING|0:00|5:00|1|Dependency|"+field+"\n",0)
             with patch.object(jobs,"_sh",return_value=reply) as read:
-                response=jobs.job_status("12")
+                response=jobs.job_status("12",max_age_seconds=0)
             self.assertEqual(response["dependencies_remaining"],expected)
             read.assert_called_once()
             self.assertIn("%E",read.call_args.args[1])
@@ -144,13 +144,13 @@ class ObservableTests(unittest.TestCase):
             self.assertFalse(context.romeo_software()["ok"])
             self.assertEqual(remote.call_count, 2)
 
-    def test_cluster_cache_is_opt_in_and_reports_its_age(self):
+    def test_cluster_cache_is_short_by_default_and_reports_its_age(self):
         response = Result(0, "###NODES\nn1|idle|x64cpu\n###PART\nshort|up|1:00\n###SHARE\ntest-project|0|1\n###QUEUE\n", 0)
         with patch.object(context, "_STATUS_CACHE", ReadCache()), patch.object(context, "_sh", return_value=response) as remote:
-            context.romeo_status()
-            context.romeo_status()
+            context.romeo_status(max_age_seconds=0)
+            context.romeo_status(max_age_seconds=0)
             self.assertEqual(remote.call_count, 2)
-            cached = context.romeo_status(max_age_seconds=5)
+            cached = context.romeo_status()
             self.assertTrue(cached["observation"]["cached"])
             self.assertFalse(cached["observation"]["current_state_observed"])
             self.assertEqual(remote.call_count, 2)

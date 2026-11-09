@@ -17,6 +17,7 @@ from .cluster import (
     ARCHS,
     DEFAULT_ACCOUNT,
     MISSING_TOOLS,
+    PARTITION_ORDER,
     PARTITIONS,
     TOOLS_VIA_SPACK,
     cheatsheet,
@@ -40,21 +41,33 @@ from .noyau import (
 # =============================================================================
 # Contexte cluster
 # =============================================================================
+#: Reutilisation par defaut d'un releve du cluster. Il coute un sinfo, un
+#: sshare et un squeue au controleur Slurm, pour un etat qui ne change guere
+#: en trente secondes.
+STATUS_MAX_AGE_SECONDS = 30
+
+
 @outil(
     annotations=READ_ONLY,
     description=(
         "Etat de ROMEO en un appel : partitions, noeuds libres par architecture, "
         "tes jobs en cours et ta part d'ordonnancement. A appeler avant de "
-        "dimensionner un job."
+        "dimensionner un job. Un releve de moins de max_age_seconds (30 s par "
+        "defaut) est reutilise pour menager le controleur Slurm ; 0 force la lecture."
     ),
 )
-def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[str, Any]:
+def romeo_status(include_queue: bool = True, max_age_seconds: int = STATUS_MAX_AGE_SECONDS) -> dict[str, Any]:
     """Situation complete du cluster en une seule aller-retour SSH."""
     s = session()
     if not 0 <= max_age_seconds <= 60:
         return _error("max_age_seconds doit etre compris entre 0 et 60 ; 0 force une lecture actuelle.")
     cache_key = (s.host, s.user, DEFAULT_ACCOUNT, include_queue)
     cached = _STATUS_CACHE.get(cache_key, max_age_seconds)
+    if cached is None and not include_queue:
+        # Un releve avec file personnelle contient tout ce que demande un releve sans.
+        cached = _STATUS_CACHE.get(cache_key[:3] + (True,), max_age_seconds)
+        if cached is not None:
+            cached[0]["my_jobs"] = None
     if cached is not None:
         value, age = cached
         value["observation"].update(cached=True, age_seconds=age, current_state_observed=False)
@@ -63,9 +76,13 @@ def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[s
     # se fait plus bas, par nom. S'appuyer sur une partition supposee couvrir
     # tout le parc etait fragile : la creation d'une partition, ou le retrait
     # d'un noeud de `instant`, l'aurait rendu faux en silence.
+    # Un seul `sinfo` : chaque appel charge noeuds et partitions depuis le
+    # controleur. Les sections NODES et PART en sont derivees sur le login ; une
+    # partition sans aucun noeud n'y figure donc pas, sans effet sur un choix.
     command = (
-        "echo '###NODES'; sinfo -h -N -o '%n|%T|%f' || exit $?; "
-        "echo '###PART'; sinfo -h -o '%P|%a|%l' || exit $?; "
+        "releve=$(sinfo -h -N -o '%n|%T|%f|%P|%a|%l') || exit $?; "
+        "echo '###NODES'; printf '%s\\n' \"$releve\" | cut -d'|' -f1-3; "
+        "echo '###PART'; printf '%s\\n' \"$releve\" | awk -F'|' 'NF >= 6 && !vu[$4]++ {print $4 \"|\" $5 \"|\" $6}'; "
         "echo '###SHARE'; sshare -U -n -P -o Account,EffectvUsage,FairShare || exit $?"
     )
     if include_queue:
@@ -147,6 +164,10 @@ def romeo_status(include_queue: bool = True, max_age_seconds: int = 0) -> dict[s
                     "time_limit": parts[2].strip(),
                 }
             )
+    # Derivees du releve des noeuds, elles arrivent dans l'ordre des noeuds :
+    # on retablit l'ordre connu des partitions, les inconnues a la suite.
+    partitions.sort(key=lambda p: PARTITION_ORDER.index(p["name"]) if p["name"] in PARTITION_ORDER
+                    else len(PARTITION_ORDER))
 
     # -- part d'ordonnancement ---------------------------------------------
     fairshare = []

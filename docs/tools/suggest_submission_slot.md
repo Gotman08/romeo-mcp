@@ -50,11 +50,13 @@ La durée doit rester finie après conversion en secondes et le nombre de nœuds
 
 La recommandation est indicative. Elle ne réserve aucune ressource et ne garantit pas le délai d’attente.
 
+La file PENDING de tout le cluster est la lecture la plus coûteuse pour le contrôleur Slurm : elle est réutilisée pendant 60 secondes, comme la vue du parc, prise sans file personnelle ni fairshare. `queue_observation` indique si la file et la vue du parc venaient du cache, et l’âge de la file.
+
 ## Voir aussi
 
 [`romeo_status`](romeo_status.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L871) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L936) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

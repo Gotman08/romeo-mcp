@@ -56,7 +56,7 @@ Les noms et motifs de fichiers sont traités comme des données. Les glob porten
 
 [`job_log_search`](job_log_search.md) · [`job_status`](job_status.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L247) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L273) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

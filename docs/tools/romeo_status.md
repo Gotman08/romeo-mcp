@@ -19,7 +19,7 @@ Rassemble en un aller-retour SSH les partitions, les nœuds par architecture, le
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
 | `include_queue` | `bool` | Non | `true` | Inclure la file personnelle des jobs Slurm. |
-| `max_age_seconds` | `int` | Non | `0` | Âge maximal du relevé réutilisé depuis le cache ; `0` demande une nouvelle lecture. |
+| `max_age_seconds` | `int` | Non | `30` | Âge maximal, de 0 à 60 secondes, du relevé réutilisé depuis le cache ; `0` demande une nouvelle lecture. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -45,13 +45,15 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Un relevé échoué, tronqué, vide ou mal formé est refusé et ne remplit pas le cache. Une file personnelle vide reste valide si les sections et l’inventaire sont complets.
 
+Le relevé coûte un `sinfo`, un `sshare` et, avec la file personnelle, un `squeue`. Nœuds et partitions viennent du même `sinfo`, si bien qu’une partition sans aucun nœud n’apparaît pas. Un relevé de moins de 30 secondes est réutilisé par défaut (`cached=true`, âge, `current_state_observed=false`) ; un relevé avec file personnelle sert aussi une demande sans file.
+
 C’est un instantané : des ressources libres peuvent être attribuées entre cette lecture et la soumission de votre job.
 
 ## Voir aussi
 
 [`romeo_quota`](romeo_quota.md) · [`suggest_submission_slot`](suggest_submission_slot.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L51) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L59) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

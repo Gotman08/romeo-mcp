@@ -71,6 +71,7 @@ et son arrêt après le délai, et inspecte les couleurs ANSI dans les modes
 | `confined-paths` | [test_confined_paths.py](test_confined_paths.py) | Noms exacts, racines physiques, FIFO et sockets, fichiers de secrets privés, changements de liens et transferts conservant leurs descripteurs ; cas POSIX exécutés sur Linux |
 | `job-io` | [test_job_io.py](test_job_io.py) | Huit tableaux soumis simultanément dans le même dossier, scripts isolés, empreintes et lecture des journaux |
 | `tool-actions` | [test_tool_actions.py](test_tool_actions.py) | Contrats MCP, effets annoncés, plans persistants, scripts exacts, appels concurrents et reprise après échec |
+| `slurm-economy` | [test_slurm_economy.py](test_slurm_economy.py) | Appels Slurm comptés sous Bash : un seul `squeue` par lecture d'un job en attente, un seul `sinfo` par relevé du parc, observations réutilisées puis invalidées, sondages espacés |
 | `concurrency` | [test_concurrency.py](test_concurrency.py) | Réservations entre processus, conflits entre outils, publication privée, récupération après mort du propriétaire, capacité bornée et annulation RPC réelle |
 | `lifecycles` | [test_lifecycles.py](test_lifecycles.py) | Parcours des services, allocations, environnements Python et fichiers |
 | `ajouts` | [test_ajouts.py](test_ajouts.py) | Pipelines et confrontation du modèle de cluster |
