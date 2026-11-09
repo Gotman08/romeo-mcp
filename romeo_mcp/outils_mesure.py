@@ -378,6 +378,9 @@ def job_system_health(job_id: str) -> dict[str, Any]:
             "job_efficiency.".format(jid, etat.get("state"))
         )
 
+    # Coeurs et memoire viennent du releve squeue de job_status : pas de second
+    # squeue, sauf pour une observation enregistree par une version precedente.
+    coeurs_alloues, memoire_demandee = etat.get("cpus"), etat.get("min_memory")
     try:
         compta = _sh(
             s,
@@ -385,18 +388,17 @@ def job_system_health(job_id: str) -> dict[str, Any]:
             "AveDiskWrite,NTasks 2>/dev/null | head -5".format(shlex.quote(jid)),
             timeout=45,
         )
-        alloc = _sh(
-            s,
-            "squeue -h -j {} -o '%C|%m|%N'".format(shlex.quote(jid)), timeout=30
-        )
+        if coeurs_alloues is None or memoire_demandee is None:
+            alloc = _sh(
+                s,
+                "squeue -h -j {} -o '%C|%m|%N'".format(shlex.quote(jid)), timeout=30
+            )
+            champs = alloc.stdout.strip().split("|")
+            if len(champs) >= 2:
+                coeurs_alloues = _entier(champs[0])
+                memoire_demandee = champs[1].strip()
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))
-
-    coeurs_alloues = memoire_demandee = None
-    champs = alloc.stdout.strip().split("|")
-    if len(champs) >= 2:
-        coeurs_alloues = _entier(champs[0])
-        memoire_demandee = champs[1].strip()
 
     # Charge et attente d'entrees-sorties se lisent sur le noeud, pas dans la
     # comptabilite : `sstat` ne rapporte ni l'un ni l'autre.
@@ -771,6 +773,10 @@ def cluster_gpu_health_run(
 # =============================================================================
 # Empreinte energetique
 # =============================================================================
+#: Valeurs de `scontrol show config` deja lues par ce processus, horodatees.
+_ENERGY_CONFIG: dict = {}
+
+
 @outil(
     annotations=READ_ONLY,
     description=(
@@ -792,8 +798,12 @@ def job_energy_footprint(job_id: str, gpu_load_factor: float = 0.6,
     def read(command, **options):
         return _sh(session(), command, **options)
     try:
+        # La configuration Slurm est relue au plus une fois par heure, au lieu
+        # d'un `scontrol show config` a chaque appel. Un processus ne parle qu'a
+        # un cluster : sa session SSH est unique.
         return footprint(job_id, read, estimate=estimate_if_unavailable,
                          gpu_load_factor=gpu_load_factor, carbon_source=carbon_source,
-                         carbon_intensity=carbon_intensity_g_kwh, carbon_reference=carbon_reference)
+                         carbon_intensity=carbon_intensity_g_kwh, carbon_reference=carbon_reference,
+                         config_cache=_ENERGY_CONFIG)
     except (SSHError, SSHTimeout) as exc:
         return _error(str(exc))

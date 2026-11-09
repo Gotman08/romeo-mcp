@@ -20,7 +20,7 @@ Sonde l’état d’un calcul court jusqu’à un état terminal ou jusqu’à l
 |---|---|---|---|---|
 | `job_id` | `str` | Oui | — | Identifiant du job Slurm à consulter ou à modifier. |
 | `timeout_seconds` | `int` | Non | `120` | Durée maximale de l’appel, en secondes ; voir les limites de cet outil. |
-| `poll_seconds` | `int` | Non | `10` | Intervalle entre consultations d’état, en secondes. |
+| `poll_seconds` | `int` | Non | `30` | Premier intervalle entre consultations d’état, en secondes ; il s’allonge ensuite. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -31,8 +31,8 @@ Arguments JSON à transmettre à `wait_for_job` depuis votre client MCP :
 ```json
 {
   "job_id": "123456",
-  "timeout_seconds": 30,
-  "poll_seconds": 5
+  "timeout_seconds": 120,
+  "poll_seconds": 30
 }
 ```
 
@@ -46,13 +46,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 ## Prérequis et limites
 
-Le délai effectif est borné entre 10 et 600 secondes, et l’intervalle entre 5 et 60 secondes. Pour un calcul long, consulter job_status ultérieurement.
+Le délai effectif est borné entre 10 et 600 secondes. Le premier intervalle est borné entre 30 et 120 secondes, puis multiplié par 1,5 à chaque lecture jusqu’à 120 secondes ; une dernière lecture a lieu à l’échéance. Attendre dix minutes coûte ainsi huit lectures Slurm, contre 120 avec l’ancien intervalle minimal de 5 secondes. La première lecture peut reprendre une observation de `job_status` de moins de 20 secondes. Pour un calcul long, consulter job_status quelques minutes plus tard.
 
 ## Voir aussi
 
 [`job_status`](job_status.md) · [`job_log_tail`](job_log_tail.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L528) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L581) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

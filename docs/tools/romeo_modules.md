@@ -50,7 +50,7 @@ Cet outil liste les modules ; il ne les charge pas dans un environnement de calc
 
 [`romeo_software`](romeo_software.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_contexte.py#L208) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_contexte.py#L229) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

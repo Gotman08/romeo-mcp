@@ -23,6 +23,11 @@ from pathlib import Path
 PLAN_TTL_SECONDS = 24 * 60 * 60
 
 
+def _job_root(job_id: str) -> str:
+    """`12_3`, `12_[1-4]` et `12+1` designent tous le job `12`."""
+    return str(job_id).split(":", 1)[-1].split("_", 1)[0].split("+", 1)[0]
+
+
 def _event_key(payload: dict) -> str:
     """Keep state/proof changes, not a new event for every elapsed-time tick."""
     fields = ("state", "slurm_state", "result_validated", "resume_validated", "service_readiness_observed",
@@ -80,6 +85,10 @@ CREATE TABLE IF NOT EXISTS observation_events (
     payload TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS observation_events_job ON observation_events(job_id, event_id DESC);
+CREATE TABLE IF NOT EXISTS observation_invalidations (
+    job_root TEXT PRIMARY KEY,
+    invalidated_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS artifact_links (
     job_id TEXT NOT NULL, kind TEXT NOT NULL, artifact_id TEXT NOT NULL,
     created_at REAL NOT NULL, PRIMARY KEY(job_id,kind,artifact_id)
@@ -213,6 +222,24 @@ class Registry:
         with self._lock, self._conn:
             self._conn.execute("INSERT OR IGNORE INTO jobs SELECT ?,name,submitted_at,partition,arch,workdir,"
                 "stdout_glob,stderr_glob,script,last_state,note FROM jobs WHERE job_id=?", (identifier,parent_id))
+
+    def invalidate_observation(self, job_id: str) -> None:
+        """Une action sur le job (annulation, signal) rend ses observations caduques.
+
+        La cle est la racine du job : agir sur un tableau ou sur l'une de ses
+        taches invalide toutes les observations du tableau. Les observations
+        restent conservees pour le diagnostic ; seule leur reutilisation cesse.
+        """
+        with self._lock, self._conn:
+            self._conn.execute("INSERT OR REPLACE INTO observation_invalidations VALUES (?, ?)",
+                               (_job_root(job_id), time.time()))
+
+    def observation_invalidated(self, job_id: str, observed_at: float) -> bool:
+        """Vrai si une action sur le job est posterieure a cette observation."""
+        with self._lock:
+            row = self._conn.execute("SELECT invalidated_at FROM observation_invalidations WHERE job_root=?",
+                                     (_job_root(job_id),)).fetchone()
+        return row is not None and row[0] >= observed_at
 
     def observation(self, job_id: str, target: dict | None = None) -> dict | None:
         with self._lock:

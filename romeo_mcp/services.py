@@ -183,5 +183,8 @@ def connection_info(service_id: str, local_port: int) -> dict:
 def stop_service(service_id: str) -> dict:
     s, job_id, _ = _service(service_id)
     result = s.run('scancel {}'.format(job_id), timeout=20, max_chars=4000)
+    if result.ok:
+        # Un job_status ulterieur doit observer l'arret, pas l'etat d'avant.
+        registry().invalidate_observation(job_id)
     return {'ok': result.ok, 'service_id': service_id, 'job_id': job_id,
             'stop_requested': result.ok, 'next_step': 'Consulte service_status pour confirmer la fin.'}

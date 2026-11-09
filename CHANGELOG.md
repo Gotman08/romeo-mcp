@@ -5,11 +5,37 @@
 <details>
 <summary>Sommaire de cette page</summary>
 
+- [1.6.0](#160)
 - [1.5.0](#150)
 - [1.4.0](#140)
 - [1.3.0](#130)
 
 </details>
+
+## 1.6.0
+
+Cette version réduit les requêtes envoyées au contrôleur Slurm de ROMEO, partagé
+par tous ses utilisateurs. Le détail des règles figure dans
+[Ménager le contrôleur Slurm](docs/observability.md#ménager-le-contrôleur-slurm).
+
+### Moins de requêtes Slurm
+
+- `job_status` lit un job en attente avec un seul `squeue` : le démarrage estimé (`%S`) et les ressources demandées (`cpus`, `min_memory`) font partie du même relevé, au lieu d’un second `squeue --start` à chaque lecture.
+- `wait_for_job` sonde au plus toutes les 30 s, puis espace ses lectures (×1,5 jusqu’à 120 s) et lit une dernière fois à l’échéance. Attendre dix minutes coûte huit lectures, contre 120 auparavant au rythme minimal de 5 s.
+- `romeo_status` lit nœuds et partitions avec un seul `sinfo` et réutilise un relevé de moins de 30 s par défaut ; un relevé avec file personnelle sert aussi une demande sans file. `romeo_selfcheck` remplace ses trois `sinfo` par un seul.
+- `suggest_submission_slot` ne lit plus ni la file personnelle ni le fairshare, et réutilise pendant 60 s la vue du parc et la file PENDING de tout le cluster, sa requête la plus coûteuse. `queue_observation` indique ce qui venait du cache.
+- `job_system_health` reprend cœurs et mémoire du relevé de `job_status` au lieu d’un second `squeue`. `job_energy_footprint` relit `scontrol show config` au plus une fois par heure.
+
+### Observations réutilisées
+
+- `job_status` accepte `max_age_seconds` (20 s par défaut, jusqu’à 300, `0` pour relire). Une observation plus récente est rendue avec `cached=true`, son âge et `current_state_observed=false`. Le registre local étant partagé, plusieurs sessions MCP qui suivent le même job ne multiplient plus les lectures.
+- Un état définitif (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `OUT_OF_MEMORY`, `DEADLINE`) n’est plus relu. `PREEMPTED`, `NODE_FAIL` et `BOOT_FAIL` restent relus, car Slurm peut remettre le job en file. `job_efficiency` réutilise de même un relevé définitif dont la mémoire des étapes est connue ; `refresh=true` force la lecture.
+- `cancel_job`, `job_checkpoint_request` et `service_stop` invalident les observations du job et de tout son tableau : la lecture suivante interroge Slurm.
+- La suite hors ligne `slurm-economy` exécute les commandes exactes du serveur sous Bash et compte chaque appel Slurm émis.
+
+### RomeoLLMTool
+
+- Avant un lancement, un avertissement rappelle la petite taille du `/tmp` des nœuds.
 
 ## 1.5.0
 

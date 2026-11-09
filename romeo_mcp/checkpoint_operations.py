@@ -179,6 +179,9 @@ def request_checkpoint(job_id):
         response = _sh(connection, "scancel --batch --signal=USR1 " + job_id, timeout=20, max_chars=1000)
     except (SSHError, SSHTimeout) as exc:
         return {"ok": False, "job_id": job_id, "request_outcome": "unknown", "error": str(exc), "checkpoint_verified": False}
+    if response.ok:
+        # Le signal peut terminer le job : son prochain etat doit etre relu.
+        registry().invalidate_observation(job_id)
     return {"ok": response.ok and not response.truncated, "job_id": job_id, "signal_requested": response.ok,
             "checkpoint_verified": False, "application_acknowledged": False,
             "next_step": "Lire job_resume_status et attendre checkpoint_after_signal_verified=true avant d'arreter le calcul."}

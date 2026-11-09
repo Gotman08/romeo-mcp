@@ -75,4 +75,4 @@ PUE inventé. Voir le [guide](../energy.md).
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_efficiency`](job_efficiency.md)
 
-[Code de l’outil](../../romeo_mcp/outils_mesure.py#L784)
+[Code de l’outil](../../romeo_mcp/outils_mesure.py#L790)

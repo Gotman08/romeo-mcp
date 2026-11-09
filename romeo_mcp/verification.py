@@ -41,13 +41,17 @@ SEP = "|"
 #: qu'un aller-retour SSH par sujet verifie. Chaque ligne vaut
 #: `<categorie>|<champs...>`. Elle sort toujours en succes, car une rubrique
 #: indisponible est un constat a rapporter, pas une panne de transport.
+#: Un seul `sinfo` : chaque appel charge noeuds et partitions depuis le
+#: controleur. Ses lignes regroupent les noeuds identiques sur tous les champs
+#: demandes ; PART, NODES et ARCH en sont derivees, les effectifs etant sommes.
 SONDE = r"""
-sinfo -h -o 'PART|%P|%l' 2>/dev/null | sort -u
-sinfo -h -o '%P|%f|%D' 2>/dev/null | awk -F'|' '
-  { gsub(/\*$/, "", $1); split($2, f, ",");
-    for (i in f) n[$1 "|" f[i]] += $3 }
+releve=$(sinfo -h -o '%P|%l|%f|%D|%c|%m|%G' 2>/dev/null)
+printf '%s\n' "$releve" | awk -F'|' 'NF >= 7 { print "PART|" $1 "|" $2 }' | sort -u
+printf '%s\n' "$releve" | awk -F'|' '
+  NF >= 7 { p = $1; gsub(/\*$/, "", p); split($3, f, ",");
+    for (i in f) n[p "|" f[i]] += $4 }
   END { for (k in n) printf "NODES|%s|%d\n", k, n[k] }'
-sinfo -h -o '%f|%c|%m|%G' 2>/dev/null | sort -u | sed 's/^/ARCH|/'
+printf '%s\n' "$releve" | awk -F'|' 'NF >= 7 { print "ARCH|" $3 "|" $5 "|" $6 "|" $7 }' | sort -u
 sacctmgr -nP show assoc user="$(id -un)" format=Account,QOS,GrpTRES,MaxSubmit 2>/dev/null | sed 's/^/ASSOC|/'
 if command -v seff >/dev/null 2>&1; then printf 'TOOL|seff|present\n'; else printf 'TOOL|seff|absent\n'; fi
 exit 0

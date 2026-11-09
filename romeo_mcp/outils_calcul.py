@@ -27,7 +27,15 @@ from .cluster import (
 )
 from .guard import GuardError, check_path
 from .registry import registry
-from .job_observation import parse_status, status_command
+from .job_observation import (
+    LIVE_REUSE_SECONDS,
+    MAX_REUSE_SECONDS,
+    parse_status,
+    reusable,
+    stable_final,
+    status_command,
+)
+from .observability import ReadCache
 from .remote_logs import READ_LOGS
 from .remote_paths import roots_for
 from .sortie import decouper, marqueur, nouveau_jeton
@@ -195,15 +203,33 @@ def job_prepare(
     annotations=READ_ONLY,
     description=(
         "Etat d'un job : file d'attente puis historique si le job est termine. "
-        "Inclut le demarrage estime pour un job en attente."
+        "Inclut le demarrage estime pour un job en attente. Pour menager le "
+        "controleur Slurm, une observation de moins de max_age_seconds (20 s par "
+        "defaut) est reutilisee et un etat definitif (COMPLETED, FAILED, CANCELLED, "
+        "TIMEOUT, OUT_OF_MEMORY) n'est plus relu ; max_age_seconds=0 force la "
+        "lecture. Un job en attente se consulte toutes les quelques minutes."
     ),
 )
-def job_status(job_id: str) -> dict[str, Any]:
+def job_status(job_id: str, max_age_seconds: int = LIVE_REUSE_SECONDS) -> dict[str, Any]:
     """Read live state, persist its evidence, retain it on subsequent SSH failure."""
     s = session()
     jid = str(job_id).strip()
+    if not 0 <= max_age_seconds <= MAX_REUSE_SECONDS:
+        return _error("max_age_seconds doit etre compris entre 0 et {} ; 0 force une "
+                      "lecture Slurm.".format(MAX_REUSE_SECONDS), job_id=jid)
     command = status_command(jid)
     target = {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}
+    store = registry()
+    previous = store.observation(jid, target)
+    if (previous is not None and reusable(previous, max_age_seconds)
+            and not store.observation_invalidated(jid, previous["observed_at"])):
+        reused = dict(previous["result"])
+        reused["observation"] = {
+            "observed_at": previous["observed_at"], "target": target, "source": "slurm",
+            "cached": True, "age_seconds": round(previous["age_seconds"], 1),
+            "current_state_observed": False,
+        }
+        return reused
     try:
         result = _sh(s, command, timeout=40, max_chars=10_000, read_only=True)
         if not result.ok or result.truncated:
@@ -380,13 +406,28 @@ def _read_job_logs(job_id, stream, lines, pattern, max_chars, max_files, max_byt
     description=(
         "Efficacite reelle d'un job termine : CPU, memoire, GPU alloues, plus "
         "des recommandations de redimensionnement. Remplace `seff`, absent de "
-        "ROMEO. A lire systematiquement apres un job pour calibrer le suivant."
+        "ROMEO. A lire systematiquement apres un job pour calibrer le suivant. "
+        "Le releve d'un job dans un etat definitif est reutilise sans relire sacct ; "
+        "refresh=true force la lecture."
     ),
 )
-def job_efficiency(job_id: str) -> dict[str, Any]:
+def job_efficiency(job_id: str, refresh: bool = False) -> dict[str, Any]:
     """Recalcule les metriques de seff depuis sacct."""
     s = session()
     jid = str(job_id).strip()
+    target = {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}
+    store = registry()
+    previous = None if refresh else store.observation("efficiency:" + jid, target)
+    # Un releve definitif ne change plus. La memoire des etapes doit y figurer :
+    # juste apres la fin d'un job, la comptabilite des etapes peut encore manquer.
+    if (previous is not None and stable_final({**previous["result"], "finished": True})
+            and previous["result"].get("ok") is True and previous["result"].get("max_rss_mb") is not None
+            and not store.observation_invalidated(jid, previous["observed_at"])):
+        reused = dict(previous["result"])
+        reused["observation"] = {"observed_at": previous["observed_at"], "source": "sacct", "cached": True,
+                                 "age_seconds": round(previous["age_seconds"], 1),
+                                 "current_state_observed": False}
+        return reused
     command = (
         "sacct -j {} -P -o "
         "JobID,JobName,Partition,State,ExitCode,Elapsed,TotalCPU,AllocCPUS,"
@@ -408,8 +449,7 @@ def job_efficiency(job_id: str) -> dict[str, Any]:
             job_id=jid,
         )
     summary["ok"] = True
-    target = {"host": s.host, "user": s.user, "account": DEFAULT_ACCOUNT}
-    registry().save_observation("efficiency:" + jid, target, summary)
+    store.save_observation("efficiency:" + jid, target, summary)
     return summary
 
 
@@ -450,6 +490,8 @@ def cancel_job(job_id: str) -> dict[str, Any]:
     if not result.ok:
         return _error("scancel a echoue : {}".format(result.stdout.strip()))
     registry().set_state(jid, "CANCEL_REQUESTED")
+    # Le prochain job_status doit observer l'arret, pas reprendre l'etat d'avant.
+    registry().invalidate_observation(jid)
     return {"ok": True, "job_id": jid, "cancel_requested": True,
             "cancellation_observed": False, "next_step": "Consulte job_status pour confirmer l'arret."}
 
@@ -518,29 +560,46 @@ def list_jobs(limit: int = 15) -> dict[str, Any]:
         ),
     }
 
+#: Bornes de l'intervalle entre deux lectures de `wait_for_job`. Chaque lecture
+#: est une requete au controleur Slurm, partage par tout ROMEO : on n'y revient
+#: pas plus d'une fois toutes les 30 s, et l'intervalle s'allonge ensuite.
+MIN_POLL_SECONDS = 30
+MAX_POLL_SECONDS = 120
+POLL_BACKOFF = 1.5
+
+
 @outil(
     annotations=READ_ONLY,
     description=(
-        "Attend qu'un job se termine, avec un plafond strict (600 s). Utilise-le "
-        "seulement pour un job court : sinon reviens interroger job_status."
+        "Attend qu'un job se termine, avec un plafond strict (600 s). Lit Slurm "
+        "au plus toutes les 30 s, puis de plus en plus rarement (x1,5 a chaque "
+        "lecture, jusqu'a 120 s) pour menager le controleur. Utilise-le seulement "
+        "pour un job court : sinon reviens interroger job_status quelques minutes "
+        "plus tard."
     ),
 )
-def wait_for_job(job_id: str, timeout_seconds: int = 120, poll_seconds: int = 10) -> dict[str, Any]:
-    """Sondage borne. Ne sequestre jamais le modele plus de MAX_WAIT_SECONDS."""
+def wait_for_job(job_id: str, timeout_seconds: int = 120, poll_seconds: int = MIN_POLL_SECONDS) -> dict[str, Any]:
+    """Sondage borne et espace. Ne sequestre jamais le modele plus de MAX_WAIT_SECONDS."""
     jid = str(job_id).strip()
     budget = max(10, min(int(timeout_seconds), MAX_WAIT_SECONDS))
-    interval = max(5, min(int(poll_seconds), 60))
-    deadline = time.monotonic() + budget
+    interval = float(max(MIN_POLL_SECONDS, min(int(poll_seconds), MAX_POLL_SECONDS)))
+    started = time.monotonic()
+    deadline = started + budget
 
-    last: dict = {}
-    while time.monotonic() < deadline:
+    while True:
+        # La premiere lecture peut reprendre une observation de moins de 20 s.
         last = job_status(jid)
         if not last.get("ok"):
             return last
         if last.get("finished"):
-            last["waited_seconds"] = round(budget - (deadline - time.monotonic()), 1)
+            last["waited_seconds"] = round(time.monotonic() - started, 1)
             return last
-        time.sleep(min(interval, max(1, deadline - time.monotonic())))
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        # Une derniere lecture a l'echeance plutot qu'une attente perdue.
+        time.sleep(min(interval, remaining))
+        interval = min(MAX_POLL_SECONDS, interval * POLL_BACKOFF)
 
     last["ok"] = True
     last["timed_out"] = True
@@ -860,6 +919,12 @@ def romeo_fairshare_forecast(
         "lecture": lecture,
     }
 
+
+#: Fraicheur suffisante pour orienter le choix d'une partition.
+SLOT_MAX_AGE_SECONDS = 60
+#: Profondeur de la file PENDING par partition, par cible SSH.
+_PENDING_CACHE = ReadCache(capacity=4)
+
 @outil(
     annotations=READ_ONLY,
     description=(
@@ -878,31 +943,42 @@ def suggest_submission_slot(
     if nodes < 1:
         return _error("nodes doit etre au moins egal a 1.")
     s = session()
-    etat = romeo_status(include_queue=True)
+    # Seul l'inventaire des noeuds sert ici : ni la file personnelle ni la part
+    # d'ordonnancement. Une vue de moins d'une minute suffit a orienter un choix.
+    etat = romeo_status(include_queue=False, max_age_seconds=SLOT_MAX_AGE_SECONDS)
     if not etat.get("ok"):
         return etat
 
-    try:
-        attente = _sh(
-            s, "squeue -h -t PENDING -o '%P|%D' 2>/dev/null", timeout=40,
-            max_chars=40_000,
-        )
-    except (SSHError, SSHTimeout) as exc:
-        return _error(str(exc))
+    # La file PENDING de tout le cluster est la lecture la plus couteuse pour le
+    # controleur : elle est partagee une minute entre les appels.
+    cle = (s.host, s.user)
+    memorise = _PENDING_CACHE.get(cle, SLOT_MAX_AGE_SECONDS)
+    if memorise is not None:
+        file_par_partition, age_file = memorise
+    else:
+        try:
+            attente = _sh(
+                s, "squeue -h -t PENDING -o '%P|%D' 2>/dev/null", timeout=40,
+                max_chars=40_000,
+            )
+        except (SSHError, SSHTimeout) as exc:
+            return _error(str(exc))
 
-    if not attente.ok or attente.truncated:
-        return _error("File PENDING incomplete ou indisponible ; recommandation impossible.",
-                      truncated=attente.truncated)
-    file_par_partition: dict[str, int] = {}
-    for ligne in attente.stdout.splitlines():
-        if not ligne.strip():
-            continue
-        morceaux = ligne.split("|")
-        if len(morceaux) != 2 or not morceaux[0].strip() or not morceaux[1].strip().isdigit():
-            return _error("Releve PENDING mal forme ; recommandation impossible.")
-        if morceaux and morceaux[0].strip():
-            nom = morceaux[0].strip().rstrip("*")
-            file_par_partition[nom] = file_par_partition.get(nom, 0) + 1
+        if not attente.ok or attente.truncated:
+            return _error("File PENDING incomplete ou indisponible ; recommandation impossible.",
+                          truncated=attente.truncated)
+        file_par_partition = {}
+        for ligne in attente.stdout.splitlines():
+            if not ligne.strip():
+                continue
+            morceaux = ligne.split("|")
+            if len(morceaux) != 2 or not morceaux[0].strip() or not morceaux[1].strip().isdigit():
+                return _error("Releve PENDING mal forme ; recommandation impossible.")
+            if morceaux and morceaux[0].strip():
+                nom = morceaux[0].strip().rstrip("*")
+                file_par_partition[nom] = file_par_partition.get(nom, 0) + 1
+        _PENDING_CACHE.put(cle, file_par_partition)
+        age_file = 0.0
 
     arch = "armgpu" if gpus_per_node > 0 else "x64cpu"
     inventaire = (etat.get("nodes") or {}).get(arch, {})
@@ -989,6 +1065,8 @@ def suggest_submission_slot(
         "options": options,
         "recommandation": recommandee["partition"] if recommandee else None,
         "conseils": conseils,
+        "queue_observation": {"cached": memorise is not None, "age_seconds": round(age_file, 1),
+                              "cluster_cached": bool((etat.get("observation") or {}).get("cached"))},
     }
 
 # =============================================================================

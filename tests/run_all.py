@@ -55,6 +55,8 @@ SUITES = [
      "services, configurations typees, fichiers atomiques et releves immuables", False),
     ("observability", "tests/test_observable_operations.py",
      "fraicheur, coupures SSH, operations persistantes, transferts et annulation", False),
+    ("slurm-economy", "tests/test_slurm_economy.py",
+     "requetes Slurm comptees, regroupees, reutilisees et sondages espaces", False),
     ("concurrency", "tests/test_concurrency.py",
      "reservations interprocessus, collisions, publication privee et recuperation apres arret", False),
     ("context-concurrency", "tests/test_context_concurrency.py",

@@ -124,6 +124,7 @@ class ContextObservations(unittest.TestCase):
         self.enterContext(patch.object(context, 'session', return_value=self.connection))
         self.enterContext(patch.object(jobs, 'session', return_value=self.connection))
         self.enterContext(patch.object(context, '_STATUS_CACHE', ReadCache()))
+        self.enterContext(patch.object(jobs, '_PENDING_CACHE', ReadCache()))
 
     def test_failed_or_truncated_modules_are_not_a_catalog(self):
         for rc, truncated in ((42, False), (0, True)):

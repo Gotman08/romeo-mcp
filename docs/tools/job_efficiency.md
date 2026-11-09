@@ -19,6 +19,7 @@ Recalcule depuis sacct les indicateurs CPU et mémoire d’un job terminé, ains
 | Paramètre | Type | Obligatoire | Défaut | Explication |
 |---|---|---|---|---|
 | `job_id` | `str` | Oui | — | Identifiant du job Slurm à consulter ou à modifier. |
+| `refresh` | `bool` | Non | `false` | Relire sacct même si un relevé définitif est déjà enregistré. |
 
 Les paramètres facultatifs peuvent être omis. `null` n’est accepté que pour les types indiquant `None`.
 
@@ -44,11 +45,13 @@ Vérifier `ok` dans la réponse ; en cas d’échec, lire `error` avant de pours
 
 Les données dépendent de la comptabilité Slurm. Le nombre de GPU alloués ne mesure pas leur occupation ; pour un job actif, utiliser job_live_metrics.
 
+Le relevé d’un job dans un état définitif (`COMPLETED`, `FAILED`, `CANCELLED`, `TIMEOUT`, `OUT_OF_MEMORY`, `DEADLINE`) dont la mémoire des étapes est connue ne change plus : il est rendu depuis le registre avec `observation.cached=true`, sans requête sacct. Un job encore actif, ou dont les étapes ne sont pas encore comptabilisées, est toujours relu.
+
 ## Voir aussi
 
 [`job_live_metrics`](job_live_metrics.md) · [`job_system_health`](job_system_health.md) · [`job_prepare`](job_prepare.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L386) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L414) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 

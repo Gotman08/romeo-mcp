@@ -59,7 +59,7 @@ Les chemins suivent le même confinement physique que `read_remote_file`. Le mot
 
 [`job_log_tail`](job_log_tail.md) · [`diagnose_job`](diagnose_job.md)
 
-[Code de l’outil](../../romeo_mcp/outils_calcul.py#L263) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
+[Code de l’outil](../../romeo_mcp/outils_calcul.py#L289) · [Configuration](../configuration.md) · [Retour au catalogue Tools](../Tools.md)
 
 ---
 
